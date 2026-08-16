@@ -1,0 +1,3 @@
+@echo off
+echo Starting MeshDrop Android Emulator (clean network, Google DNS)...
+start "" "D:\sdk\emulator\emulator.exe" -avd lynko_test -dns-server 8.8.8.8,1.1.1.1 -no-snapshot-load

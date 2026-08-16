@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Dev CSP: ws://localhost:* is required by Vite HMR; script-src 'unsafe-inline'
+         is required by the React Fast Refresh preamble. The production build
+         replaces this meta tag with a strict CSP (see vite.config.ts). -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' data: blob: ws://localhost:*; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none';"
+    />
+    <title>MeshDrop</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

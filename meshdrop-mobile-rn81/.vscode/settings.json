@@ -1,0 +1,13 @@
+{
+  "gradle.nestedProjects": true,
+  "java.import.gradle.wrapper.enabled": true,
+  "java.import.gradle.version": "8.14.3",
+  "java.jdt.ls.java.home": "C:\\Program Files\\Android\\Android Studio\\jbr",
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-21",
+      "path": "C:\\Program Files\\Android\\Android Studio\\jbr",
+      "default": true
+    }
+  ]
+}

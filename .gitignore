@@ -1,0 +1,68 @@
+# Build & output directories
+out/
+dist/
+renderer/dist/
+data/
+Output/
+scratch/
+
+# Electron-builder resources: generated artifacts are ignored, but the
+# icons/manifests packaging needs stay committed. build/dev.pfx is a local
+# signing certificate and must never be published.
+build/*
+!build/icon
+!build/icon/**
+!build/icon.png
+!build/icon.ico
+!build/icon.icns
+!build/entitlements.mac.plist
+!build/entrypoint.sh
+!build/metainfo.xml
+!build/snapcraft.yaml
+!build/AppxManifest.xml
+
+# Local multi-instance testing profile
+.p2p-test-profile/
+.portable-inspect/
+
+# Node dependencies
+node_modules/
+
+# Environment & secret files
+.env
+.env.local
+.env.*.local
+
+# Update-signing key material (private half never leaves this machine).
+# Regenerate with: node scripts/update-keygen.js
+keys/
+
+# OS system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor & IDE settings
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs & temp files
+*.log
+npm-debug.log*
+
+# Agent tooling (not part of the shipped product)
+AGENTS.md
+.agents/
+.opencode/
+skills-lock.json
+
+# Internal markdown docs; public-facing docs stay committed
+*.md
+!README.md
+!CONTRIBUTING.md
+!TRADEMARK_POLICY.md
+!web/README.md
+
+# Graphify Knowledge Graph
+graphify-out/

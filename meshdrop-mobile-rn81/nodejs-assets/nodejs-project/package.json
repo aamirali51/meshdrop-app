@@ -1,0 +1,16 @@
+{
+  "name": "meshdrop-mobile-node",
+  "version": "1.0.0-beta.4",
+  "description": "MeshDrop P2P engine running in the embedded Node thread",
+  "main": "main.js",
+  "license": "MIT",
+  "dependencies": {
+    "@mesh/core": "file:../../../core",
+    "compact-encoding": "^3.0.0",
+    "corestore": "^7.9.1",
+    "hyperbee": "^2.27.3",
+    "hypercore-crypto": "^3.3.0",
+    "hyperswarm": "^4.17.0",
+    "protomux": "^3.11.0"
+  }
+}

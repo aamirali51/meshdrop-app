@@ -1,0 +1,4 @@
+# Cloudflare Pages SPA fallback — serves index.html for /d/CODE paths so the
+# claim page can read the code from the URL. GitHub Pages ignores this file
+# (it uses 404.html instead), which is fine — both hosts work out of the box.
+/* /index.html 200

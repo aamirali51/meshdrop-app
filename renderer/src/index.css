@@ -1,0 +1,322 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* MeshDrop — OLED Dark Tech Slate (light fallback) */
+    --background: 248 250 252;
+    --foreground: 15 23 42;
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
+    --primary: 99 102 241;
+    --primary-foreground: 255 255 255;
+    --secondary: 226 232 240;
+    --secondary-foreground: 15 23 42;
+    --muted: 226 232 240;
+    --muted-foreground: 100 116 139;
+    --accent: 226 232 240;
+    --accent-foreground: 15 23 42;
+    --destructive: 220 38 38;
+    --destructive-foreground: 255 255 255;
+    --border: 226 232 240;
+    --input: 226 232 240;
+    --ring: 99 102 241;
+    --radius: 0.5rem;
+
+    /* Theme-aware hairline: dark strokes on light surfaces */
+    --hairline: 15 23 42;
+    /* Cyber cyan — darker in light mode for readable accents/text */
+    --meshdrop-cyan: 8 145 178;
+    /* Glassmorphic surfaces — light glass */
+    --glass-bg: rgba(255, 255, 255, 0.72);
+    --glass-border: rgba(15, 23, 42, 0.12);
+
+    --chart-1: 99 102 241;
+    --chart-2: 6 182 212;
+    --chart-3: 71 85 105;
+    --chart-4: 148 163 184;
+    --chart-5: 52 211 153;
+
+    --sidebar: 241 245 249;
+    --sidebar-foreground: 15 23 42;
+    --sidebar-muted: 226 232 240;
+    --sidebar-border: 226 232 240;
+
+    --status-online: 8 145 178;
+    --status-away: 180 83 9;
+    --status-busy: 220 38 38;
+    --status-offline: 100 116 139;
+
+    --success: 52 211 153;
+    --warning: 245 158 11;
+    --danger: 248 113 113;
+  }
+
+  .dark {
+    /* MeshDrop — OLED Dark Tech Slate
+     * Deep Slate Base #0B0F17 · Surfaces #111827 / #1E293B
+     * Electric Indigo #6366F1 · Cyber Cyan #06B6D4
+     * Text #F8FAFC / #94A3B8 · Hairlines rgba(255,255,255,0.08) */
+    --background: 11 15 23;
+    --foreground: 248 250 252;
+    --card: 17 24 39;
+    --card-foreground: 248 250 252;
+    --popover: 17 24 39;
+    --popover-foreground: 248 250 252;
+    --primary: 99 102 241;
+    --primary-foreground: 248 250 252;
+    --secondary: 30 41 59;
+    --secondary-foreground: 248 250 252;
+    --muted: 30 41 59;
+    --muted-foreground: 148 163 184;
+    --accent: 30 41 59;
+    --accent-foreground: 248 250 252;
+    --destructive: 248 113 113;
+    --destructive-foreground: 255 255 255;
+    --border: 30 41 59;
+    --input: 30 41 59;
+    --ring: 99 102 241;
+    --radius: 0.5rem;
+
+    /* Theme-aware hairline: white hairlines on dark surfaces */
+    --hairline: 255 255 255;
+    /* Cyber cyan — brand color in dark mode */
+    --meshdrop-cyan: 6 182 212;
+    /* Glassmorphic surfaces — dark glass */
+    --glass-bg: rgba(17, 24, 39, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.08);
+
+    --chart-1: 99 102 241;
+    --chart-2: 6 182 212;
+    --chart-3: 30 41 59;
+    --chart-4: 148 163 184;
+    --chart-5: 52 211 153;
+
+    --sidebar: 11 15 23;
+    --sidebar-foreground: 248 250 252;
+    --sidebar-muted: 30 41 59;
+    --sidebar-border: 30 41 59;
+
+    --status-online: 6 182 212;
+    --status-away: 245 158 11;
+    --status-busy: 248 113 113;
+    --status-offline: 71 85 105;
+
+    --success: 52 211 153;
+    --warning: 245 158 11;
+    --danger: 248 113 113;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    outline-color: rgb(var(--ring) / 0.5);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    overflow: hidden;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    @apply text-primary;
+    background: rgb(var(--primary) / 0.25);
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full transition-colors;
+    /* Pure neutral gray — no hue cast (avoids green/yellow fringing perception) */
+    background: rgb(128 128 140 / 0.35);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(128 128 140 / 0.55);
+  }
+}
+
+@layer utilities {
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  /* MeshDrop glassmorphic surfaces — theme-aware (light glass / dark glass) */
+  .glass-surface {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-card-interactive {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .glass-card-interactive:hover {
+    border-color: rgb(99 102 241 / 0.45);
+    box-shadow: 0 8px 24px -12px rgb(0 0 0 / 0.25);
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 24px -4px rgba(99, 102, 241, 0.45);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 24px -4px rgba(6, 182, 212, 0.45);
+  }
+
+  .glow-success {
+    box-shadow: 0 0 20px -4px rgba(52, 211, 153, 0.45);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .gradient-brand {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+  }
+
+  .gradient-border {
+    position: relative;
+    border-radius: inherit;
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(6, 182, 212, 0.5));
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-up {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-up {
+  animation: scale-up 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/*
+ * Modal entrance animation. Unlike the generic scale-up, this preserves the
+ * -translate-x-1/2 -translate-y-1/2 centering transform Tailwind applies to
+ * Dialog.Content. Without it, the animation's `transform: scale(...)` would
+ * overwrite the translate after finishing, dropping the modal into the
+ * bottom-right quadrant of the viewport.
+ */
+@keyframes modal-scale-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.animate-modal-scale-up {
+  animation: modal-scale-up 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

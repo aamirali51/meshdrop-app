@@ -1,0 +1,158 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# GITHUB_TOKEN needs write access to create/update the GitHub Release.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    env:
+      # electron-builder publish config reads these (electron-builder.yml).
+      # Update FEEDS must always point at the PUBLIC meshdrop-releases repo —
+      # the app source repo is private, and anonymous updater fetches only work
+      # against public releases. (Publishing the artifacts there requires a
+      # RELEASES token with write access to aamirali51/meshdrop-releases.)
+      GH_UPDATE_OWNER: aamirali51
+      GH_UPDATE_REPO: meshdrop-releases
+      # Portable update signing key (ed25519 private half). Empty when the
+      # secret isn't configured; the signing step skips in that case.
+      MESHDROP_UPDATE_KEY: ${{ secrets.MESHDROP_UPDATE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & publish
+        run: npm run build:release
+        env:
+          # Default token can create releases + upload artifacts in this repo.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No codesigning certs in CI: don't attempt autodiscovery (macOS).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      # Portable builds refuse unsigned updates (ed25519, fail-closed). Sign
+      # the portable artifacts and attach the .sig files to the release. The
+      # private key must match the public key embedded in
+      # electron/updater-util.js. NSIS-installed updates (electron-updater)
+      # don't need signatures.
+      - name: Sign portable artifacts & publish release
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -e
+          shopt -s nullglob
+          if [ -n "$MESHDROP_UPDATE_KEY" ]; then
+            for f in dist/*portable.exe dist/*.zip; do
+              node scripts/sign-update.js "$f"
+            done
+            sigs=(dist/*.sig)
+            if [ ${#sigs[@]} -gt 0 ]; then
+              gh release upload "$TAG" "${sigs[@]}" --clobber
+            fi
+          fi
+          gh release edit "$TAG" --draft=false || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+
+      - name: Warn when portable signing key is missing
+        if: runner.os == 'Windows' && env.MESHDROP_UPDATE_KEY == ''
+        shell: bash
+        run: echo "::warning::MESHDROP_UPDATE_KEY secret not set — portable self-updates will be unsigned (refused). NSIS installer updates still work."
+
+  # Build & publish the store-free Android APK + latest.json manifest that the
+  # in-app updater checks. Deliberately depends on the desktop `release` job so
+  # the GitHub Release already exists before we upload the APK to it. Android
+  # artifacts are only relevant on version tags.
+  android:
+    name: Build & publish Android APK
+    runs-on: ubuntu-latest
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    env:
+      # ed25519 signing key for release provenance (.sig); optional.
+      MESHDROP_UPDATE_KEY: ${{ secrets.MESHDROP_UPDATE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install mobile dependencies
+        working-directory: meshdrop-mobile-rn81
+        run: npm ci
+
+      - name: Build engine bundle
+        working-directory: meshdrop-mobile-rn81
+        # bare-pack ships the android-arm64 engine prebuilds into APK assets.
+        run: npm run build:engine
+
+      - name: Assemble release APK
+        working-directory: meshdrop-mobile-rn81/android
+        # arm64-v8a only: matches the engine prebuilds and keeps CI tractable.
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+
+      - name: Generate latest.json manifest
+        working-directory: meshdrop-mobile-rn81
+        run: node scripts/make-latest-json.js
+
+      - name: Attach APK, signature & manifest to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          APK=meshdrop-mobile-rn81/android/app/build/outputs/apk/release/app-release.apk
+          VER=$(grep -oP '(?<=^versionName=).*' meshdrop-mobile-rn81/version.properties)
+          NAME="MeshDrop-${VER}.apk"
+          cp "$APK" "$NAME"
+          if [ -n "$MESHDROP_UPDATE_KEY" ]; then
+            node scripts/sign-update.js "$NAME"
+            gh release upload "$TAG" "$NAME" "$NAME.sig" \
+              meshdrop-mobile-rn81/latest.json --clobber
+          else
+            gh release upload "$TAG" "$NAME" meshdrop-mobile-rn81/latest.json --clobber
+          fi
+
+      - name: Warn when mobile signing key is missing
+        if: env.MESHDROP_UPDATE_KEY == ''
+        shell: bash
+        run: echo "::warning::MESHDROP_UPDATE_KEY secret not set — Android APK published without an ed25519 .sig provenance file. In-app integrity still enforced via manifest sha256 + Android's signature match."

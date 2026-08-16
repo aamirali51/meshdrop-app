@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider paths so the in-app updater can share a downloaded APK with
+     the Android system installer. The APK is written to the public Downloads
+     directory (RNFS.DownloadDirectoryPath), which maps to the <external-path>
+     below; <cache-path> covers the app cache as a fallback. -->
+<paths>
+    <cache-path name="cache" path="." />
+    <external-path name="downloads" path="Download/" />
+    <external-files-path name="ext_files" path="." />
+</paths>

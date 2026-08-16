@@ -1,0 +1,16 @@
+{
+  "imports": {
+    "assert": "bare-assert",
+    "path": "bare-path",
+    "fs": "bare-fs",
+    "fs/promises": "bare-fs/promises",
+    "os": "bare-os",
+    "events": "bare-events",
+    "url": "bare-url",
+    "stream": "stream-browserify",
+    "buffer": "bare-buffer",
+    "crypto": "crypto-browserify",
+    "dgram": "bare-dgram",
+    "net": "bare-tcp"
+  }
+}

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.p2p.app</id>
+
+  <name>P2P Platform</name>
+  <summary>Decentralized peer-to-peer application platform</summary>
+
+  <metadata_license>GPL-3.0</metadata_license>
+  <project_license>GPL-3.0</project_license>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release date="2026-07-30" version="1.0.0"/>
+  </releases>
+
+  <recommends>
+    <display_length compare="ge">600</display_length>
+  </recommends>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+
+  <description>
+    <p>Decentralized peer-to-peer networking platform built with Electron and Pear Runtime.</p>
+  </description>
+
+  <launchable type="desktop-id">com.p2p.app.desktop</launchable>
+</component>
