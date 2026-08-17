@@ -133,10 +133,39 @@ jobs:
         # bare-pack ships the android-arm64 engine prebuilds into APK assets.
         run: npm run build:engine
 
+      - name: Configure release signing (keystore from secrets)
+        working-directory: meshdrop-mobile-rn81/android/app
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.MESHDROP_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MESHDROP_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > meshdrop-release.keystore
+            printf 'storeFile=meshdrop-release.keystore\nstorePassword=%s\nkeyAlias=meshdrop\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > keystore.properties
+            echo "::notice::Release signing configured from secrets"
+          else
+            echo "::warning::MESHDROP_KEYSTORE_B64 / MESHDROP_KEYSTORE_PASSWORD not set — APK will be signed with the CI debug key"
+          fi
+
       - name: Assemble release APK
         working-directory: meshdrop-mobile-rn81/android
         # arm64-v8a only: matches the engine prebuilds and keeps CI tractable.
         run: chmod +x gradlew && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+
+      - name: Verify release APK is signed with the MeshDrop release key
+        working-directory: meshdrop-mobile-rn81/android
+        shell: bash
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          if "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" 2>/dev/null \
+             | grep -q "CN=MeshDrop Mobile"; then
+            echo "APK signed with the MeshDrop release key"
+          else
+            echo "::error::APK is NOT signed with the MeshDrop release key — check MESHDROP_KEYSTORE_B64 / MESHDROP_KEYSTORE_PASSWORD"
+            exit 1
+          fi
 
       - name: Attach APK, signature & manifest to release
         shell: bash
