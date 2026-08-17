@@ -36,10 +36,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Checkout meshdrop-core (sibling)
-        uses: actions/checkout@v4
-        with:
-          repository: aamirali51/meshdrop-core
-          path: ../meshdrop-core
+        run: git clone --depth 1 https://github.com/aamirali51/meshdrop-core.git ../meshdrop-core
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -106,10 +103,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Checkout meshdrop-core (sibling)
-        uses: actions/checkout@v4
-        with:
-          repository: aamirali51/meshdrop-core
-          path: ../meshdrop-core
+        run: git clone --depth 1 https://github.com/aamirali51/meshdrop-core.git ../meshdrop-core
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
