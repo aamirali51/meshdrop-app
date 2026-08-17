@@ -120,6 +120,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install engine dependencies
+        working-directory: ../meshdrop-core
+        run: npm ci
+
       - name: Install mobile dependencies
         working-directory: meshdrop-mobile-rn81
         run: npm ci
