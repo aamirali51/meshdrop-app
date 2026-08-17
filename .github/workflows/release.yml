@@ -71,10 +71,10 @@ jobs:
             done
             sigs=(dist/*.sig)
             if [ ${#sigs[@]} -gt 0 ]; then
-              gh release upload "$TAG" "${sigs[@]}" --clobber
+              gh release upload "$TAG" "${sigs[@]}" --clobber --repo aamirali51/meshdrop-releases
             fi
           fi
-          gh release edit "$TAG" --draft=false || true
+          gh release edit "$TAG" --draft=false --repo aamirali51/meshdrop-releases || true
         env:
           GH_TOKEN: ${{ secrets.RELEASES_PAT }}
           TAG: ${{ github.ref_name }}
@@ -156,9 +156,11 @@ jobs:
           if [ -n "$MESHDROP_UPDATE_KEY" ]; then
             node scripts/sign-update.js "$NAME"
             gh release upload "$TAG" "$NAME" "$NAME.sig" \
-              meshdrop-mobile-rn81/latest.json --clobber
+              meshdrop-mobile-rn81/latest.json --clobber \
+              --repo aamirali51/meshdrop-releases
           else
-            gh release upload "$TAG" "$NAME" meshdrop-mobile-rn81/latest.json --clobber
+            gh release upload "$TAG" "$NAME" meshdrop-mobile-rn81/latest.json --clobber \
+              --repo aamirali51/meshdrop-releases
           fi
 
       - name: Warn when mobile signing key is missing
