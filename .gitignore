@@ -66,3 +66,7 @@ skills-lock.json
 
 # Graphify Knowledge Graph
 graphify-out/
+
+# Release artifacts — generated locally, published to meshdrop-releases
+meshdrop-mobile-rn81/MeshDrop-*.apk
+meshdrop-mobile-rn81/latest.json
