@@ -136,7 +136,7 @@ jobs:
       - name: Assemble release APK
         working-directory: meshdrop-mobile-rn81/android
         # arm64-v8a only: matches the engine prebuilds and keeps CI tractable.
-        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+        run: chmod +x gradlew && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
 
       - name: Generate latest.json manifest
         working-directory: meshdrop-mobile-rn81
