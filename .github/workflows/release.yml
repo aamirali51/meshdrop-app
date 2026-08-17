@@ -138,10 +138,6 @@ jobs:
         # arm64-v8a only: matches the engine prebuilds and keeps CI tractable.
         run: chmod +x gradlew && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
 
-      - name: Generate latest.json manifest
-        working-directory: meshdrop-mobile-rn81
-        run: node scripts/make-latest-json.js
-
       - name: Attach APK, signature & manifest to release
         shell: bash
         env:
@@ -152,7 +148,10 @@ jobs:
           APK=meshdrop-mobile-rn81/android/app/build/outputs/apk/release/app-release.apk
           VER=$(grep -oP '(?<=^versionName=).*' meshdrop-mobile-rn81/version.properties)
           NAME="MeshDrop-${VER}.apk"
+          # Generate the manifest against the renamed asset so its download URL
+          # matches the file that actually lands on the release.
           cp "$APK" "$NAME"
+          node meshdrop-mobile-rn81/scripts/make-latest-json.js "$NAME" meshdrop-mobile-rn81/latest.json
           if [ -n "$MESHDROP_UPDATE_KEY" ]; then
             node scripts/sign-update.js "$NAME"
             gh release upload "$TAG" "$NAME" "$NAME.sig" \
