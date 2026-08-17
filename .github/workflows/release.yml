@@ -47,8 +47,7 @@ jobs:
       - name: Build & publish
         run: npm run build:release
         env:
-          # Default token can create releases + upload artifacts in this repo.
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
           # No codesigning certs in CI: don't attempt autodiscovery (macOS).
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
@@ -74,7 +73,7 @@ jobs:
           fi
           gh release edit "$TAG" --draft=false || true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
           TAG: ${{ github.ref_name }}
 
       - name: Warn when portable signing key is missing
@@ -136,7 +135,7 @@ jobs:
       - name: Attach APK, signature & manifest to release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
           set -e

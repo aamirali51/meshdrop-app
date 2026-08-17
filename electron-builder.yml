@@ -24,7 +24,7 @@ artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 publish:
   provider: github
   owner: aamirali51
-  repo: MeshDesk
+  repo: meshdrop-releases
   releaseType: release
 
 files:
