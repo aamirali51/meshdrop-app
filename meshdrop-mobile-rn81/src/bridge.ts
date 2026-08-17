@@ -47,7 +47,9 @@ function handle(msg: any) {
   } else if (msg.type === 'engine') {
     emit('__engine', msg)
   } else if (msg.type === 'log') {
-    console.log(`[Worklet:${msg.level || 'info'}]`, msg.text)
+    const lvl = msg.level || 'info'
+    const prefix = lvl === 'error' ? '[MDLOG worklet:ERR]' : lvl === 'warn' ? '[MDLOG worklet:WARN]' : '[MDLOG worklet]'
+    console.log(`${prefix}`, msg.text)
   }
 }
 
@@ -104,8 +106,10 @@ export async function startBridge(): Promise<void> {
       throw new Error('engine bundle asset unreadable or too small')
     }
 
-    console.log('[bridge] assetsDir =', assetsDir, '| bundle bytes =', engineBundle.length)
+    console.log('[MDLOG bridge] assetsDir =', assetsDir, '| bundle bytes =', engineBundle.length)
+    console.log('[MDLOG bridge] creating Worklet...')
     const w = new Worklet({ assets: assetsDir ?? undefined })
+    console.log('[MDLOG bridge] Worklet created, setting up IPC...')
 
     let buffer = ''
     w.IPC.on('data', (data: any) => {
@@ -119,7 +123,7 @@ export async function startBridge(): Promise<void> {
           if (!trimmed) continue
           try {
             const parsed = JSON.parse(trimmed)
-            console.log('[bridge] IPC received:', parsed.type || parsed.event || 'msg')
+            console.log('[MDLOG bridge] IPC type:', parsed.type || 'unknown', parsed.event || parsed.method || '')
             handle(parsed)
           } catch (jsonErr) {
             console.error('[bridge] IPC JSON parse error:', String(jsonErr), 'raw:', trimmed.slice(0, 100))

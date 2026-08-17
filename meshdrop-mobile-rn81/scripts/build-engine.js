@@ -25,12 +25,26 @@ const addonsOut = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-addons-'))
 const host = process.env.ENGINE_HOST || process.argv.slice(2).find(a => !a.startsWith('-')) || 'android-arm64'
 // `fs` in @mesh/core (storage.js self-healing reset) is a Node builtin that
 // bare-pack cannot resolve; map it to bare-fs, which the engine already uses.
-const common = `--host ${host} --format bundle.cjs --imports ${path.join(root, 'scripts', 'engine-imports.json')}`
+const common = `--host ${host} --format bundle.cjs --imports "${path.join(root, 'scripts', 'engine-imports.json')}"`
 console.log(`[build-engine] Target host: ${host}`)
 
 console.log('[build-engine] Pass 1: linked bundle...')
 // Pass 1: linked bundle (records the addon map).
 execSync(`npx bare-pack "${entry}" ${common} --linked --out "${out}"`, { cwd: root, stdio: 'inherit' })
+
+// Guard: the Bare worklet evaluates each module as a plain script, so any
+// top-level `await` (e.g. inside a non-async function) is a SyntaxError on
+// device. Fail the build now with the exact offending module instead of
+// shipping a bundle that crashes at boot.
+console.log('[build-engine] Verifying bundle parses as plain scripts under Bare...')
+try {
+  execSync('node scripts/check-bundle.js', { cwd: root, stdio: 'inherit' })
+  console.log('[build-engine] Bundle check passed.')
+} catch (err) {
+  console.error('[build-engine] FAILED: engine bundle has module-only syntax (top-level await).')
+  console.error('[build-engine] Find the offending `await` in src/engine/index.js or @mesh/core and fix it before rebuilding.')
+  process.exit(1)
+}
 
 console.log('[build-engine] Pass 2: offload addons...')
 // Pass 2: offload the addon prebuilds.

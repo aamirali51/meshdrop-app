@@ -121,10 +121,18 @@ let downloadsDir = null
 // ─── Engine boot ───────────────────────────────────────────────────────────
 
 async function boot() {
-  if (!MeshEngine) return
+  if (!MeshEngine) {
+    console.error('[MDLOG] boot abort: MeshEngine not loaded')
+    return
+  }
+  const bootStart = Date.now()
+  console.log('[MDLOG] boot() called, MeshEngine loaded OK')
+
   try {
     let baseDir = (typeof Bare !== 'undefined' && Bare.argv && Bare.argv[0]) || (typeof process !== 'undefined' && process.argv && process.argv[0])
     let customDownloads = (typeof Bare !== 'undefined' && Bare.argv && Bare.argv[1]) || (typeof process !== 'undefined' && process.argv && process.argv[1])
+    console.log('[MDLOG] baseDir raw:', baseDir, 'downloads:', customDownloads)
+
     if (!baseDir || baseDir.startsWith('/app.bundle')) {
       baseDir = '/data/user/0/com.meshdropmobile/files'
     }
@@ -134,19 +142,20 @@ async function boot() {
 
     storageDir = path.join(baseDir, 'mesh_store')
     downloadsDir = customDownloads || '/storage/emulated/0/Download'
+    console.log('[MDLOG] storageDir:', storageDir, 'downloadsDir:', downloadsDir)
 
+    console.log('[MDLOG] creating MeshEngine...')
     engine = new MeshEngine({
       storageDir,
       downloadsDir,
       deviceName: 'MeshDrop Mobile',
       autoAcceptOffers: false,
       autoTrustLAN: true,
-      // The Bare worklet cannot create raw UDP sockets — LAN discovery is
-      // unavailable there, so disable it (DHT discovery still works).
       lanDiscovery: false
     })
+    console.log('[MDLOG] MeshEngine created OK')
 
-    // Forward engine events to the UI.
+    // Forward engine events to the UI with detailed logging.
     const EVENTS = [
       'peer:connected',
       'peer:disconnected',
@@ -181,14 +190,56 @@ async function boot() {
     ]
     for (const evt of EVENTS) {
       engine.on(evt, (data) => {
-        console.log(`[engine event] ${evt}:`, JSON.stringify(data || {}).slice(0, 150))
+        console.log(`[MDLOG event] ${evt}:`, JSON.stringify(data || {}).slice(0, 200))
         send({ type: 'event', event: evt, data })
       })
     }
 
+    // Extra diagnostic hooks on the swarm and DHT
+    engine.on('error', (err) => {
+      console.error('[MDLOG engine error]:', String(err && err.stack || err))
+    })
+
+    console.log('[MDLOG] calling engine.start()...')
+    const startT = Date.now()
     await engine.start()
-    send({ type: 'engine', status: 'ready', identity: engine.getIdentity() })
+    const startDur = Date.now() - startT
+    console.log(`[MDLOG] engine.start() completed in ${startDur}ms`)
+
+    const identity = engine.getIdentity()
+    console.log('[MDLOG] identity:', JSON.stringify({
+      deviceId: identity && identity.deviceId,
+      publicKey: identity && identity.publicKey && identity.publicKey.slice(0, 16) + '...',
+      pairingCode: identity && identity.pairingCode
+    }))
+
+    const status = engine.getStatus()
+    console.log('[MDLOG] initial status:', JSON.stringify(status))
+
+    // Hook into the internal swarm if available for DHT diagnostics
+    try {
+      const swarm = engine.swarm
+      if (swarm) {
+        console.log('[MDLOG] swarm exists, dht:', !!swarm.dht, 'listening:', swarm._listening)
+        if (swarm.dht) {
+          console.log('[MDLOG] dht.ready:', typeof swarm.dht.ready, 'dht.bootstrap:', JSON.stringify(swarm.dht.bootstrap || 'default'))
+          console.log('[MDLOG] dht.holepuncher:', !!swarm.dht.holepuncher, 'randomized:', swarm.dht.randomized)
+        }
+        swarm.on('connection', (conn, info) => {
+          console.log('[MDLOG swarm connection] peer:', info && info.publicKey && b4a.toString(info.publicKey, 'hex').slice(0, 16) + '...', 'client:', info && info.client, 'relay:', info && info.relayed)
+        })
+        swarm.on('update', () => {
+          console.log('[MDLOG swarm update] known peers:', swarm.knownPeers, 'connecting:', swarm.connecting, 'connected:', swarm.connections)
+        })
+      }
+    } catch (diagErr) {
+      console.log('[MDLOG swarm diag skipped]:', String(diagErr.message || diagErr))
+    }
+
+    console.log(`[MDLOG] total boot time: ${Date.now() - bootStart}ms`)
+    send({ type: 'engine', status: 'ready', identity })
   } catch (err) {
+    console.error('[MDLOG] boot failed:', String(err && err.stack || err))
     send({ type: 'engine', status: 'error', message: String((err && err.message) || err) })
   }
 }
@@ -196,7 +247,7 @@ async function boot() {
 // ─── RPC Dispatch ──────────────────────────────────────────────────────────
 
 function call(method, params) {
-  return Promise.resolve().then(() => {
+  return Promise.resolve().then(async () => {
     switch (method) {
     case 'getIdentity':
       return engine.getIdentity()
@@ -226,8 +277,19 @@ function call(method, params) {
     case 'getPaths':
       return { storageDir, downloadsDir }
     case 'pairWithCode': {
-      console.log('[engine] RPC pairWithCode received code:', params && params.code)
-      return engine.pairWithCode(params.code)
+      const pairCode = params && params.code
+      const pairStart = Date.now()
+      console.log('[MDLOG pair] === PAIRING ATTEMPT START === code:', pairCode)
+      console.log('[MDLOG pair] engine status before pair:', JSON.stringify(engine.getStatus()))
+      try {
+        const result = await engine.pairWithCode(pairCode)
+        console.log(`[MDLOG pair] === PAIRING SUCCESS === in ${Date.now() - pairStart}ms, peer:`, JSON.stringify(result && { id: result.id, name: result.device && result.device.name }))
+        return result
+      } catch (pairErr) {
+        console.error(`[MDLOG pair] === PAIRING FAILED === in ${Date.now() - pairStart}ms:`, String(pairErr && pairErr.message || pairErr))
+        console.error('[MDLOG pair] engine status at failure:', JSON.stringify(engine.getStatus()))
+        throw pairErr
+      }
     }
     case 'createDropCode':
     case 'createDropShare': {
