@@ -7,6 +7,7 @@ import {
   Switch,
   TouchableOpacity,
   Alert,
+  Linking,
 } from 'react-native'
 import {
   ShieldCheck,
@@ -496,6 +497,49 @@ export function Settings({ identity }: { identity?: any }) {
           </Card>
         </>
       )}
+
+      {/* About */}
+      <SectionHeader title="About" />
+      <Card style={styles.card}>
+        <View style={styles.permRow}>
+          <View style={styles.permInfo}>
+            <Zap size={16} color={theme.primary} />
+            <Text style={styles.permName}>Version</Text>
+          </View>
+          <Text style={styles.statValue}>
+            {installedVersion ? `v${installedVersion}` : '—'}
+          </Text>
+        </View>
+        <View style={[styles.permRow, styles.borderTop]}>
+          <View style={styles.permInfo}>
+            <Info size={16} color={theme.primary} />
+            <Text style={styles.permName}>License</Text>
+          </View>
+          <Pill label="MIT" color={theme.primary} />
+        </View>
+        <TouchableOpacity
+          style={[styles.permRow, styles.borderTop]}
+          onPress={() => Linking.openURL('https://github.com/aamirali51/meshdrop-app')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.permInfo}>
+            <ExternalLink size={16} color={theme.primary} />
+            <Text style={styles.permName}>Source Code</Text>
+          </View>
+          <Text style={[styles.statValue, { color: theme.primary }]}>GitHub →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.permRow, styles.borderTop]}
+          onPress={() => Linking.openURL('https://github.com/aamirali51/meshdrop-releases/releases')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.permInfo}>
+            <FileText size={16} color={theme.primary} />
+            <Text style={styles.permName}>Releases</Text>
+          </View>
+          <Text style={[styles.statValue, { color: theme.primary }]}>View →</Text>
+        </TouchableOpacity>
+      </Card>
     </ScrollView>
   )
 }

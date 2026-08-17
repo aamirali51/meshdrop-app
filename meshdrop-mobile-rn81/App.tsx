@@ -286,7 +286,7 @@ function App(): React.JSX.Element {
               <Text style={styles.brand}>MeshDrop</Text>
               <View style={styles.versionPill}>
                 <Text style={styles.versionText}>
-                  {appVersion ? `v${appVersion}` : 'v2.0'}
+                  {appVersion ? `v${appVersion}` : ''}
                 </Text>
               </View>
             </View>
