@@ -11,7 +11,7 @@ const fs = require('fs')
 const path = require('path')
 const fsp = require('fs/promises')
 const { METHODS, EVENTS, createEvent } = require('../src/shared/protocol.js')
-const { normalizePairingCode, deriveDeviceId } = require('../../meshdrop-core/crypto.js')
+const { normalizePairingCode, deriveDeviceId } = require('@mesh/core/crypto.js')
 const { WORKER_SPECIFIER } = require('./engine.js')
 
 // ─── Pure helpers (ported from workers/helpers.js) ──────────────────────────

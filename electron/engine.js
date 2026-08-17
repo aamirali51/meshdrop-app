@@ -10,7 +10,7 @@
 // protocol contract is preserved by re-encoding MeshEngine events as the
 // worker-protocol events the UI already subscribes to.
 
-const { MeshEngine } = require('../../meshdrop-core/index.js')
+const { MeshEngine } = require('@mesh/core')
 const { EVENTS, createEvent } = require('../src/shared/protocol.js')
 
 // The renderer's IPC client (renderer/src/lib/ipc.ts) addresses the engine

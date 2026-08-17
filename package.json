@@ -38,6 +38,7 @@
   "seed": "npx pear seed pear://49x3eqdfgubimdescau51sn7to47c85zkky66mi1kxaxrqpturho"
  },
  "dependencies": {
+  "@mesh/core": "file:../meshdrop-core",
   "@fontsource/inter": "^5.2.5",
   "@fontsource/jetbrains-mono": "^5.2.5",
   "@hyperswarm/secret-stream": "^6.9.1",
