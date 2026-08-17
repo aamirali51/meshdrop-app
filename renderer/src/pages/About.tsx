@@ -84,7 +84,7 @@ function openHolepunch() {
 }
 
 function openGithub() {
-  const url = 'https://github.com/aamirali51/MeshDesk'
+  const url = 'https://github.com/aamirali51/meshdrop-app'
   if (window.bridge?.openExternal) {
     window.bridge.openExternal(url)
   } else if (typeof window !== 'undefined') {
@@ -258,7 +258,7 @@ export function About() {
             title='Open repository on GitHub'
           >
             <GithubIcon className='h-3.5 w-3.5' />
-            <span>github.com/aamirali51/MeshDesk</span>
+            <span>github.com/aamirali51/meshdrop-app</span>
             <ExternalLink className='h-3 w-3' />
           </button>
         </div>

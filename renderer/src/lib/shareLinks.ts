@@ -7,7 +7,7 @@ import type { PendingShare } from '@/types'
 //
 // WEB_LINK_BASE is the GitHub Pages URL until the custom domain goes live
 // (then switch it to https://meshdrop.app/d/ — no other change needed).
-export const WEB_LINK_BASE = 'https://aamirali51.github.io/MeshDesk/d/'
+export const WEB_LINK_BASE = 'https://aamirali51.github.io/meshdrop-app/d/'
 
 export interface ShareLinkMeta {
   name?: string
