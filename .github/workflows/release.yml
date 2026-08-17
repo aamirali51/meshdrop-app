@@ -35,6 +35,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout meshdrop-core (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: aamirali51/meshdrop-core
+          path: ../meshdrop-core
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -98,6 +104,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout meshdrop-core (sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: aamirali51/meshdrop-core
+          path: ../meshdrop-core
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
