@@ -124,6 +124,17 @@ export function DeviceCard({
                     />
                   </span>
                 )}
+                {(device as any).relayedViaOwnPeer && (
+                  <span
+                    title='Connection relayed through your own device'
+                    className='flex shrink-0 items-center'
+                  >
+                    <Waypoints
+                      className='h-3 w-3 text-meshdrop-cyan'
+                      aria-label='Relayed via your own device'
+                    />
+                  </span>
+                )}
               </h3>
               <p className='truncate text-[11px] text-muted-foreground'>{device.osVersion}</p>
             </div>

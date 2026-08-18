@@ -363,7 +363,11 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     // Surface the engine's live auto-accept flag so the UI toggle reflects
     // the actual @mesh/core state (Ground Truth Rule).
     const live = (await engine.getSettings()) || {}
-    return mergeSettings({ ...(entry?.value || {}), autoAcceptOffers: live.autoAcceptOffers })
+    return mergeSettings({
+      ...(entry?.value || {}),
+      autoAcceptOffers: live.autoAcceptOffers,
+      preferOwnRelay: live.preferOwnRelay
+    })
   }
 
   handlers[METHODS.SETTINGS_UPDATE] = async (params) => {
@@ -381,6 +385,9 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     }
     if (typeof merged.autoAcceptOffers === 'boolean') {
       await engine.setAutoAcceptOffers(merged.autoAcceptOffers)
+    }
+    if (typeof merged.preferOwnRelay === 'boolean') {
+      await engine.setPreferOwnRelay(merged.preferOwnRelay)
     }
     if (updateAutoStart) {
       updateAutoStart(merged)

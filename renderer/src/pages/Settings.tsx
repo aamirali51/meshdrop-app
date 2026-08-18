@@ -38,6 +38,8 @@ interface AppSettings {
   autoTrustLAN: boolean
   /** @mesh/core auto-accept flag — inverted by the "Require Manual File Acceptance" toggle. */
   autoAcceptOffers: boolean
+  /** Prefer an online paired desktop as relay before public bootstrap nodes. */
+  preferOwnRelay: boolean
   noiseEncryption: boolean
   autoUpdate: boolean
   releaseChannel: string
@@ -52,6 +54,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   deviceName: '',
   autoTrustLAN: false,
   autoAcceptOffers: true,
+  preferOwnRelay: false,
   noiseEncryption: true,
   autoUpdate: true,
   releaseChannel: 'stable',
@@ -442,6 +445,22 @@ export function Settings() {
                     checked={settings.autoAcceptOffers}
                     onCheckedChange={(v) => set('autoAcceptOffers', v)}
                     aria-label='Auto-accept incoming files'
+                  />
+                </div>
+
+                <div className='flex items-center justify-between border-t border-hairline/10 pt-4'>
+                  <div>
+                    <p className='font-bold text-foreground'>Prefer My Devices as Relay</p>
+                    <p className='text-[11px] text-muted-foreground'>
+                      When a direct connection fails, tunnel through your own online desktop first
+                      before falling back to public relays. Only your paired devices can use your
+                      relay — it is private to your mesh.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.preferOwnRelay}
+                    onCheckedChange={(v) => set('preferOwnRelay', v)}
+                    aria-label='Prefer own devices as relay'
                   />
                 </div>
 

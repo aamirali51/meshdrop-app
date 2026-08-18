@@ -261,6 +261,8 @@ function call(method, params) {
       return engine.setAutoAcceptOffers(!!params?.enabled)
     case 'setAutoTrustLAN':
       return engine.setAutoTrustLAN(!!params?.enabled)
+    case 'setPreferOwnRelay':
+      return engine.setPreferOwnRelay(!!params?.enabled)
     case 'setLANDiscovery':
       // LAN discovery cannot run inside the Bare worklet (no raw UDP
       // sockets), so this is intentionally a persisted-only non-op.

@@ -449,6 +449,7 @@ export function DeviceCard({
             <OsIcon size={12} color={theme.muted} />
             <Text style={styles.deviceMetaText}>
               {device.os || 'Mesh Node'} · {device.isOnline ? 'Online' : 'Offline'}
+              {(device as any).relayedViaOwnPeer ? ' · via your Desktop' : ''}
             </Text>
           </View>
         </View>

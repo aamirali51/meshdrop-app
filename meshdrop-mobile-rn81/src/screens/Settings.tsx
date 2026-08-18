@@ -72,6 +72,7 @@ export function Settings({ identity }: { identity?: any }) {
 
   // Preferences
   const [autoAcceptTrusted, setAutoAcceptTrusted] = useState(false)
+  const [preferOwnRelay, setPreferOwnRelay] = useState(false)
   const [backgroundKeepAlive, setBackgroundKeepAlive] = useState(true)
   const [batteryIgnored, setBatteryIgnored] = useState(true)
 
@@ -111,6 +112,11 @@ export function Settings({ identity }: { identity?: any }) {
     call('setAutoAcceptOffers', { enabled: enable }).catch(() => {})
   }
 
+  const handleTogglePreferOwnRelay = (enable: boolean) => {
+    setPreferOwnRelay(enable)
+    call('setPreferOwnRelay', { enabled: enable }).catch(() => {})
+  }
+
   const handleRequestBatteryExemption = async () => {
     const res = await requestIgnoreBatteryOptimizations()
     if (res) {
@@ -140,6 +146,7 @@ export function Settings({ identity }: { identity?: any }) {
     call('getSettings')
       .then((s: any) => {
         if (s && typeof s.autoAcceptOffers === 'boolean') setAutoAcceptTrusted(s.autoAcceptOffers)
+        if (s && typeof s.preferOwnRelay === 'boolean') setPreferOwnRelay(s.preferOwnRelay)
       })
       .catch(() => {})
 
@@ -438,6 +445,22 @@ export function Settings({ identity }: { identity?: any }) {
             onValueChange={handleToggleAutoAccept}
             trackColor={{ false: '#E2E8F0', true: theme.primarySoft }}
             thumbColor={autoAcceptTrusted ? theme.primary : '#94A3B8'}
+          />
+        </View>
+
+        <View style={[styles.switchRow, styles.borderTop]}>
+          <View style={styles.flex1}>
+            <Text style={styles.switchTitle}>Prefer My Devices as Relay</Text>
+            <Text style={styles.switchSub}>
+              When a direct connection fails, tunnel through your own online desktop before
+              public relays. Private to your mesh.
+            </Text>
+          </View>
+          <Switch
+            value={preferOwnRelay}
+            onValueChange={handleTogglePreferOwnRelay}
+            trackColor={{ false: '#E2E8F0', true: theme.primarySoft }}
+            thumbColor={preferOwnRelay ? theme.primary : '#94A3B8'}
           />
         </View>
 
