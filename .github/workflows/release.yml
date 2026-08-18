@@ -159,11 +159,14 @@ jobs:
         shell: bash
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
-          if "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" 2>/dev/null \
-             | grep -q "CN=MeshDrop Mobile"; then
+          # SDK layout varies per runner: pick the newest build-tools apksigner.
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name apksigner -type f 2>/dev/null | sort -V | tail -1)
+          if [ -n "$APKSIGNER" ] && "$APKSIGNER" verify --print-certs "$APK" 2>/dev/null \
+             | grep -qF "CN=MeshDrop Mobile"; then
             echo "APK signed with the MeshDrop release key"
           else
             echo "::error::APK is NOT signed with the MeshDrop release key — check MESHDROP_KEYSTORE_B64 / MESHDROP_KEYSTORE_PASSWORD"
+            [ -z "$APKSIGNER" ] && echo "::warning::apksigner not found under $ANDROID_HOME/build-tools"
             exit 1
           fi
 
