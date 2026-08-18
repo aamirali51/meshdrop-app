@@ -45,12 +45,15 @@ export type UpdateState = {
   versionName: string | null
 }
 
+// All MeshDropUpdater methods are declared with a React Promise
+// (see MeshDropUpdaterModule.kt), so they must be awaited — a trailing
+// callback is never invoked, which hung the version read and the check.
 type UpdaterNative = {
-  getVersionCode?: (cb: (code: number) => void) => void
-  getVersionName?: (cb: (name: string) => void) => void
-  canInstallPackages?: (cb: (ok: boolean) => void) => void
-  openInstallSettings?: (cb: (ok: boolean) => void) => void
-  installApk?: (path: string, cb: (error: { message: string } | null) => void) => void
+  getVersionCode?: () => Promise<number>
+  getVersionName?: () => Promise<string>
+  canInstallPackages?: () => Promise<boolean>
+  openInstallSettings?: () => Promise<boolean>
+  installApk?: (path: string) => Promise<boolean>
 }
 
 const native = (NativeModules.MeshDropUpdater ?? {}) as UpdaterNative
@@ -84,14 +87,26 @@ export function isUpdaterSupported(): boolean {
   return Platform.OS === 'android' && !!native.getVersionCode && !!native.installApk
 }
 
+// A dead native bridge (or a missing method) must not hang the version read
+// forever — that left the Settings version row stuck on "—".
+const NATIVE_TIMEOUT_MS = 5000
+
 function getVersionInfo(): Promise<{ versionCode: number; versionName: string }> {
   return new Promise((resolve, reject) => {
     if (!isUpdaterSupported()) return reject(new Error('Updater unsupported on this platform'))
-    native.getVersionCode!((code) => {
-      native.getVersionName!((name) =>
-        resolve({ versionCode: Number(code) || 0, versionName: String(name) })
-      )
-    })
+    const timer = setTimeout(
+      () => reject(new Error('Updater native call timed out')),
+      NATIVE_TIMEOUT_MS
+    )
+    Promise.all([native.getVersionCode!(), native.getVersionName!()])
+      .then(([code, name]) => {
+        clearTimeout(timer)
+        resolve({ versionCode: Number(code) || 0, versionName: String(name ?? '') })
+      })
+      .catch((err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
   })
 }
 
@@ -107,20 +122,33 @@ export async function refreshVersion(): Promise<string | null> {
 }
 
 async function fetchManifest(): Promise<UpdateInfo | null> {
-  const res = await fetch(UPDATE_MANIFEST_URL)
-  if (!res.ok) return null // e.g. 404 (no release yet) -> consider up to date
-  const data = await res.json()
-  const versionCode = Number(data?.versionCode) || 0
-  const versionName = String(data?.versionName ?? '')
-  const url = String(data?.url ?? '')
-  if (!versionCode || !versionName || !url) return null
-  return {
-    versionCode,
-    versionName,
-    url,
-    size: data?.size ? Number(data.size) : undefined,
-    sha256: data?.sha256 ? String(data.sha256) : undefined,
-    notes: data?.notes ? String(data.notes) : undefined,
+  try {
+    const res = await fetch(UPDATE_MANIFEST_URL)
+    if (!res.ok) {
+      // Not silently "up to date": a failed feed fetch must be visible in the
+      // logs, or an unreachable host looks identical to "no update".
+      console.warn(`[updater] manifest fetch failed: HTTP ${res.status} (${UPDATE_MANIFEST_URL})`)
+      return null
+    }
+    const data = await res.json()
+    const versionCode = Number(data?.versionCode) || 0
+    const versionName = String(data?.versionName ?? '')
+    const url = String(data?.url ?? '')
+    if (!versionCode || !versionName || !url) {
+      console.warn('[updater] manifest missing required fields:', JSON.stringify(data))
+      return null
+    }
+    return {
+      versionCode,
+      versionName,
+      url,
+      size: data?.size ? Number(data.size) : undefined,
+      sha256: data?.sha256 ? String(data.sha256) : undefined,
+      notes: data?.notes ? String(data.notes) : undefined,
+    }
+  } catch (err) {
+    console.warn('[updater] manifest fetch threw:', String((err as Error)?.message || err))
+    return null
   }
 }
 
@@ -192,30 +220,21 @@ export async function downloadUpdate(
 }
 
 /** Hand a downloaded APK to the system installer (ACTION_VIEW). */
-export function installApk(path: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!isUpdaterSupported()) return reject(new Error('Updater unsupported on this platform'))
-    native.installApk!(path, (error) => {
-      if (error) reject(new Error(error.message || 'Install failed'))
-      else resolve()
-    })
-  })
+export async function installApk(path: string): Promise<void> {
+  if (!isUpdaterSupported()) throw new Error('Updater unsupported on this platform')
+  await native.installApk!(path)
 }
 
 /** Whether the user has granted "install unknown apps" for MeshDrop. */
-export function canInstallPackages(): Promise<boolean> {
-  return new Promise((res) => {
-    if (!isUpdaterSupported()) return res(false)
-    native.canInstallPackages!((ok) => res(Boolean(ok)))
-  })
+export async function canInstallPackages(): Promise<boolean> {
+  if (!isUpdaterSupported()) return false
+  return !!(await native.canInstallPackages?.())
 }
 
 /** Deep-link to the "Allow install unknown apps" setting. */
-export function openInstallSettings(): Promise<void> {
-  return new Promise((res) => {
-    if (!isUpdaterSupported()) return res()
-    native.openInstallSettings!(() => res())
-  })
+export async function openInstallSettings(): Promise<void> {
+  if (!isUpdaterSupported()) return
+  await native.openInstallSettings?.()
 }
 
 /** User chose "Later" — clear the prompt until the next launch/resume. */
