@@ -162,6 +162,7 @@ async function boot() {
       'trust:paired',
       'trust:untrusted',
       'trust:revoked',
+      'pairing:failed',
       'device:updated',
       'device:removed',
       'drop:created',
@@ -397,7 +398,20 @@ function call(method, params) {
     case 'syncFolder':
       return engine.syncLibrary(params?.id)
     case 'refreshNetwork':
-      return engine.refreshNetwork()
+      // resolve with plain status, NOT the engine: the RPC layer JSON-serializes
+      // every response, and the engine references the DHT routing table
+      // (circular) — stringifying it throws and the response is never sent,
+      // leaving the bridge's call() pending forever.
+      // A dead-network rebuild can fail (swarm.destroy timeout, DHT down).
+      // Never reject — the RPC layer would log an unhandled error and the
+      // engine's own retry timer heals the swarm when connectivity returns.
+      return engine.refreshNetwork().then(
+        () => ({ ok: true, status: engine.getStatus() }),
+        (err) => {
+          console.warn('[worklet] refreshNetwork failed:', String((err && err.message) || err))
+          return { ok: false, error: String((err && err.message) || err) }
+        }
+      )
     default:
       throw new Error('Unknown method: ' + method)
     }
