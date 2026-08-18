@@ -39,7 +39,7 @@ import { Settings } from './src/screens/Settings'
 import { TransferApprovalDialog } from './src/components/TransferApprovalDialog'
 import { FloatingTransferPill } from './src/components/FloatingTransferPill'
 import { UpdateAvailableModal } from './src/components/UpdateAvailableModal'
-import { startBridge, on, call } from './src/bridge'
+import { startBridge, watchNetworkChanges, on, call } from './src/bridge'
 import { initStore } from './src/store'
 import { checkForUpdate, refreshVersion } from './src/updater'
 import { theme, fonts } from './src/theme'
@@ -88,6 +88,7 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     startBridge()
+    watchNetworkChanges()
     initStore()
     startBackgroundSync().catch(() => {})
 

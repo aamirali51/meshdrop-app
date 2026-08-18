@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, Notification, shell } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell } = require('electron')
 
 const fs = require('fs')
 const os = require('os')
@@ -370,6 +370,28 @@ ipcMain.handle('pear:startWorker', () => {
 let mainWindow = null
 let isQuitting = false
 let trayHintShown = false
+let closePromptOpen = false
+
+// Small persisted UI prefs (close behavior, ...) in userData. Kept separate
+// from engine state so a "remember my choice" checkbox actually survives restarts.
+function readUiSettings() {
+  try {
+    return JSON.parse(
+      fs.readFileSync(path.join(app.getPath('userData'), 'ui-settings.json'), 'utf8')
+    )
+  } catch {
+    return {}
+  }
+}
+
+function writeUiSettings(patch) {
+  try {
+    const file = path.join(app.getPath('userData'), 'ui-settings.json')
+    fs.writeFileSync(file, JSON.stringify({ ...readUiSettings(), ...patch }, null, 2))
+  } catch (err) {
+    console.error('[Main] Failed to persist UI settings:', err)
+  }
+}
 
 app.on('before-quit', () => {
   isQuitting = true
@@ -426,21 +448,69 @@ async function createWindow() {
     onToggleStartMinimized: handleTrayToggleStartMinimized
   })
 
+  // First close asks: tray (sync keeps running) or quit? The window stays
+  // visible while the dialog is up so it can't get lost behind a hidden
+  // parent; it only hides once the user picks "Close to tray".
+  const showTrayHint = () => {
+    if (trayHintShown) return
+    trayHintShown = true
+    try {
+      new Notification({
+        title: appName,
+        body: 'MeshDrop is still running in the system tray.'
+      }).show()
+    } catch {}
+    win.webContents.send('app:tray-hidden')
+  }
+
   win.on('close', (evt) => {
-    if (!isQuitting) {
-      evt.preventDefault()
-      win.hide()
-      if (!trayHintShown) {
-        trayHintShown = true
-        try {
-          new Notification({
-            title: appName,
-            body: 'MeshDrop is still running in the system tray.'
-          }).show()
-        } catch {}
-        win.webContents.send('app:tray-hidden')
+    if (isQuitting) return
+    evt.preventDefault()
+
+    const settings = readUiSettings()
+    if (settings.rememberClose) {
+      if (settings.closeAction === 'quit') {
+        isQuitting = true
+        app.quit()
+      } else {
+        win.hide()
+        showTrayHint()
       }
+      return
     }
+
+    if (closePromptOpen) return
+    closePromptOpen = true
+    dialog
+      .showMessageBox(win, {
+        type: 'question',
+        title: appName,
+        message: 'MeshDrop is closing',
+        detail:
+          'Close to the system tray and keep syncing in the background, or quit completely?',
+        buttons: ['Close to tray', 'Quit'],
+        defaultId: 0,
+        cancelId: 0,
+        checkboxLabel: 'Remember my choice',
+        checkboxChecked: false
+      })
+      .then(({ response, checkboxChecked }) => {
+        closePromptOpen = false
+        const closeAction = response === 0 ? 'tray' : 'quit'
+        if (checkboxChecked) writeUiSettings({ rememberClose: true, closeAction })
+        if (closeAction === 'quit') {
+          isQuitting = true
+          app.quit()
+        } else {
+          win.hide()
+          showTrayHint()
+        }
+      })
+      .catch(() => {
+        // Dialog dismissed without a choice (e.g. Esc) — fall back to tray.
+        closePromptOpen = false
+        win.hide()
+      })
   })
 
   win.on('closed', () => console.log(`[Main:${instLabel}] window closed`))

@@ -16,7 +16,7 @@
 //   Bare -> RN:  { type: 'engine', status, ... }
 
 import { Worklet } from 'react-native-bare-kit'
-import { NativeModules } from 'react-native'
+import { NativeModules, NativeEventEmitter, type NativeModule } from 'react-native'
 import RNFS from 'react-native-fs'
 import b4a from 'b4a'
 
@@ -28,6 +28,8 @@ const listeners = new Map<string, Set<(data: any) => void>>()
 let nextId = 1
 let started = false
 let worklet: Worklet | null = null
+let engineReady = false
+let networkTimer: ReturnType<typeof setTimeout> | null = null
 
 function emit(event: string, data: any) {
   const set = listeners.get(event)
@@ -45,6 +47,8 @@ function handle(msg: any) {
   } else if (msg.type === 'event') {
     emit(msg.event, msg.data)
   } else if (msg.type === 'engine') {
+    if (msg.status === 'ready') engineReady = true
+    else if (msg.status === 'stopped') engineReady = false
     emit('__engine', msg)
   } else if (msg.type === 'log') {
     const lvl = msg.level || 'info'
@@ -170,4 +174,31 @@ export function on(event: string, handler: (data: any) => void): () => void {
   if (!listeners.has(event)) listeners.set(event, new Set())
   listeners.get(event)!.add(handler)
   return () => listeners.get(event)?.delete(handler)
+}
+
+/**
+ * Watch the active network transport (native ConnectivityManager callback).
+ * When it switches (Wi-Fi → cellular, router swap, VPN), tell the engine to
+ * rebuild its swarm — the DHT node + sockets are bound to the previous
+ * interface and only a fresh swarm re-announces this device on the new
+ * network. Debounced: a switch fires several callbacks in quick succession.
+ */
+export function watchNetworkChanges(): void {
+  const mod = NativeModules.MeshDropNetwork as {
+    startListening?: () => void
+  }
+  if (!mod?.startListening) return
+  mod.startListening()
+  const emitter = new NativeEventEmitter(mod as unknown as NativeModule)
+  emitter.addListener('MeshDropNetworkChanged', (e: { type?: string }) => {
+    if (!engineReady) return
+    if (networkTimer) clearTimeout(networkTimer)
+    networkTimer = setTimeout(() => {
+      networkTimer = null
+      console.log('[MDLOG bridge] network changed → engine.refreshNetwork()')
+      call('refreshNetwork').catch((err: Error) => {
+        console.warn('[bridge] refreshNetwork failed:', String(err?.message || err))
+      })
+    }, 2500)
+  })
 }

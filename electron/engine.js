@@ -11,16 +11,37 @@
 // worker-protocol events the UI already subscribes to.
 
 const { MeshEngine } = require('@mesh/core')
+const os = require('os')
 const { EVENTS, createEvent } = require('../src/shared/protocol.js')
 
 // The renderer's IPC client (renderer/src/lib/ipc.ts) addresses the engine
 // through this identifier. It is only a channel name now — no worker exists.
 const WORKER_SPECIFIER = '/workers/main.js'
 
+// Signature of the machine's active network interfaces (non-internal IPv4s).
+// A change means the OS moved to another network: the engine's DHT node and
+// sockets are bound to the old interface, so only a swarm rebuild re-announces
+// this device on the new one.
+function networkSignature() {
+  try {
+    const ifaces = os.networkInterfaces()
+    const parts = []
+    for (const [name, addrs] of Object.entries(ifaces)) {
+      for (const a of addrs || []) {
+        if (a && a.family === 'IPv4' && !a.internal && a.address) parts.push(`${name}:${a.address}`)
+      }
+    }
+    return parts.sort().join('|')
+  } catch {
+    return null
+  }
+}
+
 function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, getLabel }) {
   const engine = new MeshEngine({ storageDir, downloadsDir, deviceName, autoAcceptOffers: false })
   let started = false
   let startPromise = null
+  let networkPollStarted = false
 
   function forward(event, data) {
     const isSync = !!(data && (data.isSync || data.source === 'sync'))
@@ -96,6 +117,23 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
       forward(EVENTS.WORKER_READY, {
         identity: { ...engine.deviceIdentity, pairingCode: identity.pairingCode }
       })
+      // Watch for interface changes (Wi-Fi → ethernet, router swap, VPN):
+      // rebuild the swarm so this device stays findable on the new network.
+      if (!networkPollStarted) {
+        networkPollStarted = true
+        let lastSig = networkSignature()
+        setInterval(() => {
+          if (!started) return
+          const sig = networkSignature()
+          if (sig && lastSig && sig !== lastSig) {
+            console.log(`[Main:${getLabel()}] Network interface changed — rebuilding swarm`)
+            engine.refreshNetwork().catch((err) => {
+              console.warn(`[Main:${getLabel()}] refreshNetwork failed:`, err.message)
+            })
+          }
+          lastSig = sig
+        }, 10000).unref()
+      }
     })().catch((err) => {
       startPromise = null
       console.error(`[Main:${getLabel()}] Engine failed to start:`, err)

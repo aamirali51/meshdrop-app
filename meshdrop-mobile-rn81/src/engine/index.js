@@ -396,6 +396,8 @@ function call(method, params) {
     case 'sync.trigger':
     case 'syncFolder':
       return engine.syncLibrary(params?.id)
+    case 'refreshNetwork':
+      return engine.refreshNetwork()
     default:
       throw new Error('Unknown method: ' + method)
     }

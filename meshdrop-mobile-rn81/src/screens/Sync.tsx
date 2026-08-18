@@ -161,6 +161,7 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
 }) {
   const isSyncing = syncingId === lib.id || lib.status === 'syncing'
   const isPaused = lib.paused || lib.status === 'paused'
+  const isError = lib.status === 'error'
   const isWaitingPeer = lib.status === 'waiting_peer' || lib.status === 'waiting_accept'
   const isAnalyzing = phase?.phase === 'analyzing'
   const isTransferring = phase?.phase === 'transferring'
@@ -180,6 +181,8 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
               label={
                 isPaused
                   ? 'Paused'
+                  : isError
+                  ? 'Sync Error'
                   : isWaitingPeer
                   ? 'Waiting for Peer'
                   : isAnalyzing
@@ -191,6 +194,8 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
               color={
                 isPaused
                   ? theme.warning
+                  : isError
+                  ? theme.danger
                   : isWaitingPeer
                   ? theme.muted
                   : isAnalyzing
@@ -199,7 +204,7 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
                   ? theme.primary
                   : theme.success
               }
-              dot={!isPaused && !isWaitingPeer && !isAnalyzing}
+              dot={!isPaused && !isError && !isWaitingPeer && !isAnalyzing}
             />
           </View>
 
