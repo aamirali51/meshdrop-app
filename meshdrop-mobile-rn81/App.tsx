@@ -39,7 +39,7 @@ import { Settings } from './src/screens/Settings'
 import { TransferApprovalDialog } from './src/components/TransferApprovalDialog'
 import { FloatingTransferPill } from './src/components/FloatingTransferPill'
 import { UpdateAvailableModal } from './src/components/UpdateAvailableModal'
-import { startBridge, watchNetworkChanges, on, call } from './src/bridge'
+import { startBridge, watchNetworkChanges, on, call, probeNetwork } from './src/bridge'
 import { initStore } from './src/store'
 import { checkForUpdate, refreshVersion } from './src/updater'
 import { theme, fonts } from './src/theme'
@@ -236,6 +236,11 @@ function App(): React.JSX.Element {
         call('getIdentity').then((res: any) => {
           if (res) setIdentity(res)
         }).catch(() => {})
+        // Re-probe the active transport: ConnectivityManager callbacks are not
+        // replayed to a frozen process, so a switch that happened while the
+        // app was backgrounded would otherwise leave the swarm bound to a dead
+        // interface. checkNow() only emits when the signature changed.
+        probeNetwork()
         if (!updatePrompted.current) {
           checkForUpdate().then((info) => {
             if (info) updatePrompted.current = true

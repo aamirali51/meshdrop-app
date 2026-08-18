@@ -29,7 +29,15 @@ let nextId = 1
 let started = false
 let worklet: Worklet | null = null
 let engineReady = false
+// Last engine status message. The ready event is emitted once and not buffered,
+// so a subscriber that attaches after the engine reported ready (slow JS mount,
+// process restore) would stay stuck on 'Booting…' forever. Replayed in on().
+let lastEngineMsg: any = null
 let networkTimer: ReturnType<typeof setTimeout> | null = null
+// A network change that arrived while the engine was still booting. The boot
+// binds to the network current at boot time, so an early switch matters only
+// if it is the last one before ready — replay it then instead of dropping it.
+let pendingNetworkChange = false
 
 function emit(event: string, data: any) {
   const set = listeners.get(event)
@@ -47,8 +55,16 @@ function handle(msg: any) {
   } else if (msg.type === 'event') {
     emit(msg.event, msg.data)
   } else if (msg.type === 'engine') {
-    if (msg.status === 'ready') engineReady = true
-    else if (msg.status === 'stopped') engineReady = false
+    lastEngineMsg = msg
+    if (msg.status === 'ready') {
+      engineReady = true
+      // Replay a network change that arrived during the boot window now that
+      // the engine can rebuild the swarm on the current network.
+      if (pendingNetworkChange) {
+        pendingNetworkChange = false
+        scheduleNetworkRefresh()
+      }
+    } else if (msg.status === 'stopped') engineReady = false
     emit('__engine', msg)
   } else if (msg.type === 'log') {
     const lvl = msg.level || 'info'
@@ -173,6 +189,11 @@ export function call<T = any>(method: string, params?: any): Promise<T> {
 export function on(event: string, handler: (data: any) => void): () => void {
   if (!listeners.has(event)) listeners.set(event, new Set())
   listeners.get(event)!.add(handler)
+  if (event === '__engine' && lastEngineMsg) {
+    // Engine already reported (e.g. 'ready') before this subscriber attached —
+    // replay it async so late UI state (header pill, identity) catches up.
+    setTimeout(() => handler(lastEngineMsg), 0)
+  }
   return () => listeners.get(event)?.delete(handler)
 }
 
@@ -190,15 +211,38 @@ export function watchNetworkChanges(): void {
   if (!mod?.startListening) return
   mod.startListening()
   const emitter = new NativeEventEmitter(mod as unknown as NativeModule)
-  emitter.addListener('MeshDropNetworkChanged', (e: { type?: string }) => {
-    if (!engineReady) return
-    if (networkTimer) clearTimeout(networkTimer)
-    networkTimer = setTimeout(() => {
-      networkTimer = null
-      console.log('[MDLOG bridge] network changed → engine.refreshNetwork()')
-      call('refreshNetwork').catch((err: Error) => {
-        console.warn('[bridge] refreshNetwork failed:', String(err?.message || err))
-      })
-    }, 2500)
+  emitter.addListener('MeshDropNetworkChanged', () => {
+    if (!engineReady) {
+      // Engine still booting — defer instead of dropping; the replay happens
+      // in handle() when the engine reports ready.
+      pendingNetworkChange = true
+      return
+    }
+    scheduleNetworkRefresh()
   })
+}
+
+// Debounced rebuild trigger; a single switch fires several callbacks
+// (onAvailable / onLost / onCapabilitiesChanged) in quick succession.
+function scheduleNetworkRefresh() {
+  if (networkTimer) clearTimeout(networkTimer)
+  networkTimer = setTimeout(() => {
+    networkTimer = null
+    console.log('[MDLOG bridge] network changed → engine.refreshNetwork()')
+    call('refreshNetwork').catch((err: Error) => {
+      console.warn('[bridge] refreshNetwork failed:', String(err?.message || err))
+    })
+  }, 2500)
+}
+
+/**
+ * Re-probe the active transport. ConnectivityManager callbacks are not
+ * replayed to a process that was frozen while backgrounded (Doze, app
+ * freezer), so a switch that happened in that window would otherwise be
+ * missed entirely. The native side only emits when the transport signature
+ * actually changed. Called from the AppState 'active' handler.
+ */
+export function probeNetwork(): void {
+  const mod = NativeModules.MeshDropNetwork as { checkNow?: () => void }
+  mod?.checkNow?.()
 }

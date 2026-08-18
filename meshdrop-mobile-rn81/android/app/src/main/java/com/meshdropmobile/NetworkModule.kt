@@ -36,6 +36,18 @@ class NetworkModule(private val reactContext: ReactApplicationContext) :
     registered = true
   }
 
+  /**
+   * Re-derive the active transport and emit MeshDropNetworkChanged only when
+   * it changed since the last emission. Called when the app returns to the
+   * foreground: connectivity callbacks are not replayed to a process that was
+   * frozen while backgrounded (Doze / app freezer), so a switch that happened
+   * in that window would otherwise be missed entirely.
+   */
+  @ReactMethod
+  fun checkNow() {
+    emitChange()
+  }
+
   private val callback = object : ConnectivityManager.NetworkCallback() {
     override fun onAvailable(network: Network) = emitChange()
     override fun onLost(network: Network) = emitChange()
