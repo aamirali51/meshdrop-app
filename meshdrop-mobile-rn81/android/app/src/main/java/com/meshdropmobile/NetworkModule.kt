@@ -67,13 +67,17 @@ class NetworkModule(private val reactContext: ReactApplicationContext) :
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
             else -> "other"
           }
-      // A network switch fires several callbacks; only emit when the active
-      // transport signature actually changed.
-      val sig = "$type:${active?.toString() ?: "none"}"
+      // Distinguish "no connectivity at all" from "switched transports": a full
+      // loss with no replacement network must not trigger a swarm rebuild onto
+      // a dead interface — the engine only rebuilds when connectivity returns.
+      // The online flag is part of the signature so loss→recovery always emits.
+      val isOnline = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+      val sig = "$type:${active?.toString() ?: "none"}:$isOnline"
       if (sig == lastSig) return
       lastSig = sig
       val params = Arguments.createMap()
       params.putString("type", type)
+      params.putBoolean("online", isOnline)
       reactContext
           .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
           .emit("MeshDropNetworkChanged", params)

@@ -73,6 +73,7 @@ export declare const EVENTS: {
   readonly DEVICE_DISCOVERED: 'device.discovered'
   readonly DEVICE_PAIRED: 'device.paired'
   readonly DEVICE_UPDATED: 'device.updated'
+  readonly DEVICE_REMOVED: 'device.removed'
   readonly PRESENCE_CHANGED: 'presence.changed'
   readonly PEER_CONNECTED: 'peer.connected'
   readonly PEER_DISCONNECTED: 'peer.disconnected'

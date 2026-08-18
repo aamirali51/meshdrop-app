@@ -58,6 +58,7 @@ export const METHODS = {
 export const EVENTS = {
   DEVICE_PAIRED: 'device.paired',
   DEVICE_UNPAIRED: 'device.unpaired',
+  DEVICE_REMOVED: 'device.removed',
   DEVICE_ONLINE: 'device.online',
   DEVICE_OFFLINE: 'device.offline',
   DEVICE_UPDATED: 'device.updated',

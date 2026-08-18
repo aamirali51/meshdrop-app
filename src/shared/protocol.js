@@ -77,6 +77,7 @@ const EVENTS = {
   DEVICE_DISCOVERED: 'device.discovered',
   DEVICE_PAIRED: 'device.paired',
   DEVICE_UPDATED: 'device.updated',
+  DEVICE_REMOVED: 'device.removed',
   PRESENCE_CHANGED: 'presence.changed',
   PEER_CONNECTED: 'peer.connected',
   PEER_DISCONNECTED: 'peer.disconnected',

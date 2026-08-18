@@ -14,6 +14,7 @@ import {
   AppState,
   type AppStateStatus,
   Animated,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
@@ -118,6 +119,18 @@ function App(): React.JSX.Element {
         if (typeof data?.peerCount === 'number') setPeerCount(data.peerCount)
       })
     )
+
+    // A host deleted this device (or we were revoked mid-pairing). Surface it
+    // immediately — otherwise the peer only discovers the deletion on its next
+    // reconnect (revoked → refused auto-trust → must re-pair).
+    const unsubRevoked = on('trust:revoked', (data: any) => {
+      if (!data) return
+      Alert.alert(
+        'Device Removed',
+        'You were removed from a device\'s trusted mesh. You can pair again with its current code.'
+      )
+      call('listDevices').catch(() => {})
+    })
 
     const handleIncomingOffer = (data: any) => {
       if (!data) return
@@ -253,6 +266,7 @@ function App(): React.JSX.Element {
     return () => {
       unsubEngine()
       unsubs.forEach((u) => u())
+      unsubRevoked()
       unsubOffer()
       unsubApproval()
       unsubStarted()

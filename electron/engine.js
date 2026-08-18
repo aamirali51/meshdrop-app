@@ -70,6 +70,14 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
       forward(EVENTS.DEVICE_PAIRED, peer)
       forward(EVENTS.DEVICE_UPDATED, peer)
     })
+    engine.on('trust:revoked', (data) => {
+      // A remote host deleted this device. Forward so the renderer can surface
+      // "you were removed" instead of the peer discovering it on next reconnect.
+      forward(EVENTS.DEVICE_REMOVED, data)
+    })
+    engine.on('device:removed', (data) => {
+      forward(EVENTS.DEVICE_REMOVED, data)
+    })
     engine.on('transfer:offer', (offer) => forward(EVENTS.TRANSFER_OFFER_RECEIVED, offer))
     engine.on('transfer:queued', (t) => forward(EVENTS.TRANSFER_QUEUED, t))
     engine.on('transfer:started', (t) => forward(EVENTS.TRANSFER_STARTED, t))

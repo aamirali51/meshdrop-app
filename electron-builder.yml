@@ -31,6 +31,10 @@ files:
   - electron/**/*
   - core/**/*
   - src/shared/**/*
+  # renderer/dist is gitignored; electron-builder honors .gitignore even for
+  # paths listed in `files`, so the built UI was silently dropped from the
+  # package (app crashed on launch with no renderer). The `!` re-includes it.
+  - '!renderer/dist/**/*'
   - renderer/dist/**/*
   - build/**/*
   - package.json

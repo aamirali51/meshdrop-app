@@ -38,6 +38,11 @@ let networkTimer: ReturnType<typeof setTimeout> | null = null
 // binds to the network current at boot time, so an early switch matters only
 // if it is the last one before ready — replay it then instead of dropping it.
 let pendingNetworkChange = false
+// The native layer reports online=false when connectivity fully drops (no
+// replacement network). While offline, refreshes are pointless — the swarm
+// rebuilds onto a dead interface. We remember the loss so the next
+// online=true event always rebuilds exactly once.
+let isOffline = false
 
 function emit(event: string, data: any) {
   const set = listeners.get(event)
@@ -64,7 +69,22 @@ function handle(msg: any) {
         pendingNetworkChange = false
         scheduleNetworkRefresh()
       }
-    } else if (msg.status === 'stopped') engineReady = false
+    } else if (msg.status === 'stopped' || msg.status === 'error') {
+      engineReady = false
+      // The worklet died (unhandled rejection in Bare is fatal, or the engine
+      // crashed). A dead Worklet instance cannot be restarted in place — drop
+      // it and re-boot. startBridge() resets its `started` guard, and a fresh
+      // Worklet is created from the same asset bundle. Pending RPCs are
+      // orphaned; fail them so callers don't hang on a dead bridge.
+      worklet = null
+      const err = new Error('Engine unavailable: ' + String(msg.message || 'worklet stopped'))
+      for (const [, p] of pending) p.reject(err)
+      pending.clear()
+      setTimeout(() => {
+        started = false
+        startBridge().catch(() => {})
+      }, 2000)
+    }
     emit('__engine', msg)
   } else if (msg.type === 'log') {
     const lvl = msg.level || 'info'
@@ -211,14 +231,30 @@ export function watchNetworkChanges(): void {
   if (!mod?.startListening) return
   mod.startListening()
   const emitter = new NativeEventEmitter(mod as unknown as NativeModule)
-  emitter.addListener('MeshDropNetworkChanged', () => {
+  emitter.addListener('MeshDropNetworkChanged', (params: { type?: string; online?: boolean }) => {
     if (!engineReady) {
       // Engine still booting — defer instead of dropping; the replay happens
       // in handle() when the engine reports ready.
       pendingNetworkChange = true
       return
     }
-    scheduleNetworkRefresh()
+    const online = params?.online !== false
+    if (!online) {
+      // Full connectivity loss. Cancel any pending rebuild — refreshing onto
+      // a dead network just churns. Remember the loss so the recovery event
+      // (online=true) always rebuilds exactly once below.
+      if (networkTimer) {
+        clearTimeout(networkTimer)
+        networkTimer = null
+      }
+      isOffline = true
+      return
+    }
+    const wasOffline = isOffline
+    isOffline = false
+    // Recovered from a loss, or switched transports while online — both need a
+    // rebuild on the current interface.
+    if (wasOffline || online) scheduleNetworkRefresh()
   })
 }
 
