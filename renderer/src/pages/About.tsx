@@ -148,7 +148,7 @@ export function About() {
   const handleCopyBtc = async () => {
     try {
       if (window.bridge?.writeClipboard) {
-        await window.bridge.writeClipboard(BITCOIN_ADDRESS)
+        await window.bridge.writeClipboard({ text: BITCOIN_ADDRESS })
       } else if (navigator?.clipboard) {
         await navigator.clipboard.writeText(BITCOIN_ADDRESS)
       }
