@@ -110,7 +110,9 @@ async function boot() {
       'sync:completed',
       'sync:deleted',
       'sync:conflict',
-      'sync:error'
+      'sync:error',
+      'sync:invite:received',
+      'sync:phase'
     ]
     for (const evt of EVENTS) {
       engine.on(evt, (data) => send({ type: 'event', event: evt, data }))
@@ -125,7 +127,7 @@ async function boot() {
 
 // ─── RPC ───────────────────────────────────────────────────────────────────
 
-function call(method, params) {
+function call(method, params = {}) {
   return Promise.resolve().then(() => {
     switch (method) {
     case 'getIdentity':
@@ -134,6 +136,8 @@ function call(method, params) {
       return engine.getStatus()
     case 'getPaths':
       return { storageDir, downloadsDir }
+    case 'listDevices':
+      return engine.listDevices()
     case 'pairWithCode':
       return engine.pairWithCode(params.code)
     case 'createDropShare':
@@ -159,17 +163,36 @@ function call(method, params) {
     case 'offerFile':
       return engine.offerFile(params.peerId, params.filePath)
     case 'addSyncLibrary':
-      return engine.addSyncLibrary(params)
+    case 'createSyncLibrary':
+      return engine.addSyncLibrary({
+        path: params.path || params.localPath,
+        peerId: params.peerId,
+        name: params.name,
+        mode: params.mode
+      })
     case 'listSyncLibraries':
       return engine.listSyncLibraries()
     case 'removeSyncLibrary':
+    case 'deleteSyncLibrary':
       return engine.removeSyncLibrary(params.id)
     case 'pauseSyncLibrary':
       return engine.pauseSyncLibrary(params.id)
     case 'resumeSyncLibrary':
       return engine.resumeSyncLibrary(params.id)
+    case 'setSyncLibraryPaused':
+      return params.paused
+        ? engine.pauseSyncLibrary(params.id)
+        : engine.resumeSyncLibrary(params.id)
     case 'syncLibrary':
+    case 'triggerSync':
       return engine.syncLibrary(params.id)
+    case 'acceptSyncInvite':
+      return engine.acceptSyncInvite(params)
+    case 'declineSyncInvite':
+      return engine.declineSyncInvite(params)
+    case 'listPendingSyncInvites':
+    case 'listSyncInvites':
+      return engine.listPendingSyncInvites()
     default:
       throw new Error('Unknown method: ' + method)
     }

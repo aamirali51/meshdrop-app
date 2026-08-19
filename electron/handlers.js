@@ -498,7 +498,8 @@ handlers[METHODS.FILES_CLAIM_CODE] = async (params) => {
     const lib = await engine.addSyncLibrary({
       path: params?.path,
       peerId: params?.peerId,
-      name: params?.name
+      name: params?.name,
+      mode: params?.mode
     })
     console.log(`[Main] Sync library added: ${lib.name} (${lib.fileCount} file(s)) -> ${lib.peerId ? lib.peerId.slice(0, 12) : 'unknown'}...`)
     if (updateAutoStart) updateAutoStart()

@@ -64,6 +64,17 @@ interface PairedDevice {
   isTrusted?: boolean
 }
 
+interface SyncInvite {
+  id: string
+  name: string
+  peerId?: string
+  peerName?: string
+  defaultPath?: string
+  mode?: string
+  fileCount?: number
+  totalSize?: number
+}
+
 type SyncTemplateKey = 'camera' | 'docs' | 'media' | 'custom'
 
 const ANDROID_STORAGE_ROOT = '/storage/emulated/0'
@@ -305,6 +316,7 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
 export function Sync({ identity: _identity }: { identity?: any }) {
   const [libraries, setLibraries] = useState<SyncLibrary[]>([])
   const [devices, setDevices] = useState<PairedDevice[]>([])
+  const [invites, setInvites] = useState<SyncInvite[]>([])
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [activeTemplate, setActiveTemplate] = useState<SyncTemplateKey>('custom')
   const [newFolderName, setNewFolderName] = useState('')
@@ -346,6 +358,12 @@ export function Sync({ identity: _identity }: { identity?: any }) {
         if (Array.isArray(devs)) setDevices(devs)
       })
       .catch(() => {})
+
+    call('listPendingSyncInvites')
+      .then((inv: any) => {
+        if (Array.isArray(inv)) setInvites(inv)
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -361,6 +379,8 @@ export function Sync({ identity: _identity }: { identity?: any }) {
       'sync:up_to_date',
       'sync:completed',
       'sync:error',
+      'sync:invite:received',
+      'sync:phase',
       'transfer:started',
       'transfer:completed',
       'transfer:failed',
@@ -533,6 +553,26 @@ export function Sync({ identity: _identity }: { identity?: any }) {
     )
   }, [refresh])
 
+  const handleAcceptInvite = useCallback(async (inv: SyncInvite) => {
+    setBusy(true)
+    try {
+      await call('acceptSyncInvite', { id: inv.id })
+      Alert.alert('Sync Folder Linked', `"${inv.name}" is now continuously syncing.`)
+      refresh()
+    } catch (err: any) {
+      Alert.alert('Accept Error', err?.message || 'Failed to accept sync invitation.')
+    } finally {
+      setBusy(false)
+    }
+  }, [refresh])
+
+  const handleDeclineInvite = useCallback(async (inv: SyncInvite) => {
+    try {
+      await call('declineSyncInvite', { id: inv.id })
+      refresh()
+    } catch {}
+  }, [refresh])
+
   const totalFiles = libraries.reduce((acc, l) => acc + (l.fileCount || l.itemCount || 0), 0)
   // listSyncLibraries returns totalSize (alias: size), not totalBytes.
   const totalBytes = libraries.reduce((acc, l) => acc + (l.totalSize ?? l.size ?? 0), 0)
@@ -564,6 +604,44 @@ export function Sync({ identity: _identity }: { identity?: any }) {
           color={theme.success}
         />
       </View>
+
+      {/* Pending Sync Invitations Banner */}
+      {invites.length > 0 && (
+        <View style={{ marginBottom: 16 }}>
+          <SectionHeader title="Incoming Sync Invites" badge={invites.length} />
+          {invites.map((inv) => (
+            <Card key={inv.id} glow style={{ marginTop: 8, padding: 14, borderColor: theme.primary }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: theme.primary + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                  <FolderSync size={20} color={theme.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>{inv.name}</Text>
+                  <Text style={{ color: theme.textDim, fontSize: 12 }}>
+                    From {inv.peerName || 'Remote Peer'} · {inv.fileCount ? `${inv.fileCount} file(s)` : 'Folder sync'}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: theme.primary, paddingVertical: 9, borderRadius: 8, alignItems: 'center' }}
+                  onPress={() => handleAcceptInvite(inv)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Accept & Link</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: theme.surfaceAlt, paddingVertical: 9, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
+                  onPress={() => handleDeclineInvite(inv)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: theme.textDim, fontWeight: '600', fontSize: 13 }}>Decline</Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
+          ))}
+        </View>
+      )}
 
       {/* Header & Add Button */}
       <View style={styles.sectionHeaderRow}>
