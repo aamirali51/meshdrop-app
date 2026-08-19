@@ -75,7 +75,7 @@ export function Settings({ identity }: { identity?: any }) {
 
   // Preferences
   const [autoAcceptTrusted, setAutoAcceptTrusted] = useState(false)
-  const [preferOwnRelay, setPreferOwnRelay] = useState(false)
+  const [preferOwnRelay, setPreferOwnRelay] = useState(true)
   const [backgroundKeepAlive, setBackgroundKeepAlive] = useState(true)
   const [batteryIgnored, setBatteryIgnored] = useState(true)
 

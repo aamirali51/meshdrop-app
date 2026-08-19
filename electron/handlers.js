@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   // When false the engine holds incoming transfers at "pending approval"
   // until the user explicitly accepts (Require Manual File Acceptance).
   autoAcceptOffers: true,
+  preferOwnRelay: true,
   noiseEncryption: true,
   autoUpdate: true,
   releaseChannel: 'stable',

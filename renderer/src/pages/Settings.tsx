@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   deviceName: '',
   autoTrustLAN: false,
   autoAcceptOffers: true,
-  preferOwnRelay: false,
+  preferOwnRelay: true,
   noiseEncryption: true,
   autoUpdate: true,
   releaseChannel: 'stable',
