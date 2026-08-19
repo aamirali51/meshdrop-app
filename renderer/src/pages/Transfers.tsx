@@ -201,7 +201,7 @@ export function Transfers() {
           </p>
         </div>
 
-        <div className='flex flex-col md:flex-row items-stretch md:items-center gap-2'>
+        <div className='flex flex-wrap items-stretch md:items-center gap-2'>
           <select
             value={targetId}
             onChange={(e) => setTargetId(e.target.value)}
@@ -222,7 +222,7 @@ export function Transfers() {
             title='Create a one-time DROP code for a file'
           >
             <Link2 className='h-4 w-4' />
-            Share via One-Time Code
+            Share Code
           </Button>
           <Button
             className='h-9 font-bold text-xs gap-1.5'
@@ -235,8 +235,9 @@ export function Transfers() {
           {terminalCount > 0 && (
             <Button
               variant='ghost'
-              className='h-9 text-xs font-bold text-muted-foreground gap-1.5'
+              className='h-9 text-xs font-bold text-muted-foreground hover:text-destructive gap-1.5'
               onClick={() => setClearOpen(true)}
+              title='Clear all finished and cancelled transfers'
             >
               <Trash2 className='h-4 w-4' /> Clear Finished
             </Button>

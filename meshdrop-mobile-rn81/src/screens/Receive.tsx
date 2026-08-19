@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import {
   AlertCircle,
   Radio,
   Sparkles,
+  ArrowDownToLine,
+  ClipboardCheck,
 } from 'lucide-react-native'
 import { call } from '../bridge'
 import {
@@ -28,6 +30,7 @@ import {
 } from '../components'
 import { QRScannerModal } from '../components/QRScannerModal'
 import { formatCodeInput } from '../utils/formatCode'
+import { getClipboardText } from '../clipboard'
 import { theme, fonts } from '../theme'
 
 export function Receive() {
@@ -36,6 +39,23 @@ export function Receive() {
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
   const [showScanner, setShowScanner] = useState(false)
+  const [detectedClipboardCode, setDetectedClipboardCode] = useState<string | null>(null)
+
+  // Smart Clipboard Detection on Mount
+  useEffect(() => {
+    let active = true
+    getClipboardText().then((text) => {
+      if (!active || !text) return
+      const trimmed = text.trim().toUpperCase()
+      // Match code patterns: DROP-XXXX-XXXX, XXXX-XXXX, or 8-character hex/alphanumeric
+      const codeMatch = trimmed.match(/(?:DROP-)?([A-Z0-9]{4}-[A-Z0-9]{4})/i) || trimmed.match(/^([A-Z0-9]{8})$/i)
+      if (codeMatch) {
+        const formatted = formatCodeInput(codeMatch[1] || codeMatch[0])
+        setDetectedClipboardCode(formatted)
+      }
+    }).catch(() => {})
+    return () => { active = false }
+  }, [])
 
   const handleClaimWithCode = async (targetCode: string) => {
     const clean = targetCode.trim().toUpperCase()
@@ -45,8 +65,9 @@ export function Receive() {
     setError('')
     try {
       await call('claimDropCode', { code: clean })
-      setMsg(`Code "${clean}" verified! P2P Download stream initiated.`)
+      setMsg(`Code "${clean}" verified! Direct P2P transfer started.`)
       setCode('')
+      setDetectedClipboardCode(null)
     } catch (e: any) {
       setError(e?.message || 'Could not claim the drop code.')
       Alert.alert('Claim Failed', e?.message || 'Could not verify code.')
@@ -74,24 +95,47 @@ export function Receive() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Hero Quantum Claim Card */}
+      {/* Smart Clipboard Code Detection Banner */}
+      {detectedClipboardCode && (
+        <TouchableOpacity
+          style={styles.clipboardBanner}
+          onPress={() => {
+            setCode(detectedClipboardCode)
+            handleClaimWithCode(detectedClipboardCode)
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={styles.clipboardIconBox}>
+            <Sparkles size={16} color={theme.primary} />
+          </View>
+          <View style={styles.flex1}>
+            <Text style={styles.clipboardTitle}>Drop Code in Clipboard</Text>
+            <Text style={styles.clipboardCode}>{detectedClipboardCode}</Text>
+          </View>
+          <View style={styles.clipboardActionBtn}>
+            <Text style={styles.clipboardActionText}>Claim Now</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* Hero Claim Card */}
       <Card glow style={styles.heroCard}>
         <View style={styles.heroHeader}>
           <View style={styles.heroIconBox}>
             <Download size={22} color={theme.primary} />
           </View>
           <View style={styles.flex1}>
-            <Text style={styles.heroTitle}>Quantum Claim</Text>
-            <Text style={styles.heroSub}>Instant Serverless P2P Reception</Text>
+            <Text style={styles.heroTitle}>Claim Drop Code</Text>
+            <Text style={styles.heroSub}>Direct Serverless P2P Reception</Text>
           </View>
         </View>
 
         <Text style={styles.heroDescription}>
-          Enter an 8-character DROP code from the sender or scan their QR matrix to stream files directly into your local storage.
+          Enter an 8-character Drop Code from the sender or scan their QR code to stream files directly to this device with end-to-end encryption.
         </Text>
 
         <Btn
-          label="Scan DROP QR Matrix"
+          label="Scan Drop QR Code"
           icon={Camera}
           variant="secondary"
           onPress={() => setShowScanner(true)}
@@ -99,7 +143,7 @@ export function Receive() {
         />
 
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>DROP Code</Text>
+          <Text style={styles.inputLabel}>Drop Code</Text>
           <View style={styles.inputBoxWrap}>
             <TextInput
               style={styles.input}
@@ -114,7 +158,7 @@ export function Receive() {
         </View>
 
         <Btn
-          label="Claim & Download Payload"
+          label="Claim & Start Download"
           icon={Zap}
           variant="primary"
           disabled={!code.trim() || busy}
@@ -139,42 +183,40 @@ export function Receive() {
         )}
       </Card>
 
-      {/* Security & Protocol Telemetry Card */}
+      {/* Security & Protocol Safeguards Card */}
       <Card style={styles.infoCard}>
         <View style={styles.infoHeader}>
           <ShieldCheck size={18} color={theme.primary} />
-          <Text style={styles.infoTitle}>Cryptographic Safeguards</Text>
+          <Text style={styles.infoTitle}>P2P Transfer Security</Text>
         </View>
 
         <View style={styles.bulletRow}>
           <View style={styles.bulletDot} />
           <Text style={styles.bulletText}>
-            <Text style={styles.bulletBold}>Direct Device Hop:</Text> Zero cloud relays; traffic moves peer-to-peer over encrypted Hyperswarm DHT streams.
+            End-to-End Encrypted via Noise Protocol Handshake.
           </Text>
         </View>
 
         <View style={styles.bulletRow}>
           <View style={styles.bulletDot} />
           <Text style={styles.bulletText}>
-            <Text style={styles.bulletBold}>Cryptographic Verification:</Text> Payloads are verified against SHA-256 Merkle hashes prior to disk writing.
+            Direct stream over local Wi-Fi or Hyperswarm DHT without cloud relay.
           </Text>
         </View>
 
         <View style={styles.bulletRow}>
           <View style={styles.bulletDot} />
           <Text style={styles.bulletText}>
-            <Text style={styles.bulletBold}>One-Time Use:</Text> DROP codes automatically self-destruct once downloaded or when their TTL timer expires.
+            One-time single-use codes auto-expire after transfer completion.
           </Text>
         </View>
       </Card>
 
-      {/* QR Code Camera Scanner Modal */}
+      {/* QR Scanner Modal */}
       <QRScannerModal
         visible={showScanner}
-        title="Scan DROP Code Matrix"
-        instruction="Align camera with the sender's DROP QR code"
-        onScan={handleScanCode}
         onClose={() => setShowScanner(false)}
+        onScan={handleScanCode}
       />
     </ScrollView>
   )
@@ -192,6 +234,48 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 90,
   },
+  clipboardBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.primarySoft,
+    borderColor: 'rgba(79, 70, 229, 0.25)',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  clipboardIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clipboardTitle: {
+    color: theme.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  clipboardCode: {
+    color: theme.primary,
+    fontSize: 14,
+    fontWeight: '900',
+    fontFamily: fonts.mono,
+    letterSpacing: 0.5,
+  },
+  clipboardActionBtn: {
+    backgroundColor: theme.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  clipboardActionText: {
+    color: '#FFFFFF',
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
   heroCard: {
     padding: 18,
     marginBottom: 16,
@@ -200,7 +284,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   heroIconBox: {
     width: 44,
@@ -214,18 +298,17 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: theme.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
-    letterSpacing: -0.3,
   },
   heroSub: {
-    color: theme.textSecondary,
+    color: theme.muted,
     fontSize: 12,
-    marginTop: 1,
+    marginTop: 2,
   },
   heroDescription: {
     color: theme.textSecondary,
-    fontSize: 13,
+    fontSize: 12.5,
     lineHeight: 18,
     marginBottom: 16,
   },
@@ -242,18 +325,16 @@ const styles = StyleSheet.create({
     backgroundColor: theme.bgElevated,
     borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingHorizontal: 12,
   },
   input: {
-    color: theme.primary,
-    fontSize: 17,
-    fontWeight: '900',
+    height: 48,
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: '800',
     fontFamily: fonts.mono,
-    letterSpacing: 1.5,
-    padding: 0,
-    textAlign: 'center',
+    letterSpacing: 1,
   },
   successBanner: {
     flexDirection: 'row',
@@ -262,13 +343,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.successBg,
     borderColor: theme.successBorder,
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 8,
+    padding: 10,
     marginTop: 14,
   },
   successText: {
     color: theme.success,
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '700',
     flex: 1,
   },
@@ -279,20 +360,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.dangerBg,
     borderColor: theme.dangerBorder,
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 8,
+    padding: 10,
     marginTop: 14,
   },
   errorText: {
     color: theme.danger,
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '700',
     flex: 1,
   },
   infoCard: {
     padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
   },
   infoHeader: {
     flexDirection: 'row',
@@ -302,19 +381,19 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     color: theme.text,
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
   },
   bulletRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 8,
   },
   bulletDot: {
     width: 5,
     height: 5,
-    borderRadius: 2.5,
+    borderRadius: 3,
     backgroundColor: theme.primary,
     marginTop: 6,
   },
@@ -323,9 +402,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     flex: 1,
-  },
-  bulletBold: {
-    color: theme.text,
-    fontWeight: '700',
   },
 })

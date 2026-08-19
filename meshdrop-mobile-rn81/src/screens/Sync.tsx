@@ -340,10 +340,24 @@ export function Sync({ identity: _identity }: { identity?: any }) {
   const [syncMode, setSyncMode] = useState<'two-way' | 'send-only' | 'receive-only'>('send-only')
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [hasStorageAccess, setHasStorageAccess] = useState<boolean>(true)
   // Library id -> live transfer progress { progress, speed } from listTransfers.
   const [transferProgress, setTransferProgress] = useState<Record<string, { progress: number; speed: number }>>({})
   // Library id -> run phase from sync:phase events (analyzing/transferring/synced).
   const [phases, setPhases] = useState<Record<string, { phase: string; total: number; done: number }>>({})
+
+  useEffect(() => {
+    const checkPerm = async () => {
+      try {
+        const mod = NativeModules.MeshDropEngineAssets as any
+        if (mod && mod.hasAllFilesAccess) {
+          const has = await mod.hasAllFilesAccess()
+          setHasStorageAccess(Boolean(has))
+        }
+      } catch {}
+    }
+    checkPerm()
+  }, [])
 
   const refresh = useCallback(() => {
     call('listSyncLibraries')
@@ -601,6 +615,22 @@ export function Sync({ identity: _identity }: { identity?: any }) {
     } catch {}
   }, [refresh])
 
+  const handleGrantStorageAccess = async () => {
+    try {
+      const mod = NativeModules.MeshDropEngineAssets as any
+      if (mod && mod.requestAllFilesAccess) {
+        await mod.requestAllFilesAccess()
+        // Re-check after returning from settings
+        setTimeout(async () => {
+          if (mod.hasAllFilesAccess) {
+            const has = await mod.hasAllFilesAccess()
+            setHasStorageAccess(Boolean(has))
+          }
+        }, 1500)
+      }
+    } catch {}
+  }
+
   const totalFiles = libraries.reduce((acc, l) => acc + (l.fileCount || l.itemCount || 0), 0)
   // listSyncLibraries returns totalSize (alias: size), not totalBytes.
   const totalBytes = libraries.reduce((acc, l) => acc + (l.totalSize ?? l.size ?? 0), 0)
@@ -611,6 +641,28 @@ export function Sync({ identity: _identity }: { identity?: any }) {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      {/* Storage Permission Health Banner */}
+      {!hasStorageAccess && (
+        <View style={styles.permissionCard}>
+          <View style={styles.permissionIconBox}>
+            <AlertCircle size={20} color={theme.warning} />
+          </View>
+          <View style={styles.flex1}>
+            <Text style={styles.permissionTitle}>All Files Access Required</Text>
+            <Text style={styles.permissionSub}>
+              Grant full storage permission for uninterrupted background folder synchronization.
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.permissionBtn}
+            onPress={handleGrantStorageAccess}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.permissionBtnText}>Grant</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Overview Stat Grid */}
       <View style={styles.statGrid}>
         <StatCard
@@ -871,9 +923,9 @@ export function Sync({ identity: _identity }: { identity?: any }) {
           <Text style={styles.inputLabel}>Replication Mode</Text>
           <View style={styles.modeRow}>
             {[
-              { key: 'send-only', label: 'Send Only' },
-              { key: 'two-way', label: 'Bidirectional' },
-              { key: 'receive-only', label: 'Receive Only' },
+              { key: 'send-only', label: 'Send-Only (Backup)' },
+              { key: 'two-way', label: 'Two-Way Sync' },
+              { key: 'receive-only', label: 'Receive-Only (Mirror)' },
             ].map((m) => {
               const isActive = syncMode === m.key
               return (
@@ -1294,6 +1346,47 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 15,
     fontWeight: '600',
+  },
+  permissionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.warningBg,
+    borderColor: theme.warningBorder,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  permissionIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionTitle: {
+    color: theme.warning,
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  permissionSub: {
+    color: theme.textSecondary,
+    fontSize: 10.5,
+    marginTop: 2,
+    lineHeight: 14,
+  },
+  permissionBtn: {
+    backgroundColor: theme.warning,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  permissionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11.5,
+    fontWeight: '800',
   },
   modalCtaWrap: {
     paddingTop: 4,

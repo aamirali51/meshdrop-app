@@ -125,13 +125,17 @@ export function MainLayout() {
       {/* Drag-and-drop share overlay: pointer-events-none so the drop still
           lands on the window root above. */}
       {dragging && (
-        <div className='pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm'>
-          <div className='flex flex-col items-center gap-3 rounded-3xl border-2 border-dashed border-primary/60 bg-card/90 px-10 py-8 text-center shadow-2xl'>
-            <Upload className='h-10 w-10 text-primary' />
-            <p className='text-base font-black text-foreground'>Drop to share</p>
-            <p className='text-xs text-muted-foreground'>
-              Files go device-to-device — no cloud, no account
-            </p>
+        <div className='pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-md transition-all'>
+          <div className='flex flex-col items-center gap-4 rounded-3xl border-2 border-dashed border-primary bg-card/95 p-12 text-center shadow-2xl animate-pulse'>
+            <div className='flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15 text-primary border border-primary/30'>
+              <Upload className='h-8 w-8' />
+            </div>
+            <div>
+              <p className='text-lg font-black text-foreground'>Drop Files to Share Instantly</p>
+              <p className='text-xs text-muted-foreground mt-1'>
+                Direct peer-to-peer stream · End-to-end encrypted · No cloud intermediary
+              </p>
+            </div>
           </div>
         </div>
       )}
