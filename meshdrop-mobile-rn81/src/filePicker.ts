@@ -1,4 +1,4 @@
-import { NativeModules, Alert } from 'react-native'
+import { NativeModules } from 'react-native'
 import RNFS from 'react-native-fs'
 
 export interface PickedFile {
@@ -6,6 +6,12 @@ export interface PickedFile {
   path: string
   name: string
   size: number
+}
+
+export interface PickedFolder {
+  uri: string
+  path: string
+  name: string
 }
 
 /**
@@ -43,4 +49,21 @@ export async function pickFiles(): Promise<PickedFile[]> {
   } catch {
     return []
   }
+}
+
+/**
+ * Open the native Android Directory Picker (ACTION_OPEN_DOCUMENT_TREE) to select a folder.
+ */
+export async function pickFolder(): Promise<PickedFolder | null> {
+  const nativePicker = NativeModules.MeshDropFilePicker
+  if (nativePicker && typeof nativePicker.pickFolder === 'function') {
+    try {
+      const result: PickedFolder | null = await nativePicker.pickFolder({})
+      return result
+    } catch (err: any) {
+      console.warn('[FilePicker] Native pickFolder error:', err)
+      return null
+    }
+  }
+  return null
 }

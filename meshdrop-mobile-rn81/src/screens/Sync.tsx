@@ -12,6 +12,7 @@ import {
 import {
   Folder,
   FolderSync,
+  FolderOpen,
   RefreshCw,
   Trash2,
   Check,
@@ -25,8 +26,10 @@ import {
   Zap,
   Radio,
   Film,
+  Info,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
+import { pickFolder } from '../filePicker'
 import {
   Card,
   Btn,
@@ -451,6 +454,21 @@ export function Sync({ identity: _identity }: { identity?: any }) {
     }
   }, [refresh])
 
+  const handleBrowseFolder = async () => {
+    try {
+      const res = await pickFolder()
+      if (res && res.path) {
+        setNewFolderPath(res.path)
+        if (!newFolderName.trim() || activeTemplate !== 'custom') {
+          setNewFolderName(res.name || 'Sync-Folder')
+        }
+        setActiveTemplate('custom')
+      }
+    } catch (err: any) {
+      Alert.alert('Folder Picker Error', err?.message || 'Could not open folder picker.')
+    }
+  }
+
   const handleApplyTemplate = (tmpl: typeof SYNC_TEMPLATES[0]) => {
     setActiveTemplate(tmpl.key)
     if (tmpl.key !== 'custom') {
@@ -461,6 +479,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
       setNewFolderName('')
       setNewFolderPath('')
       setSyncMode('send-only')
+      handleBrowseFolder()
     }
   }
 
@@ -813,6 +832,30 @@ export function Sync({ identity: _identity }: { identity?: any }) {
             </View>
           )}
 
+          {/* Local Folder Selector with Native File Manager Picker */}
+          <Text style={styles.inputLabel}>Folder Path</Text>
+          <TouchableOpacity
+            style={styles.folderPickerCard}
+            onPress={handleBrowseFolder}
+            activeOpacity={0.7}
+          >
+            <View style={styles.folderPickerIconBox}>
+              <Folder size={18} color={theme.primary} />
+            </View>
+            <View style={styles.flex1}>
+              <Text style={styles.folderPickerTitle} numberOfLines={1}>
+                {newFolderPath ? newFolderPath : 'Tap to choose folder from File Manager…'}
+              </Text>
+              <Text style={styles.folderPickerSub}>
+                {newFolderPath ? 'Selected Storage Directory' : 'Opens Android File Manager'}
+              </Text>
+            </View>
+            <View style={styles.browseButton}>
+              <FolderOpen size={13} color={theme.primary} />
+              <Text style={styles.browseButtonText}>Browse</Text>
+            </View>
+          </TouchableOpacity>
+
           <Text style={styles.inputLabel}>Folder Display Name</Text>
           <TextInput
             style={styles.textInput}
@@ -825,23 +868,11 @@ export function Sync({ identity: _identity }: { identity?: any }) {
             }}
           />
 
-          <Text style={styles.inputLabel}>Custom Subfolder Path (Optional)</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="e.g. DCIM/Camera or Documents"
-            placeholderTextColor={theme.muted}
-            value={newFolderPath}
-            onChangeText={(t) => {
-              setNewFolderPath(t)
-              setActiveTemplate('custom')
-            }}
-          />
-
           <Text style={styles.inputLabel}>Replication Mode</Text>
           <View style={styles.modeRow}>
             {[
-              { key: 'two-way', label: 'Bidirectional' },
               { key: 'send-only', label: 'Send Only' },
+              { key: 'two-way', label: 'Bidirectional' },
               { key: 'receive-only', label: 'Receive Only' },
             ].map((m) => {
               const isActive = syncMode === m.key
@@ -868,15 +899,16 @@ export function Sync({ identity: _identity }: { identity?: any }) {
             })}
           </View>
 
-          {/* Network Controls */}
-          <View style={styles.switchRow}>
-            <View style={styles.flex1}>
-              <Text style={styles.switchTitle}>Network Policy</Text>
-              <Text style={styles.switchSub}>
-                Not supported on this build — sync runs over whichever network is available
-              </Text>
-            </View>
-            <Pill label="Any" color={theme.muted} />
+          {/* Mode Helper Card */}
+          <View style={styles.modeHelpCard}>
+            <Info size={13} color={theme.primary} style={{ marginTop: 1 }} />
+            <Text style={styles.modeHelpText}>
+              {syncMode === 'send-only'
+                ? '⬆️ Phone is the master copy. Remote edits will not modify or delete files on your phone.'
+                : syncMode === 'two-way'
+                ? '🔄 Bidirectional sync. Edits and deletes on either device synchronize automatically.'
+                : '⬇️ Remote device is the master. Phone receives files and never pushes changes.'}
+            </Text>
           </View>
 
           <View style={styles.modalCtaWrap}>
@@ -1197,24 +1229,71 @@ const styles = StyleSheet.create({
     color: theme.primary,
     fontWeight: '900',
   },
-  switchRow: {
+  folderPickerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: theme.hairline,
-    marginBottom: 14,
+    gap: 10,
+    padding: 10,
+    backgroundColor: theme.bgElevated,
+    borderColor: theme.border,
+    borderWidth: 1,
+    borderRadius: theme.radiusSm,
+    marginBottom: 10,
   },
-  switchTitle: {
+  folderPickerIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: theme.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 70, 229, 0.2)',
+  },
+  folderPickerTitle: {
     color: theme.text,
-    fontSize: 13,
+    fontSize: 12.5,
+    fontWeight: '700',
+    fontFamily: fonts.mono,
+  },
+  folderPickerSub: {
+    color: theme.muted,
+    fontSize: 10.5,
+    marginTop: 1,
+  },
+  browseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.primarySoft,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 70, 229, 0.25)',
+  },
+  browseButtonText: {
+    color: theme.primary,
+    fontSize: 11.5,
     fontWeight: '800',
   },
-  switchSub: {
-    color: theme.muted,
+  modeHelpCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: theme.primarySoft,
+    padding: 9,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 70, 229, 0.15)',
+  },
+  modeHelpText: {
+    color: theme.textSecondary,
     fontSize: 11,
-    marginTop: 1,
+    flex: 1,
+    lineHeight: 15,
+    fontWeight: '600',
   },
   modalCtaWrap: {
     paddingTop: 4,
