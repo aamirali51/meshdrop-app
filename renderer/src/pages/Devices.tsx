@@ -345,7 +345,7 @@ export function Devices() {
                             {dev.name}
                             {dev.isTrusted && <ShieldCheck className='h-3 w-3 text-primary' />}
                           </p>
-                          <p className='text-[10px] text-muted-foreground'>{dev.osVersion}</p>
+                          <p className='text-[10px] text-muted-foreground'>{dev.osVersion || dev.os || '—'}</p>
                         </div>
                       </div>
                     </td>
@@ -369,11 +369,11 @@ export function Devices() {
                       </span>
                     </td>
                     <td className='p-3.5 font-mono text-[10px] uppercase text-muted-foreground'>
-                      {NETWORK_LABEL[dev.networkType] || dev.networkType.replace('_', ' ')}
+                      {(dev.networkType && (NETWORK_LABEL[dev.networkType] || dev.networkType.replace('_', ' '))) || 'Direct'}
                     </td>
-                    <td className='p-3.5 font-mono text-foreground'>{dev.ipAddress}</td>
+                    <td className='p-3.5 font-mono text-foreground'>{dev.ipAddress || '—'}</td>
                     <td className='p-3.5 font-mono font-bold text-status-online'>
-                      {dev.isOnline ? `${dev.latencyMs} ms` : '—'}
+                      {dev.isOnline ? (dev.latencyMs != null ? `${dev.latencyMs} ms` : '—') : '—'}
                     </td>
                     <td className='space-x-2 p-3.5 text-right'>
                       <Button

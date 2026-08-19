@@ -119,7 +119,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const addSyncLibrary = useCallback(
-    async (params: { path: string; peerId: string; name?: string }) => {
+    async (params: { path: string; peerId: string; name?: string; mode?: 'two-way' | 'push' | 'receive_only' }) => {
       const lib = (await call(METHODS.SYNC_ADD || 'sync.add', params)) as SyncLibrary
       refresh()
       return lib

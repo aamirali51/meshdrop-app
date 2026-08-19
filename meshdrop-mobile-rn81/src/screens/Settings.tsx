@@ -571,20 +571,29 @@ export function Settings({ identity }: { identity?: any }) {
         </TouchableOpacity>
 
         <View style={styles.donationActions}>
-          <Btn
-            label={copiedBtc ? 'Copied!' : 'Copy BTC Address'}
-            icon={copiedBtc ? Check : Copy}
-            variant="primary"
+          <TouchableOpacity
+            style={[styles.donationBtn, styles.donationBtnPrimary]}
             onPress={handleCopyBtc}
-            style={{ flex: 1 }}
-          />
-          <Btn
-            label="Show QR"
-            icon={QrCode}
-            variant="secondary"
+            activeOpacity={0.8}
+          >
+            {copiedBtc ? (
+              <Check size={14} color="#FFFFFF" />
+            ) : (
+              <Copy size={14} color="#FFFFFF" />
+            )}
+            <Text style={styles.donationBtnTextPrimary}>
+              {copiedBtc ? 'Copied!' : 'Copy BTC Address'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.donationBtn, styles.donationBtnSecondary]}
             onPress={() => setShowBtcQr(true)}
-            style={{ flex: 1 }}
-          />
+            activeOpacity={0.8}
+          >
+            <QrCode size={14} color={theme.text} />
+            <Text style={styles.donationBtnTextSecondary}>Show QR</Text>
+          </TouchableOpacity>
         </View>
       </Card>
 
@@ -846,6 +855,39 @@ const styles = StyleSheet.create({
   },
   donationActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
+  },
+  donationBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+  },
+  donationBtnPrimary: {
+    backgroundColor: theme.primary,
+    shadowColor: theme.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  donationBtnSecondary: {
+    backgroundColor: theme.bgElevated,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  donationBtnTextPrimary: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  donationBtnTextSecondary: {
+    color: theme.text,
+    fontSize: 12.5,
+    fontWeight: '700',
   },
 })

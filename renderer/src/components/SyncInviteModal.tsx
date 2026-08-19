@@ -42,14 +42,10 @@ export function SyncInviteModal() {
     }
 
     const unsub1 = on(EVENTS.SYNC_INVITE_RECEIVED, onInvite)
-    const unsub2 = on('sync.invite_received', onInvite)
-    const unsub3 = on('sync:invite:received', onInvite)
 
     return () => {
       clearInterval(timer)
       unsub1()
-      unsub2()
-      unsub3()
     }
   }, [])
 

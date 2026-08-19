@@ -81,8 +81,8 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
     const unsub3 = on(EVENTS.DEVICE_REMOVED, refreshDevices)
     const unsub4 = on(EVENTS.PEER_CONNECTED, refreshDevices)
     const unsub5 = on(EVENTS.PEER_DISCONNECTED, refreshDevices)
-    const unsub6 = on(EVENTS.PEER_LEFT, refreshDevices)
-    const unsub7 = on(EVENTS.ENGINE_READY, refreshDevices)
+    const unsub6 = on(EVENTS.DEVICE_OFFLINE, refreshDevices)
+    const unsub7 = on(EVENTS.WORKER_READY, refreshDevices)
 
     return () => {
       clearTimeout(t1)

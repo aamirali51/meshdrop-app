@@ -104,6 +104,7 @@ export declare const EVENTS: {
   readonly SYNC_CONFLICT: 'sync.conflict'
   readonly SYNC_ERROR: 'sync.error'
   readonly SYNC_INVITE_RECEIVED: 'sync.invite_received'
+  readonly SYNC_PHASE: 'sync.phase'
   readonly CLIPBOARD_RECEIVED: 'clipboard.received'
   readonly DRIVE_INVITE_RECEIVED: 'drive.inviteReceived'
   readonly DRIVE_AUTO_MOUNT: 'drive.autoMount'

@@ -108,6 +108,7 @@ const EVENTS = {
   SYNC_CONFLICT: 'sync.conflict',
   SYNC_ERROR: 'sync.error',
   SYNC_INVITE_RECEIVED: 'sync.invite_received',
+  SYNC_PHASE: 'sync.phase',
   CLIPBOARD_RECEIVED: 'clipboard.received',
   DRIVE_INVITE_RECEIVED: 'drive.inviteReceived',
   DRIVE_AUTO_MOUNT: 'drive.autoMount',
