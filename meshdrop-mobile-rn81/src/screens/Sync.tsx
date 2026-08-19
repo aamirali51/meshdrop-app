@@ -27,6 +27,7 @@ import {
   Radio,
   Film,
   Info,
+  AlertCircle,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
 import { pickFolder } from '../filePicker'
