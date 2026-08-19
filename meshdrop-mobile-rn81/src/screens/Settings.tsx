@@ -559,11 +559,16 @@ export function Settings({ identity }: { identity?: any }) {
           MeshDrop is 100% free and open-source software — no cloud accounts, no subscriptions, and no tracking. If MeshDrop helps you transfer files across your devices, tips via Bitcoin are deeply appreciated to support ongoing maintenance!
         </Text>
 
-        <View style={styles.btcAddressContainer}>
+        <TouchableOpacity
+          style={styles.btcAddressContainer}
+          onPress={handleCopyBtc}
+          activeOpacity={0.7}
+        >
           <Text style={styles.btcAddressText} numberOfLines={1} ellipsizeMode="middle">
             {BITCOIN_ADDRESS}
           </Text>
-        </View>
+          <Copy size={13} color={theme.muted} />
+        </TouchableOpacity>
 
         <View style={styles.donationActions}>
           <Btn
@@ -819,6 +824,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   btcAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: theme.bgElevated,
     borderWidth: 1,
     borderColor: theme.border,
@@ -826,10 +834,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 12,
+    gap: 8,
   },
   btcAddressText: {
+    flex: 1,
     color: theme.text,
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: fonts.mono,
     letterSpacing: 0.5,

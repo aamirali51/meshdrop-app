@@ -226,10 +226,15 @@ export function About() {
           </p>
 
           <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1'>
-            <div className='flex-1 flex items-center gap-2 rounded-xl border border-amber-500/25 bg-background/80 px-3.5 py-2.5 shadow-xs'>
+            <div
+              onClick={handleCopyBtc}
+              className='flex-1 flex items-center justify-between gap-2 rounded-xl border border-amber-500/25 bg-background/80 px-3.5 py-2.5 shadow-xs cursor-pointer hover:border-amber-500/50 hover:bg-background transition-all group'
+              title='Click to copy Bitcoin address'
+            >
               <span className='font-mono text-xs font-bold text-foreground truncate select-all'>
                 {BITCOIN_ADDRESS}
               </span>
+              <Copy className='h-3.5 w-3.5 text-muted-foreground group-hover:text-amber-500 shrink-0 transition-colors' />
             </div>
 
             <div className='flex items-center gap-2'>
