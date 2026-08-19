@@ -42,6 +42,7 @@ export declare const METHODS: {
   readonly TRANSFERS_RETRY: 'transfers.retry'
   readonly TRANSFERS_LIST: 'transfers.list'
   readonly TRANSFERS_CLEAR: 'transfers.clear'
+  readonly TRANSFERS_DELETE: 'transfers.delete'
   readonly TRANSFERS_BROADCAST: 'transfers.broadcast'
   readonly SYNC_ADD: 'sync.add'
   readonly SYNC_REMOVE: 'sync.remove'

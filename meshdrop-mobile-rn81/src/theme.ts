@@ -59,6 +59,7 @@ export const theme = {
   danger: '#E11D48',          // Rose 600
   dangerGlow: 'rgba(225, 29, 72, 0.16)',
   dangerBg: '#FFF1F2',        // Rose 50
+  dangerSoft: '#FFF1F2',      // Rose 50
   dangerBorder: 'rgba(225, 29, 72, 0.25)',
 
   // Soft Mobile Shadow Tokens

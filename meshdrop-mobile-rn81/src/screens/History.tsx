@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   deleteCardBtn: {
     padding: 6,
     borderRadius: 6,
-    backgroundColor: theme.dangerSoft,
+    backgroundColor: theme.dangerBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 4,
