@@ -58,6 +58,7 @@ export function Transfers() {
     cancelTransfer,
     retryTransfer,
     clearTransfers,
+    deleteTransfer,
     sendFileToDevice
   } = useTransfers()
   const { devices } = useDevices()
@@ -65,7 +66,7 @@ export function Transfers() {
   const { toast } = useToast()
   const [targetId, setTargetId] = useState('')
   const [sending, setSending] = useState(false)
-  const [clearOpen, setClearOpen] = useState(false)
+  const [clearMode, setClearMode] = useState<'finished' | 'all' | null>(null)
   const [rowMenu, setRowMenu] = useState<{ transfer: TransferRecord; x: number; y: number } | null>(
     null
   )
@@ -105,14 +106,25 @@ export function Transfers() {
     if (t.status === 'waiting_peer') {
       // A claimed DROP code whose host has not come online yet.
       return (
-        <Button
-          size='sm'
-          variant='ghost'
-          className='h-7 px-2 text-[10px] font-bold text-destructive'
-          onClick={() => cancelTransfer(t.id)}
-        >
-          <XCircle className='mr-1 h-3 w-3' /> Cancel
-        </Button>
+        <div className='flex items-center gap-1.5'>
+          <Button
+            size='sm'
+            variant='ghost'
+            className='h-7 px-2 text-[10px] font-bold text-destructive'
+            onClick={() => cancelTransfer(t.id)}
+          >
+            <XCircle className='mr-1 h-3 w-3' /> Cancel
+          </Button>
+          <Button
+            size='sm'
+            variant='ghost'
+            className='h-7 w-7 p-0 text-muted-foreground hover:text-destructive'
+            title='Delete log record'
+            onClick={() => deleteTransfer(t.id)}
+          >
+            <Trash2 className='h-3.5 w-3.5' />
+          </Button>
+        </div>
       )
     }
     if (t.status === 'active') {
@@ -156,36 +168,70 @@ export function Transfers() {
           >
             <XCircle className='mr-1 h-3 w-3' /> Cancel
           </Button>
+          <Button
+            size='sm'
+            variant='ghost'
+            className='h-7 w-7 p-0 text-muted-foreground hover:text-destructive'
+            title='Delete record'
+            onClick={() => deleteTransfer(t.id)}
+          >
+            <Trash2 className='h-3.5 w-3.5' />
+          </Button>
         </div>
       )
     }
-    if (t.status === 'failed') {
+    if (t.status === 'failed' || t.status === 'cancelled') {
       return (
-        <Button
-          size='sm'
-          variant='outline'
-          className='h-7 px-2 text-[10px] font-bold'
-          onClick={() => retryTransfer(t.id)}
-        >
-          <RotateCcw className='mr-1 h-3 w-3' /> Retry
-        </Button>
+        <div className='flex items-center gap-1.5'>
+          {t.status === 'failed' && (
+            <Button
+              size='sm'
+              variant='outline'
+              className='h-7 px-2 text-[10px] font-bold'
+              onClick={() => retryTransfer(t.id)}
+            >
+              <RotateCcw className='mr-1 h-3 w-3' /> Retry
+            </Button>
+          )}
+          <Button
+            size='sm'
+            variant='ghost'
+            className='h-7 w-7 p-0 text-muted-foreground hover:text-destructive'
+            title='Delete record'
+            onClick={() => deleteTransfer(t.id)}
+          >
+            <Trash2 className='h-3.5 w-3.5' />
+          </Button>
+        </div>
       )
     }
     if (t.status === 'completed') {
       const localPath = t.destPath || t.filePath
-      if (!localPath) return null
       return (
-        <Button
-          size='sm'
-          variant='outline'
-          className='h-7 px-2 text-[10px] font-bold'
-          title='Reveal the file in your system file manager'
-          onClick={() => {
-            if (window.bridge?.showItemInFolder) window.bridge.showItemInFolder(localPath)
-          }}
-        >
-          <FolderOpen className='mr-1 h-3 w-3' /> Show in Folder
-        </Button>
+        <div className='flex items-center gap-1.5'>
+          {localPath && (
+            <Button
+              size='sm'
+              variant='outline'
+              className='h-7 px-2 text-[10px] font-bold'
+              title='Reveal the file in your system file manager'
+              onClick={() => {
+                if (window.bridge?.showItemInFolder) window.bridge.showItemInFolder(localPath)
+              }}
+            >
+              <FolderOpen className='mr-1 h-3 w-3' /> Show in Folder
+            </Button>
+          )}
+          <Button
+            size='sm'
+            variant='ghost'
+            className='h-7 w-7 p-0 text-muted-foreground hover:text-destructive'
+            title='Delete record'
+            onClick={() => deleteTransfer(t.id)}
+          >
+            <Trash2 className='h-3.5 w-3.5' />
+          </Button>
+        </div>
       )
     }
     return null
@@ -235,11 +281,21 @@ export function Transfers() {
           {terminalCount > 0 && (
             <Button
               variant='ghost'
-              className='h-9 text-xs font-bold text-muted-foreground hover:text-destructive gap-1.5'
-              onClick={() => setClearOpen(true)}
-              title='Clear all finished and cancelled transfers'
+              className='h-9 text-xs font-bold text-muted-foreground hover:text-foreground gap-1.5'
+              onClick={() => setClearMode('finished')}
+              title='Clear completed and failed transfers'
             >
               <Trash2 className='h-4 w-4' /> Clear Finished
+            </Button>
+          )}
+          {transfers.length > 0 && (
+            <Button
+              variant='ghost'
+              className='h-9 text-xs font-bold text-muted-foreground hover:text-destructive gap-1.5'
+              onClick={() => setClearMode('all')}
+              title='Clear all transfer logs (including awaiting)'
+            >
+              <Trash2 className='h-4 w-4 text-destructive' /> Clear All
             </Button>
           )}
         </div>
@@ -414,14 +470,27 @@ export function Transfers() {
         </CardContent>
       </Card>
 
-      {/* Clear Finished Confirmation */}
+      {/* Clear Confirmation Dialog */}
       <ConfirmDialog
-        open={clearOpen}
-        onOpenChange={setClearOpen}
-        title='Clear finished transfers?'
-        description='Completed, failed, cancelled, and interrupted transfers will be removed from the list. Active transfers are kept.'
-        confirmLabel='Clear Transfers'
-        onConfirm={clearTransfers}
+        open={clearMode !== null}
+        onOpenChange={(open) => {
+          if (!open) setClearMode(null)
+        }}
+        title={clearMode === 'all' ? 'Clear all transfer logs?' : 'Clear finished transfers?'}
+        description={
+          clearMode === 'all'
+            ? 'All transfer records, including active, queued, and waiting transfers, will be cancelled and cleared from your transfer history.'
+            : 'Completed, failed, cancelled, and interrupted transfers will be removed from the list. Active transfers will be kept.'
+        }
+        confirmLabel={clearMode === 'all' ? 'Clear All Logs' : 'Clear Finished'}
+        onConfirm={() => {
+          if (clearMode === 'all') {
+            clearTransfers({ includePending: true })
+          } else {
+            clearTransfers()
+          }
+          setClearMode(null)
+        }}
       />
 
       {/* Row Context Menu */}
@@ -465,6 +534,11 @@ export function Transfers() {
               icon: <RotateCcw className='h-3.5 w-3.5' />,
               onClick: () => retryTransfer(rowMenu.transfer.id),
               disabled: rowMenu.transfer.status !== 'failed'
+            },
+            {
+              label: 'Delete Record',
+              icon: <Trash2 className='h-3.5 w-3.5 text-destructive' />,
+              onClick: () => deleteTransfer(rowMenu.transfer.id)
             }
           ]}
         />

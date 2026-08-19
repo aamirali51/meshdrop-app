@@ -469,7 +469,8 @@ handlers[METHODS.FILES_CLAIM_CODE] = async (params) => {
   handlers[METHODS.TRANSFERS_CANCEL] = async (params) => engine.cancelTransfer(params.id)
   handlers[METHODS.TRANSFERS_RETRY] = async (params) => engine.retryTransfer(params.id)
   handlers[METHODS.TRANSFERS_LIST] = async () => engine.listTransfers()
-  handlers[METHODS.TRANSFERS_CLEAR] = async () => engine.clearTransfers()
+  handlers[METHODS.TRANSFERS_CLEAR] = async (params) => engine.clearTransfers(params)
+  handlers[METHODS.TRANSFERS_DELETE] = async (params) => engine.deleteTransfer(params?.id)
 
   handlers[METHODS.TRANSFERS_BROADCAST] = async (params) => {
     const onlinePeers = Array.from(engine.peers.values()).filter(

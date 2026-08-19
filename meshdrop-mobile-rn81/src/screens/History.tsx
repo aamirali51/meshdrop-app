@@ -90,17 +90,29 @@ export function History() {
     return () => unsubs.forEach((u) => u())
   }, [refresh])
 
+  const handleDeleteRecord = async (id: string) => {
+    await call('deleteTransfer', { id }).catch(() => {})
+    setTransfers((prev) => prev.filter((t) => t.id !== id))
+  }
+
   const handleClearHistory = () => {
     Alert.alert(
       'Clear Transfer Ledger',
-      'Are you sure you want to clear transfer logs? Synced files on disk will not be removed.',
+      'Choose which logs to remove from the transmission history:',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Clear Ledger',
-          style: 'destructive',
+          text: 'Clear Finished Logs',
           onPress: async () => {
             await call('clearTransfers').catch(() => {})
+            refresh()
+          },
+        },
+        {
+          text: 'Clear All (Inc. Awaiting)',
+          style: 'destructive',
+          onPress: async () => {
+            await call('clearTransfers', { includePending: true }).catch(() => {})
             refresh()
           },
         },
@@ -300,6 +312,14 @@ export function History() {
                       {formatTimestamp(timestamp)}
                     </Text>
                   </View>
+
+                  <TouchableOpacity
+                    style={styles.deleteCardBtn}
+                    onPress={() => handleDeleteRecord(item.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Trash2 size={14} color={theme.danger} />
+                  </TouchableOpacity>
                 </View>
               </Card>
             )
@@ -453,6 +473,14 @@ const styles = StyleSheet.create({
   statusCol: {
     alignItems: 'flex-end',
     gap: 4,
+  },
+  deleteCardBtn: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: theme.dangerSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
   },
   timestampText: {
     color: theme.muted,

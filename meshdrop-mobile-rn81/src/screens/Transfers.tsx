@@ -21,6 +21,8 @@ import {
   Clock,
   Sparkles,
   Layers,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
 import {
@@ -136,6 +138,40 @@ export function Transfers() {
     call('cancelTransfer', { id }).catch(() => {})
   }
 
+  const handleRetry = (id: string) => {
+    call('retryTransfer', { id }).catch(() => {})
+  }
+
+  const handleDelete = async (id: string) => {
+    await call('deleteTransfer', { id }).catch(() => {})
+    setTransfers((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const handleClear = () => {
+    Alert.alert(
+      'Clear Transfer Logs',
+      'Choose which transfer logs to clear from the list:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear Finished Only',
+          onPress: async () => {
+            await call('clearTransfers').catch(() => {})
+            refresh()
+          },
+        },
+        {
+          text: 'Clear All (Inc. Awaiting)',
+          style: 'destructive',
+          onPress: async () => {
+            await call('clearTransfers', { includePending: true }).catch(() => {})
+            refresh()
+          },
+        },
+      ]
+    )
+  }
+
   const activeTransfers = useMemo(
     () =>
       transfers.filter((t) =>
@@ -222,6 +258,8 @@ export function Transfers() {
       <SectionHeader
         title="Transfer Queue"
         badge={filteredTransfers.length}
+        actionLabel={transfers.length > 0 ? 'Clear Logs' : undefined}
+        onAction={handleClear}
       />
 
       {filteredTransfers.length > 0 ? (
@@ -327,9 +365,9 @@ export function Transfers() {
                 )}
 
                 {/* Micro Action Buttons */}
-                {!isFinished && (
+                {!isFinished ? (
                   <View style={styles.actionsRow}>
-                    {t.status === 'paused' ? (
+                    {t.status === 'paused' && (
                       <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => handleResume(t.id)}
@@ -338,7 +376,8 @@ export function Transfers() {
                         <Play size={13} color={theme.success} />
                         <Text style={styles.actionBtnText}>Resume</Text>
                       </TouchableOpacity>
-                    ) : (
+                    )}
+                    {t.status === 'active' && (
                       <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => handlePause(t.id)}
@@ -356,6 +395,37 @@ export function Transfers() {
                     >
                       <X size={13} color={theme.danger} />
                       <Text style={[styles.actionBtnText, { color: theme.danger }]}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.actionBtnDanger]}
+                      onPress={() => handleDelete(t.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Trash2 size={13} color={theme.danger} />
+                      <Text style={[styles.actionBtnText, { color: theme.danger }]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.actionsRow}>
+                    {t.status === 'failed' && (
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => handleRetry(t.id)}
+                        activeOpacity={0.7}
+                      >
+                        <RotateCcw size={13} color={theme.primary} />
+                        <Text style={[styles.actionBtnText, { color: theme.primary }]}>Retry</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.actionBtnDanger]}
+                      onPress={() => handleDelete(t.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Trash2 size={13} color={theme.danger} />
+                      <Text style={[styles.actionBtnText, { color: theme.danger }]}>Delete Log</Text>
                     </TouchableOpacity>
                   </View>
                 )}

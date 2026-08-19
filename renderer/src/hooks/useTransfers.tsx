@@ -14,7 +14,8 @@ interface TransfersContextValue {
   resumeTransfer: (transferId: string) => void
   cancelTransfer: (transferId: string) => void
   retryTransfer: (transferId: string) => void
-  clearTransfers: () => void
+  clearTransfers: (options?: { includePending?: boolean }) => void
+  deleteTransfer: (transferId: string) => Promise<void>
   sendFileToDevice: (device: Device) => Promise<unknown>
   sendFilePath: (device: Device, file: File) => Promise<unknown>
 }
@@ -157,16 +158,25 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     call(METHODS.TRANSFERS_RETRY, { id: transferId }).catch(() => {})
   }, [])
 
-  const clearTransfers = useCallback(() => {
-    call(METHODS.TRANSFERS_CLEAR, null)
+  const clearTransfers = useCallback((options?: { includePending?: boolean }) => {
+    call(METHODS.TRANSFERS_CLEAR, options || null)
       .then(() => {
-        setTransfers((prev) =>
-          prev.filter(
-            (t) => !['completed', 'failed', 'cancelled', 'interrupted'].includes(t.status)
+        if (options?.includePending) {
+          setTransfers([])
+        } else {
+          setTransfers((prev) =>
+            prev.filter(
+              (t) => !['completed', 'failed', 'cancelled', 'interrupted'].includes(t.status)
+            )
           )
-        )
+        }
       })
       .catch(() => {})
+  }, [])
+
+  const deleteTransfer = useCallback(async (transferId: string) => {
+    await call(METHODS.TRANSFERS_DELETE || 'transfers.delete', { id: transferId }).catch(() => {})
+    setTransfers((prev) => prev.filter((t) => t.id !== transferId))
   }, [])
 
   const sendFileToDevice = useCallback(
@@ -231,6 +241,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         cancelTransfer,
         retryTransfer,
         clearTransfers,
+        deleteTransfer,
         sendFileToDevice,
         sendFilePath
       }}

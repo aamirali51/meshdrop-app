@@ -39,6 +39,7 @@ export const METHODS = {
   TRANSFERS_RETRY: 'transfers.retry',
   TRANSFERS_LIST: 'transfers.list',
   TRANSFERS_CLEAR: 'transfers.clear',
+  TRANSFERS_DELETE: 'transfers.delete',
   TRANSFERS_BROADCAST: 'transfers.broadcast',
   SYNC_ADD: 'sync.add',
   SYNC_REMOVE: 'sync.remove',

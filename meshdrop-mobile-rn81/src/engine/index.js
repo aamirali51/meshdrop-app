@@ -352,7 +352,9 @@ function call(method, params) {
     case 'retryTransfer':
       return engine.retryTransfer(params.id)
     case 'clearTransfers':
-      return engine.clearTransfers()
+      return engine.clearTransfers(params)
+    case 'deleteTransfer':
+      return engine.deleteTransfer(params?.id)
     case 'sendOffer':
     case 'sendTransfer':
     case 'offerFile':
