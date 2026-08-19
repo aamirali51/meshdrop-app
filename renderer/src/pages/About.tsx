@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import {
   Waypoints,
   ShieldCheck,
@@ -10,9 +11,30 @@ import {
   Database,
   Lock,
   ExternalLink,
-  Server
+  Server,
+  Heart,
+  Copy,
+  Check,
+  QrCode
 } from 'lucide-react'
+import QRCode from 'qrcode'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/hooks/useToast'
+
+const BITCOIN_ADDRESS = '12bNXZEg6vDtJZUMdauhkvUqg92UPeWJfs'
+
+function BitcoinIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox='0 0 24 24' fill='none'>
+      <circle cx='12' cy='12' r='12' fill='#F7931A' />
+      <path
+        d='M16.667 9.872c.24-1.605-.983-2.468-2.656-3.044l.542-2.176-1.325-.33-.528 2.118c-.348-.087-.706-.17-1.064-.251l.531-2.133-1.324-.33-.543 2.178c-.288-.066-.57-.13-.844-.198l.002-.008-1.828-.456-.353 1.416s.983.225.962.239c.537.134.634.49.618.772l-.619 2.482c.037.01.085.023.138.044-.044-.011-.092-.023-.138-.035l-.868 3.48c-.066.163-.233.407-.61.314.013.018-.962-.24-.962-.24l-.659 1.52 1.725.43c.321.08.636.163.946.242l-.548 2.203 1.324.33.543-2.18c.362.098.713.189 1.057.274l-.54 2.167 1.325.33.548-2.196c2.261.428 3.961.255 4.676-1.789.576-1.646-.029-2.595-1.22-3.214.867-.2 1.52-.77 1.695-1.95zm-3.033 4.254c-.41 1.646-3.184.757-4.085.533l.729-2.922c.901.224 3.784.67 3.356 2.389zm.41-4.275c-.374 1.5-2.684.738-3.434.551l.661-2.65c.75.187 3.16.536 2.773 2.099z'
+        fill='#FFFFFF'
+      />
+    </svg>
+  )
+}
 
 function GithubIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -105,6 +127,39 @@ const APP_VERSION = (() => {
 })()
 
 export function About() {
+  const { toast } = useToast()
+  const [copied, setCopied] = useState(false)
+  const [showQr, setShowQr] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    QRCode.toDataURL(BITCOIN_ADDRESS, {
+      margin: 1,
+      width: 200,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    })
+      .then((url) => setQrDataUrl(url))
+      .catch(() => {})
+  }, [])
+
+  const handleCopyBtc = async () => {
+    try {
+      if (window.bridge?.writeClipboard) {
+        await window.bridge.writeClipboard(BITCOIN_ADDRESS)
+      } else if (navigator?.clipboard) {
+        await navigator.clipboard.writeText(BITCOIN_ADDRESS)
+      }
+      setCopied(true)
+      toast.success('Address Copied', 'Bitcoin donation address copied to clipboard!')
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      toast.error('Copy Failed', 'Could not access clipboard')
+    }
+  }
+
   return (
     <div className='space-y-6 pb-12'>
       {/* Product Hero */}
@@ -139,6 +194,80 @@ export function About() {
               <span className='text-muted-foreground/50'>·</span> Open source (MIT)
             </p>
           </div>
+        </div>
+      </Card>
+
+      {/* Support & Bitcoin Donation Card */}
+      <Card className='glass-card overflow-hidden border-amber-500/20 bg-gradient-to-br from-amber-500/5 via-card/50 to-orange-500/5 relative p-6 shadow-lg'>
+        <div className='absolute -right-16 -bottom-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl' />
+        <div className='relative space-y-4'>
+          <div className='flex flex-col md:flex-row md:items-center justify-between gap-3'>
+            <div className='flex items-center gap-3'>
+              <div className='flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 shadow-sm shrink-0'>
+                <BitcoinIcon className='h-6 w-6' />
+              </div>
+              <div>
+                <h3 className='text-base font-black text-foreground flex items-center gap-2'>
+                  Support MeshDrop Development
+                  <Heart className='h-4 w-4 text-rose-500 fill-rose-500 animate-pulse' />
+                </h3>
+                <p className='text-xs text-muted-foreground'>
+                  100% Free · Open Source · No Ads · Direct Peer-to-Peer
+                </p>
+              </div>
+            </div>
+            <span className='self-start md:self-auto rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 font-mono'>
+              Network: Bitcoin (BTC)
+            </span>
+          </div>
+
+          <p className='text-xs text-muted-foreground leading-relaxed'>
+            MeshDrop is built with love for decentralized, private communication. If MeshDrop helps you seamlessly transfer files or continuously sync folders across your devices without cloud subscriptions, consider sending a Bitcoin tip to support ongoing maintenance and new features. Every satoshi is deeply appreciated!
+          </p>
+
+          <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1'>
+            <div className='flex-1 flex items-center gap-2 rounded-xl border border-amber-500/25 bg-background/80 px-3.5 py-2.5 shadow-xs'>
+              <span className='font-mono text-xs font-bold text-foreground truncate select-all'>
+                {BITCOIN_ADDRESS}
+              </span>
+            </div>
+
+            <div className='flex items-center gap-2'>
+              <Button
+                variant='outline'
+                className='h-10 text-xs font-bold gap-1.5 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-500'
+                onClick={handleCopyBtc}
+              >
+                {copied ? <Check className='h-4 w-4 text-emerald-500' /> : <Copy className='h-4 w-4' />}
+                {copied ? 'Copied!' : 'Copy BTC Address'}
+              </Button>
+
+              <Button
+                variant='ghost'
+                className='h-10 text-xs font-bold gap-1.5 text-muted-foreground hover:text-foreground'
+                onClick={() => setShowQr(!showQr)}
+              >
+                <QrCode className='h-4 w-4 text-amber-500' />
+                {showQr ? 'Hide QR' : 'Show QR'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Expandable QR Code Frame */}
+          {showQr && qrDataUrl && (
+            <div className='flex flex-col items-center justify-center gap-2.5 p-5 rounded-2xl border border-amber-500/20 bg-background/90 text-center transition-all animate-in fade-in zoom-in-95 duration-200'>
+              <div className='p-3 bg-white rounded-2xl shadow-md border border-border/40'>
+                <img
+                  src={qrDataUrl}
+                  alt='Bitcoin Donation QR Code'
+                  className='h-44 w-44 rounded-lg'
+                />
+              </div>
+              <p className='text-[11px] font-semibold text-muted-foreground'>
+                Scan with any Bitcoin or Lightning-enabled wallet to donate
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 

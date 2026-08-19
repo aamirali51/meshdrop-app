@@ -29,6 +29,8 @@ import {
   FileText,
   Clock,
   FolderSync,
+  Heart,
+  QrCode,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
 import {
@@ -38,6 +40,7 @@ import {
   SectionHeader,
   DeviceAvatar,
 } from '../components'
+import { QRCodeModal } from '../components/QRCodeModal'
 import {
   checkAllPermissions,
   requestAllPermissions,
@@ -83,6 +86,20 @@ export function Settings({ identity }: { identity?: any }) {
   const [storageStats, setStorageStats] = useState<any>(null)
   const [installedVersion, setInstalledVersion] = useState<string | null>(null)
   const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [showBtcQr, setShowBtcQr] = useState(false)
+  const [copiedBtc, setCopiedBtc] = useState(false)
+
+  const BITCOIN_ADDRESS = '12bNXZEg6vDtJZUMdauhkvUqg92UPeWJfs'
+
+  const handleCopyBtc = async () => {
+    const ok = await copyToClipboard(BITCOIN_ADDRESS)
+    setCopiedBtc(true)
+    setTimeout(() => setCopiedBtc(false), 2500)
+    Alert.alert(
+      'Bitcoin Address Copied',
+      ok ? '12bNXZEg6vDtJZUMdauhkvUqg92UPeWJfs copied to clipboard. Thank you for supporting MeshDrop!' : 'Could not access clipboard.'
+    )
+  }
 
   const refreshPermissions = useCallback(async () => {
     setCheckingPerms(true)
@@ -521,6 +538,51 @@ export function Settings({ identity }: { identity?: any }) {
         </>
       )}
 
+      {/* Support & Bitcoin Donation */}
+      <SectionHeader title="Support MeshDrop" />
+      <Card glow style={styles.donationCard}>
+        <View style={styles.donationHeader}>
+          <View style={styles.bitcoinIconBox}>
+            <Text style={styles.bitcoinSymbol}>₿</Text>
+          </View>
+          <View style={styles.flex1}>
+            <View style={styles.donationTitleRow}>
+              <Text style={styles.donationTitle}>Donate with Bitcoin</Text>
+              <Heart size={14} color="#E11D48" fill="#E11D48" />
+            </View>
+            <Text style={styles.donationSub}>Direct Developer Support</Text>
+          </View>
+          <Pill label="Bitcoin (BTC)" color="#D97706" />
+        </View>
+
+        <Text style={styles.donationDescription}>
+          MeshDrop is 100% free and open-source software — no cloud accounts, no subscriptions, and no tracking. If MeshDrop helps you transfer files across your devices, tips via Bitcoin are deeply appreciated to support ongoing maintenance!
+        </Text>
+
+        <View style={styles.btcAddressContainer}>
+          <Text style={styles.btcAddressText} numberOfLines={1} ellipsizeMode="middle">
+            {BITCOIN_ADDRESS}
+          </Text>
+        </View>
+
+        <View style={styles.donationActions}>
+          <Btn
+            label={copiedBtc ? 'Copied!' : 'Copy BTC Address'}
+            icon={copiedBtc ? Check : Copy}
+            variant="primary"
+            onPress={handleCopyBtc}
+            style={{ flex: 1 }}
+          />
+          <Btn
+            label="Show QR"
+            icon={QrCode}
+            variant="secondary"
+            onPress={() => setShowBtcQr(true)}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </Card>
+
       {/* About */}
       <SectionHeader title="About" />
       <Card style={styles.card}>
@@ -563,6 +625,15 @@ export function Settings({ identity }: { identity?: any }) {
           <Text style={[styles.statValue, { color: theme.primary }]}>View →</Text>
         </TouchableOpacity>
       </Card>
+
+      {/* Bitcoin QR Modal */}
+      <QRCodeModal
+        visible={showBtcQr}
+        title="Donate via Bitcoin"
+        subtitle="Scan with any Bitcoin wallet to send a tip"
+        value={BITCOIN_ADDRESS}
+        onClose={() => setShowBtcQr(false)}
+      />
     </ScrollView>
   )
 }
@@ -698,5 +769,73 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     fontFamily: fonts.mono,
+  },
+  donationCard: {
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 119, 6, 0.25)',
+  },
+  donationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  bitcoinIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: 'rgba(217, 119, 6, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bitcoinSymbol: {
+    color: '#D97706',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  donationTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  donationTitle: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  donationSub: {
+    color: theme.muted,
+    fontSize: 11,
+    marginTop: 1,
+  },
+  donationDescription: {
+    color: theme.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  btcAddressContainer: {
+    backgroundColor: theme.bgElevated,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  btcAddressText: {
+    color: theme.text,
+    fontSize: 12.5,
+    fontWeight: '700',
+    fontFamily: fonts.mono,
+    letterSpacing: 0.5,
+  },
+  donationActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
 })
