@@ -8,9 +8,14 @@ export interface SyncLibrary {
   localPath: string
   peerId: string
   status: 'idle' | 'scanning' | 'syncing' | 'waiting_peer' | 'up_to_date' | 'paused' | 'error'
+  mode?: 'two-way' | 'push' | 'receive_only'
   paused: boolean
   autoCreated: boolean
   fileCount: number
+  totalSize?: number
+  lastScanAt?: number
+  lastSyncAt?: number
+  phase?: string
 }
 
 interface SyncContextValue {
@@ -18,7 +23,7 @@ interface SyncContextValue {
   transferProgress: Record<string, { filename: string; direction: string; progress: number; speed: number }>
   phases: Record<string, { phase: string; total: number; done: number }>
   refresh: () => void
-  addSyncLibrary: (params: { path: string; peerId: string; name?: string }) => Promise<SyncLibrary>
+  addSyncLibrary: (params: { path: string; peerId: string; name?: string; mode?: 'two-way' | 'push' | 'receive_only' }) => Promise<SyncLibrary>
   removeSyncLibrary: (id: string) => Promise<void>
   triggerSync: (id: string) => Promise<void>
   pauseSync: (id: string) => Promise<void>

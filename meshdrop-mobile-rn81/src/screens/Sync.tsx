@@ -219,9 +219,18 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
             />
           </View>
 
-          <Text style={styles.libPath} numberOfLines={1}>
-            {lib.localPath || 'Default Storage Root'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <Text style={styles.libPath} numberOfLines={1}>
+              {lib.localPath || 'Default Storage Root'}
+            </Text>
+            {lib.mode && (
+              <View style={{ backgroundColor: theme.primarySoft, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(79, 70, 229, 0.2)' }}>
+                <Text style={{ color: theme.primary, fontSize: 9, fontWeight: '800' }}>
+                  {lib.mode === 'two-way' ? '2-WAY' : lib.mode === 'receive-only' ? 'MIRROR' : 'BACKUP'}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
 
@@ -617,7 +626,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>{inv.name}</Text>
-                  <Text style={{ color: theme.textDim, fontSize: 12 }}>
+                  <Text style={{ color: theme.muted, fontSize: 12 }}>
                     From {inv.peerName || 'Remote Peer'} · {inv.fileCount ? `${inv.fileCount} file(s)` : 'Folder sync'}
                   </Text>
                 </View>
@@ -631,11 +640,11 @@ export function Sync({ identity: _identity }: { identity?: any }) {
                   <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Accept & Link</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: theme.surfaceAlt, paddingVertical: 9, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
+                  style={{ flex: 1, backgroundColor: theme.bgElevated, paddingVertical: 9, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
                   onPress={() => handleDeclineInvite(inv)}
                   activeOpacity={0.8}
                 >
-                  <Text style={{ color: theme.textDim, fontWeight: '600', fontSize: 13 }}>Decline</Text>
+                  <Text style={{ color: theme.muted, fontWeight: '600', fontSize: 13 }}>Decline</Text>
                 </TouchableOpacity>
               </View>
             </Card>
