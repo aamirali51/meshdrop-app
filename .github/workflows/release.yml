@@ -11,9 +11,35 @@ permissions:
   contents: write
 
 jobs:
+  # Create the GitHub Release ONCE before any build publishes to it. Without
+  # this, the three desktop OS jobs race to POST /releases and the losers fail
+  # with "Published releases must have a valid tag" (422) — the release was
+  # created by a peer job a moment earlier. Creating it here (draft) means
+  # every later upload just updates it, and the final unpublish step flips it
+  # live only after everything succeeded.
+  prepare-release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Create as a draft first so uploads from the build jobs can land
+          # before it becomes visible. If it already exists (re-run), reuse it.
+          if ! gh release view "$TAG" --repo aamirali51/meshdrop-releases >/dev/null 2>&1; then
+            gh release create "$TAG" --repo aamirali51/meshdrop-releases \
+              --title "$TAG" --draft --generate-notes || true
+          else
+            echo "release $TAG already exists — reusing"
+          fi
+
   release:
     name: Build & publish (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    needs: prepare-release
     strategy:
       fail-fast: false
       matrix:
@@ -74,7 +100,8 @@ jobs:
               gh release upload "$TAG" "${sigs[@]}" --clobber --repo aamirali51/meshdrop-releases
             fi
           fi
-          gh release edit "$TAG" --draft=false --repo aamirali51/meshdrop-releases || true
+          # Do NOT flip the release live here — the publish-release job does
+          # that after every platform (desktop + android) has uploaded.
         env:
           GH_TOKEN: ${{ secrets.RELEASES_PAT }}
           TAG: ${{ github.ref_name }}
@@ -198,3 +225,27 @@ jobs:
         if: env.MESHDROP_UPDATE_KEY == ''
         shell: bash
         run: echo "::warning::MESHDROP_UPDATE_KEY secret not set — Android APK published without an ed25519 .sig provenance file. In-app integrity still enforced via manifest sha256 + Android's signature match."
+
+  # Final gate: flip the draft release live only after EVERY platform
+  # (windows/mac/linux desktop + android) has uploaded its artifacts. This
+  # guarantees the release is never visible half-populated, and ordering is
+  # strictly: prepare (create) → desktop (windows/mac/linux) → android → live.
+  publish-release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: [release, android]
+    if: startsWith(github.ref, 'refs/tags/v') && always()
+    steps:
+      - name: Flip release live
+        if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release edit "$TAG" --draft=false --repo aamirali51/meshdrop-releases
+          echo "Release $TAG published."
+      - name: Fail if any platform failed
+        if: ${{ cancelled() || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "::error::A platform build failed — release left as draft."
+          exit 1
