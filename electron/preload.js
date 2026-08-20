@@ -108,5 +108,13 @@ contextBridge.exposeInMainWorld('bridge', {
     const wrap = (evt, data) => callback(data)
     ipcRenderer.on('app:deep-link', wrap)
     return () => ipcRenderer.removeListener('app:deep-link', wrap)
-  }
+  },
+  onQuickSend: (callback) => {
+    const wrap = (evt, data) => callback(data)
+    ipcRenderer.on('app:quick-send', wrap)
+    return () => ipcRenderer.removeListener('app:quick-send', wrap)
+  },
+  setContextMenuEnabled: (enabled) => ipcRenderer.invoke('contextMenu:setEnabled', enabled),
+  getContextMenuStatus: () => ipcRenderer.invoke('contextMenu:getStatus')
 })
+

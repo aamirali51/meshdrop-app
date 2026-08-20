@@ -47,6 +47,7 @@ interface AppSettings {
   downloadDir: string | null
   launchAtStartup: boolean
   startMinimized: boolean
+  contextMenu: boolean
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -61,8 +62,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   notifications: { transfer: true, device: true, sound: false },
   downloadDir: null,
   launchAtStartup: false,
-  startMinimized: true
+  startMinimized: true,
+  contextMenu: true
 }
+
 
 export function Settings() {
   const { theme, setTheme } = useTheme()
@@ -362,11 +365,29 @@ export function Settings() {
                         aria-label='Start minimized to system tray'
                       />
                     </div>
+
+                    <div className='flex items-center justify-between border-t border-border/40 pt-3'>
+                      <div>
+                        <p className='font-bold text-foreground'>Explorer Context Menu Integration</p>
+                        <p className='text-[11px] text-muted-foreground'>
+                          Add "Send via MeshDrop" to Windows Explorer / OS file manager right-click menu.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.contextMenu !== false}
+                        onCheckedChange={(v) => {
+                          set('contextMenu', v)
+                          window.bridge?.setContextMenuEnabled?.(v)
+                        }}
+                        aria-label='Explorer Context Menu Integration'
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+
 
           {/* Appearance Tab */}
           <TabsContent value='appearance' className='space-y-4 pt-4'>

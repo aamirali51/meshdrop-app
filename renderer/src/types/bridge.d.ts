@@ -82,8 +82,16 @@ interface Bridge {
   showItemInFolder: (filePath: string) => void
   writeClipboard: (data: { text: string }) => Promise<void>
   onClipboardChanged: (callback: (data: { type: string; content: string }) => void) => () => void
-  onTrayHidden: (callback: () => void) => () => void
+  onTrayHidden?: (callback: () => void) => () => void
   onDeepLink: (callback: (data: { url: string; code?: string | null }) => void) => () => void
+  onQuickSend?: (
+    callback: (data: {
+      peerId?: string | null
+      files: { filePath: string; filename: string; fileSize: number; isDirectory?: boolean }[]
+    }) => void
+  ) => () => void
+  setContextMenuEnabled?: (enabled: boolean) => Promise<boolean>
+  getContextMenuStatus?: () => Promise<{ supported: boolean; platform: string }>
 }
 
 declare global {
@@ -93,3 +101,4 @@ declare global {
 }
 
 export type { Bridge, DialogResult, PortableInstallResult, PortableStatus, UpdateStatusData }
+

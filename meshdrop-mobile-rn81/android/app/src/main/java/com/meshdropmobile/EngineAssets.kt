@@ -120,9 +120,11 @@ class MeshDropEngineAssetsPackage : ReactPackage {
           MeshDropClipboardModule(reactContext),
           BackgroundServiceModule(reactContext),
           MeshDropUpdaterModule(reactContext),
-          NetworkModule(reactContext)
+          NetworkModule(reactContext),
+          MeshDropShareModule(reactContext)
       )
 
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
       emptyList()
 }
+

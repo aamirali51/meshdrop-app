@@ -28,10 +28,16 @@ const { registerIpcHandlers } = require('./ipc')
 const { createTrayIcon, updateTraySettings } = require('./tray')
 const { createEngineBridge, WORKER_SPECIFIER } = require('./engine')
 const { registerEngineHandlers } = require('./handlers')
+const {
+  registerWindowsContextMenu,
+  unregisterWindowsContextMenu,
+  registerLinuxContextMenu
+} = require('./contextMenu')
 
 const protocol = name
 
 const appName = productName ?? name
+
 
 const cmd = command(
   appName,
@@ -521,11 +527,18 @@ async function createWindow() {
   win.webContents.on('render-process-gone', (e, details) =>
     console.log(`[Main:${instLabel}] render-process-gone:`, JSON.stringify(details))
   )
-  win.webContents.on('did-finish-load', () => console.log(`[Main:${instLabel}] did-finish-load`))
+  win.webContents.on('did-finish-load', () => {
+    console.log(`[Main:${instLabel}] did-finish-load`)
+    const initialQuickSend = parseQuickSendArgs(process.argv)
+    if (initialQuickSend) {
+      setTimeout(() => handleQuickSend(initialQuickSend), 800)
+    }
+  })
   win.webContents.on('dom-ready', () => console.log(`[Main:${instLabel}] dom-ready`))
   win.webContents.on('did-fail-load', (e, code, desc) =>
     console.log(`[Main:${instLabel}] did-fail-load: ${code} ${desc}`)
   )
+
 
   // Forward renderer console.log/warn/error to the main-process terminal so
   // we can read [Renderer] / [App] / [ThemeProvider] logs in the dev:p2p output.
@@ -634,12 +647,131 @@ async function createWindow() {
   // engine emits worker.ready when it is up.
   engineBridge
     .start()
-    .then(() => {
+    .then(async () => {
       updateAutoStart()
+      try {
+        const settings = await getPersistedSettings()
+        if (settings.contextMenu !== false) {
+          if (process.platform === 'win32') {
+            const devices = await engineBridge.engine.listDevices().catch(() => [])
+            await registerWindowsContextMenu({ devices })
+          } else if (process.platform === 'linux') {
+            await registerLinuxContextMenu()
+          }
+        }
+      } catch {}
     })
     .catch((err) => {
       console.error('[Main] Engine failed to start:', err)
     })
+
+  // Dynamic context menu update on peer topology changes
+  try {
+    engineBridge.engine.on('peer:connected', async () => {
+      if (process.platform === 'win32') {
+        const settings = await getPersistedSettings()
+        if (settings.contextMenu !== false) {
+          const devices = await engineBridge.engine.listDevices().catch(() => [])
+          registerWindowsContextMenu({ devices }).catch(() => {})
+        }
+      }
+    })
+    engineBridge.engine.on('peer:disconnected', async () => {
+      if (process.platform === 'win32') {
+        const settings = await getPersistedSettings()
+        if (settings.contextMenu !== false) {
+          const devices = await engineBridge.engine.listDevices().catch(() => [])
+          registerWindowsContextMenu({ devices }).catch(() => {})
+        }
+      }
+    })
+  } catch {}
+}
+
+function parseQuickSendArgs(args) {
+  if (!Array.isArray(args) || args.length === 0) return null
+  let peerId = null
+  const filePaths = []
+
+  const IGNORE_FLAGS = new Set([
+    '--storage',
+    '--user-data-dir',
+    '--inspect',
+    '--inspect-brk',
+    '--remote-debugging-port',
+    '--cwd'
+  ])
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+    const prevArg = i > 0 ? args[i - 1] : null
+
+    if (arg === '--send') {
+      if (args[i + 1] && !args[i + 1].startsWith('-')) {
+        filePaths.push(args[i + 1])
+        i++
+      }
+    } else if (arg === '--send-to') {
+      if (args[i + 1]) {
+        peerId = args[i + 1]
+        i++
+      }
+      if (args[i + 1] && !args[i + 1].startsWith('-')) {
+        filePaths.push(args[i + 1])
+        i++
+      }
+    } else if (
+      i > 0 &&
+      !arg.startsWith('-') &&
+      !arg.startsWith(protocol + '://') &&
+      !arg.includes('electron') &&
+      !arg.endsWith('.js') &&
+      arg !== '.' &&
+      !IGNORE_FLAGS.has(prevArg) &&
+      !arg.includes('p2p-instance') &&
+      path.resolve(arg) !== process.cwd() &&
+      path.resolve(arg) !== app.getAppPath()
+    ) {
+      try {
+        if (fs.existsSync(arg)) filePaths.push(arg)
+      } catch {}
+    }
+  }
+
+  if (filePaths.length === 0) return null
+  return { peerId, filePaths }
+}
+
+function handleQuickSend(quickSendPayload) {
+  if (!quickSendPayload || !quickSendPayload.filePaths?.length) return
+  const win = mainWindow
+  if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore()
+    if (!win.isVisible()) win.show()
+    win.focus()
+
+    const resolvedFiles = []
+    for (const filePath of quickSendPayload.filePaths) {
+      try {
+        if (fs.existsSync(filePath)) {
+          const stat = fs.statSync(filePath)
+          resolvedFiles.push({
+            filePath: path.resolve(filePath),
+            filename: path.basename(filePath),
+            fileSize: stat.size,
+            isDirectory: stat.isDirectory()
+          })
+        }
+      } catch {}
+    }
+
+    if (resolvedFiles.length > 0) {
+      win.webContents.send('app:quick-send', {
+        peerId: quickSendPayload.peerId || null,
+        files: resolvedFiles
+      })
+    }
+  }
 }
 
 function handleDeepLink(url) {
@@ -686,8 +818,16 @@ if (!allowMultipleInstances && !testPeer) {
       mainWindow.focus()
     }
     const url = args.find((arg) => arg.startsWith(protocol + '://'))
-    if (url) handleDeepLink(url)
+    if (url) {
+      handleDeepLink(url)
+    } else {
+      const quickSend = parseQuickSendArgs(args)
+      if (quickSend) {
+        handleQuickSend(quickSend)
+      }
+    }
   })
+
 
   app.whenReady().then(() => {
     // CSP is owned by index.html (dev meta) and the vite build transform

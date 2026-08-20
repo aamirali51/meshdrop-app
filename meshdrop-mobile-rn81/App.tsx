@@ -40,9 +40,11 @@ import { Settings } from './src/screens/Settings'
 import { TransferApprovalDialog } from './src/components/TransferApprovalDialog'
 import { FloatingTransferPill } from './src/components/FloatingTransferPill'
 import { UpdateAvailableModal } from './src/components/UpdateAvailableModal'
+import { ShareTargetModal } from './src/components/ShareTargetModal'
 import { startBridge, watchNetworkChanges, on, call, probeNetwork } from './src/bridge'
 import { initStore } from './src/store'
 import { checkForUpdate, refreshVersion } from './src/updater'
+import { getInitialShare, onShareReceived, clearInitialShare, type SharedPayload } from './src/shareTarget'
 import { theme, fonts } from './src/theme'
 import { Pill, PulseIndicator } from './src/components'
 import {
@@ -83,6 +85,8 @@ function App(): React.JSX.Element {
   // Incoming Transfer Approval State
   const [pendingApproval, setPendingApproval] = useState<any | null>(null)
   const [appVersion, setAppVersion] = useState<string | null>(null)
+  // System Share Target State
+  const [incomingShare, setIncomingShare] = useState<SharedPayload | null>(null)
   const appState = useRef<AppStateStatus>(AppState.currentState)
   // Avoid re-surfacing the update prompt on every background-resume.
   const updatePrompted = useRef(false)
@@ -92,6 +96,15 @@ function App(): React.JSX.Element {
     watchNetworkChanges()
     initStore()
     startBackgroundSync().catch(() => {})
+
+    // Check for initial system share target intent
+    getInitialShare().then((payload) => {
+      if (payload) setIncomingShare(payload)
+    }).catch(() => {})
+
+    const unsubShare = onShareReceived((payload) => {
+      if (payload) setIncomingShare(payload)
+    })
 
     // Store-free app update check: compare the hosted manifest to the running
     // build and surface an "Update available" modal if a newer APK exists.
@@ -109,6 +122,7 @@ function App(): React.JSX.Element {
         setErrorMessage(msg.message || 'Engine error')
       }
     })
+
 
     const unsubs = [
       'peer:connected',
@@ -406,6 +420,16 @@ function App(): React.JSX.Element {
 
       {/* Global Optional "Update available" Modal (store-free APK updater) */}
       <UpdateAvailableModal />
+
+      {/* Global Native Share Target Modal (System Share Sheet Receiver) */}
+      <ShareTargetModal
+        visible={Boolean(incomingShare)}
+        payload={incomingShare}
+        onClose={() => {
+          setIncomingShare(null)
+          clearInitialShare()
+        }}
+      />
 
       {/* Floating Luminous Bottom Navigation Dock */}
       <View style={styles.dockContainer}>

@@ -45,7 +45,13 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
 
   function forward(event, data) {
     const isSync = !!(data && (data.isSync || data.source === 'sync'))
-    if (isSync && (event === EVENTS.TRANSFER_OFFER_RECEIVED || event === EVENTS.TRANSFER_QUEUED || event === EVENTS.TRANSFER_STARTED || event === EVENTS.TRANSFER_COMPLETED)) {
+    if (
+      isSync &&
+      (event === EVENTS.TRANSFER_OFFER_RECEIVED ||
+        event === EVENTS.TRANSFER_QUEUED ||
+        event === EVENTS.TRANSFER_STARTED ||
+        event === EVENTS.TRANSFER_COMPLETED)
+    ) {
       return
     }
     sendToAll('pear:worker:ipc:' + WORKER_SPECIFIER, Buffer.from(createEvent(event, data)))

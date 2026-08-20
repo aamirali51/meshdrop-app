@@ -23,6 +23,8 @@ export type NetworkType = 'direct_lan' | 'p2p_dht' | 'relay'
 export interface Device {
   id: string
   name: string
+  /** Optional user-set display name override; falls back to `name`. */
+  customName?: string
   os: 'windows' | 'macos' | 'linux'
   osVersion: string
   avatar: string

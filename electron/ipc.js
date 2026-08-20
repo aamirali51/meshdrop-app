@@ -156,6 +156,27 @@ function registerIpcHandlers({ storageDir, getMainWindow, getLabel }) {
     } catch {}
   }, 2000)
 
+  // ─── Native Explorer Context Menu ───────────────────────────────────────
+
+  ipcMain.handle('contextMenu:getStatus', () => {
+    return {
+      supported: process.platform === 'win32' || process.platform === 'linux',
+      platform: process.platform
+    }
+  })
+
+  ipcMain.handle('contextMenu:setEnabled', async (evt, enabled) => {
+    const { registerWindowsContextMenu, unregisterWindowsContextMenu, registerLinuxContextMenu, unregisterLinuxContextMenu } = require('./contextMenu')
+    if (process.platform === 'win32') {
+      if (enabled) await registerWindowsContextMenu()
+      else await unregisterWindowsContextMenu()
+    } else if (process.platform === 'linux') {
+      if (enabled) await registerLinuxContextMenu()
+      else await unregisterLinuxContextMenu()
+    }
+    return true
+  })
+
   // ─── Window controls (frameless custom title bar) ────────────────────────
 
   ipcMain.on('window:minimize', (evt) => {
@@ -181,3 +202,4 @@ function registerIpcHandlers({ storageDir, getMainWindow, getLabel }) {
 }
 
 module.exports = { registerIpcHandlers }
+

@@ -7,6 +7,7 @@ import { ToastContainer } from '@/components/Toast'
 import { UpdateToaster } from '@/components/UpdateToaster'
 import { PortableBanner } from '@/components/PortableBanner'
 import { WelcomeModal } from '@/components/WelcomeModal'
+import { QuickSendModal } from '@/components/QuickSendModal'
 import { MainLayout } from '@/layouts/MainLayout'
 import { MotionConfig } from 'framer-motion'
 
@@ -20,6 +21,7 @@ export default function App() {
               <SyncProvider>
                 <MainLayout />
                 <WelcomeModal />
+                <QuickSendModal />
                 <UpdateToaster />
                 <PortableBanner />
                 <ToastContainer />
@@ -31,3 +33,4 @@ export default function App() {
     </MotionConfig>
   )
 }
+
