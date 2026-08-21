@@ -168,6 +168,24 @@ export function DeviceCard({
               Encrypted
             </span>
           )}
+          {device.isOnline && (
+            <span
+              className={cn(
+                'rounded-md border px-1.5 py-0.5 font-mono text-[9px] font-bold',
+                device.transferMethod === 'lan'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                  : device.transferMethod === 'relay' || device.relayed
+                    ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
+                    : 'border-blue-500/30 bg-blue-500/10 text-blue-400'
+              )}
+            >
+              {device.transferMethod === 'lan'
+                ? '⚡ LAN'
+                : device.transferMethod === 'relay' || device.relayed
+                  ? '🌐 Relay'
+                  : '🔗 Direct'}
+            </span>
+          )}
           {dragging && (
             <span className='text-[10px] font-bold text-primary'>Drop to send files</span>
           )}

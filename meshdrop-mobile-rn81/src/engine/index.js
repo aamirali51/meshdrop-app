@@ -151,7 +151,7 @@ async function boot() {
       deviceName: 'MeshDrop Mobile',
       autoAcceptOffers: false,
       autoTrustLAN: true,
-      lanDiscovery: false
+      lanDiscovery: true
     })
     console.log('[MDLOG] MeshEngine created OK')
 

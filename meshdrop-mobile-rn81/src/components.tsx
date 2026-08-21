@@ -451,6 +451,31 @@ export function DeviceCard({
               {device.os || 'Mesh Node'} · {device.isOnline ? 'Online' : 'Offline'}
               {(device as any).relayedViaOwnPeer ? ' · via your Desktop' : ''}
             </Text>
+            {device.isOnline && (
+              <View style={[
+                styles.transportBadge,
+                (device as any).transferMethod === 'lan'
+                  ? styles.transportBadgeLan
+                  : (device as any).transferMethod === 'relay' || (device as any).relayed
+                    ? styles.transportBadgeRelay
+                    : styles.transportBadgeDirect
+              ]}>
+                <Text style={[
+                  styles.transportBadgeText,
+                  (device as any).transferMethod === 'lan'
+                    ? styles.transportTextLan
+                    : (device as any).transferMethod === 'relay' || (device as any).relayed
+                      ? styles.transportTextRelay
+                      : styles.transportTextDirect
+                ]}>
+                  {(device as any).transferMethod === 'lan'
+                    ? '⚡ LAN'
+                    : (device as any).transferMethod === 'relay' || (device as any).relayed
+                      ? '🌐 Relay'
+                      : '🔗 Direct'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -1005,5 +1030,40 @@ const styles = StyleSheet.create({
     color: theme.primary,
     fontSize: 12,
     fontWeight: '700',
+  },
+  transportBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  transportBadgeLan: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  transportBadgeDirect: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  transportBadgeRelay: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+  },
+  transportBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    fontFamily: fonts.mono,
+  },
+  transportTextLan: {
+    color: '#10B981',
+  },
+  transportTextDirect: {
+    color: '#3B82F6',
+  },
+  transportTextRelay: {
+    color: '#A855F7',
   },
 })
