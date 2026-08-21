@@ -39,17 +39,21 @@ jobs:
 
       - name: Build Electron Desktop Release
         working-directory: meshdrop-app
+        shell: bash
         run: |
           npm run build
           npx electron-builder --windows --publish never
+          cp dist/latest.yml dist/dev.yml 2>/dev/null || true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASES_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Upload Desktop Artifact
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-build
-          path: meshdrop-app/dist/*.exe
+          path: |
+            meshdrop-app/dist/*.exe
+            meshdrop-app/dist/*.yml
           if-no-files-found: error
 
   build-android:
@@ -132,7 +136,7 @@ jobs:
         env:
           UPDATE_TAG: dev-preview
           UPDATE_OWNER: aamirali51
-          UPDATE_REPO: meshdrop-app
+          UPDATE_REPO: meshdrop-releases
 
       - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
@@ -165,6 +169,7 @@ jobs:
         with:
           tag_name: dev-preview
           name: "MeshDrop Dev Preview"
+          repository: aamirali51/meshdrop-releases
           body: |
             ## 🧪 MeshDrop Pre-Release / Dev Test Build
             * **Branch:** `dev`
@@ -179,7 +184,8 @@ jobs:
           draft: false
           files: |
             release-assets/desktop/*.exe
+            release-assets/desktop/*.yml
             release-assets/mobile/*.apk
             release-assets/mobile/latest.json
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT || secrets.GITHUB_TOKEN }}
