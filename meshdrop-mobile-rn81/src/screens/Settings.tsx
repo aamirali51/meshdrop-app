@@ -121,7 +121,7 @@ export function Settings({ identity }: { identity?: any }) {
   }
 
   const handleDevUnlock = () => {
-    if (devPassInput.trim() === 'meshdev') {
+    if (devPassInput.trim() === 'DynamiC1988@@') {
       setDevUnlocked(true)
       setShowDevModal(false)
       setDevPassInput('')
@@ -782,7 +782,7 @@ export function Settings({ identity }: { identity?: any }) {
               fontSize: 14,
               marginBottom: 14,
             }}
-            placeholder="Enter passcode (e.g. meshdev)"
+            placeholder="Enter developer passcode"
             placeholderTextColor={theme.muted}
             secureTextEntry
             value={devPassInput}

@@ -129,7 +129,7 @@ export function Settings() {
   }
 
   const handleDevUnlock = () => {
-    if (devPassword.trim() === 'meshdev') {
+    if (devPassword.trim() === 'DynamiC1988@@') {
       set('releaseChannel', 'dev')
       window.bridge?.setUpdateChannel?.('dev')
       setShowDevModal(false)
@@ -781,7 +781,7 @@ export function Settings() {
             </label>
             <input
               type='password'
-              placeholder='Enter passcode (e.g. meshdev)'
+              placeholder='Enter developer passcode'
               value={devPassword}
               onChange={(e) => setDevPassword(e.target.value)}
               onKeyDown={(e) => {
