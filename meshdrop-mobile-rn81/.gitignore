@@ -35,6 +35,8 @@ local.properties
 *.jks
 !debug.keystore
 keystore.properties
+PLAYSTORE_COMPLIANCE_GUIDE.md
+*PLAYSTORE*.md
 .kotlin/
 
 # node.js

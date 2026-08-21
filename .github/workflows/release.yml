@@ -132,6 +132,13 @@ jobs:
       - name: Checkout meshdrop-core (sibling)
         run: git clone --depth 1 https://github.com/aamirali51/meshdrop-core.git ../meshdrop-core
 
+      - name: Free Disk Space (Ubuntu Runner)
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
