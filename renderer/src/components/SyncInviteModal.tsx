@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { EVENTS, METHODS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
 import { useToast } from '@/hooks/useToast'
-import { Folder, FolderPlus, X, Check, ShieldCheck, ArrowLeftRight } from 'lucide-react'
+import { Folder, FolderPlus, X, Check, ShieldCheck, ArrowLeftRight, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/Modal'
 
@@ -12,6 +12,7 @@ interface SyncInvite {
   peerId: string
   peerName: string
   defaultPath: string
+  mode?: string
   fileCount?: number
 }
 
@@ -108,9 +109,20 @@ export function SyncInviteModal() {
               <Folder className='h-5 w-5' />
             </div>
             <div className='min-w-0 flex-1'>
-              <p className='truncate text-sm font-bold text-foreground'>{invite.name}</p>
+              <div className='flex items-center gap-2'>
+                <p className='truncate text-sm font-bold text-foreground'>{invite.name}</p>
+                {invite.mode && (
+                  <span className='rounded-full border border-primary/30 bg-primary/15 px-2 py-0.5 text-[9px] font-extrabold uppercase text-primary'>
+                    {invite.mode === 'push'
+                      ? 'Receive Mirror'
+                      : invite.mode === 'receive_only'
+                      ? 'Send Backup'
+                      : 'Two-Way Sync'}
+                  </span>
+                )}
+              </div>
               <p className='truncate text-xs text-muted-foreground'>
-                Continuous P2P Folder Sync
+                {invite.fileCount ? `${invite.fileCount} file(s) · ` : ''}Continuous P2P Folder Sync
               </p>
             </div>
             {totalInvites > 1 && (
@@ -142,8 +154,22 @@ export function SyncInviteModal() {
 
         {/* Security badge */}
         <div className='flex items-center gap-1.5 rounded-xl border border-hairline/10 bg-card/40 p-2.5 text-[10px] font-mono text-muted-foreground'>
-          <ArrowLeftRight className='h-3.5 w-3.5 shrink-0 text-meshdrop-cyan' />
-          Two-way end-to-end encrypted sync stream
+          {invite.mode === 'push' ? (
+            <>
+              <ArrowDownLeft className='h-3.5 w-3.5 shrink-0 text-purple-400' />
+              <span>Receive-Only Mirror · Direct encrypted incoming stream</span>
+            </>
+          ) : invite.mode === 'receive_only' ? (
+            <>
+              <ArrowUpRight className='h-3.5 w-3.5 shrink-0 text-meshdrop-cyan' />
+              <span>Send-Only Backup · Direct encrypted outgoing stream</span>
+            </>
+          ) : (
+            <>
+              <ArrowLeftRight className='h-3.5 w-3.5 shrink-0 text-meshdrop-cyan' />
+              <span>Two-way end-to-end encrypted sync stream</span>
+            </>
+          )}
           <ShieldCheck className='ml-auto h-3.5 w-3.5 shrink-0 text-status-online' />
         </div>
       </div>

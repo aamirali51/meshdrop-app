@@ -3,6 +3,7 @@ import {
   FolderPlus,
   RefreshCw,
   Trash2,
+  Unlink,
   Folder,
   FolderOpen,
   CheckCircle2,
@@ -24,22 +25,23 @@ import { useSync, SyncLibrary } from '@/hooks/useSync'
 import { useDevices } from '@/hooks/useDevices'
 import { useToast } from '@/hooks/useToast'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/Modal'
 import { cn } from '@/lib/utils'
 import { EVENTS } from '@/types/protocol'
 import { on } from '@/lib/ipc'
 
 const STATUS_LABEL: Record<string, string> = {
-  idle: 'Idle',
+  idle: 'Synchronized',
   scanning: 'Scanning…',
   syncing: 'Syncing…',
   waiting_peer: 'Waiting for device',
   up_to_date: 'Synchronized',
   paused: 'Paused',
-  error: 'Error'
+  error: 'Sync Error'
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  idle: 'text-muted-foreground border-border/40 bg-muted/20',
+  idle: 'text-status-online border-status-online/30 bg-status-online/10',
   scanning: 'text-primary border-primary/30 bg-primary/10 animate-pulse',
   syncing: 'text-primary border-primary/30 bg-primary/10 animate-pulse',
   waiting_peer: 'text-amber-500 border-amber-500/30 bg-amber-500/10',
@@ -90,9 +92,9 @@ function formatBytes(bytes?: number): string {
 }
 
 function formatRelativeTime(timestamp?: number | string): string {
-  if (!timestamp) return 'Never'
+  if (!timestamp) return 'Awaiting initial sync'
   const t = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp
-  if (isNaN(t) || t <= 0) return 'Never'
+  if (isNaN(t) || t <= 0) return 'Awaiting initial sync'
   const diff = Date.now() - t
   if (diff < 15000) return 'Just now'
   if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`
@@ -116,6 +118,8 @@ export function Sync() {
   const [busy, setBusy] = useState(false)
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [activityLog, setActivityLog] = useState<ActivityItem[]>([])
+  const [libraryErrors, setLibraryErrors] = useState<Record<string, string>>({})
+  const [removingLib, setRemovingLib] = useState<SyncLibrary | null>(null)
 
   const onlineDevices = useMemo(
     () => devices.filter((d) => d.publicKey && d.isTrusted !== false && d.isOnline !== false),
@@ -155,6 +159,13 @@ export function Sync() {
             'Folder Synced',
             `"${data.name || 'Folder'}" synchronized ${data.pushed || 0} file(s).`
           )
+        }
+        if (data.id || data.libraryId) {
+          setLibraryErrors((prev) => {
+            const copy = { ...prev }
+            delete copy[data.id || data.libraryId]
+            return copy
+          })
         }
         setActivityLog((prev) => [
           {
@@ -201,7 +212,14 @@ export function Sync() {
     })
 
     const unsubError = on(EVENTS.SYNC_ERROR, (data: any) => {
-      toastRef.current.error('Sync Error', data?.message || 'Folder sync encountered an issue.')
+      const errMsg = data?.message || data?.error || 'Folder sync encountered an issue.'
+      toastRef.current.error('Sync Error', errMsg)
+      if (data?.id || data?.libraryId) {
+        setLibraryErrors((prev) => ({
+          ...prev,
+          [data.id || data.libraryId]: errMsg
+        }))
+      }
     })
 
     return () => {
@@ -267,12 +285,19 @@ export function Sync() {
     }
   }
 
-  const handleRemove = async (id: string) => {
+  const handleRemove = (lib: SyncLibrary) => {
+    setRemovingLib(lib)
+  }
+
+  const confirmRemove = async () => {
+    if (!removingLib) return
     try {
-      await removeSyncLibrary(id)
-      toast.success('Sync Removed', 'The folder sync link was removed.')
+      await removeSyncLibrary(removingLib.id)
+      toast.success('Sync Removed', `"${removingLib.name}" sync link was removed.`)
     } catch (err: any) {
       toast.error('Remove Failed', err?.message || 'Could not remove sync.')
+    } finally {
+      setRemovingLib(null)
     }
   }
 
@@ -324,6 +349,7 @@ export function Sync() {
 
   const activeSyncCount = libraries.filter((l) => !l.paused).length
   const isAnySyncing = libraries.some((l) => l.status === 'syncing' || l.status === 'scanning')
+  const hasErrors = libraries.some((l) => l.status === 'error' || Boolean(libraryErrors[l.id]))
 
   return (
     <div className='space-y-6 pb-12 max-w-6xl mx-auto'>
@@ -344,6 +370,8 @@ export function Sync() {
             'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border',
             isAnySyncing
               ? 'bg-primary/10 text-primary border-primary/25 animate-spin'
+              : hasErrors
+              ? 'bg-destructive/10 text-destructive border-destructive/25'
               : 'bg-status-online/10 text-status-online border-status-online/25'
           )}>
             <ArrowLeftRight className='h-5 w-5' />
@@ -351,8 +379,17 @@ export function Sync() {
           <div>
             <p className='text-xs text-muted-foreground font-semibold'>Engine State</p>
             <p className='text-xs font-bold flex items-center gap-1.5 text-foreground'>
-              <span className={cn('h-2 w-2 rounded-full', isAnySyncing ? 'bg-primary animate-ping' : 'bg-status-online')} />
-              {isAnySyncing ? 'Synchronizing changes…' : activeSyncCount > 0 ? 'All Synchronized' : 'Idle'}
+              <span className={cn(
+                'h-2 w-2 rounded-full',
+                isAnySyncing ? 'bg-primary animate-ping' : hasErrors ? 'bg-destructive' : 'bg-status-online'
+              )} />
+              {isAnySyncing
+                ? 'Synchronizing changes…'
+                : hasErrors
+                ? 'Attention Needed'
+                : activeSyncCount > 0
+                ? 'All Synchronized'
+                : 'Idle'}
             </p>
           </div>
         </div>
@@ -512,6 +549,16 @@ export function Sync() {
                 </>
               )}
             </Button>
+
+            {(!folderPath || selectedPeerIds.length === 0) && (
+              <p className='text-center text-[11px] font-medium text-muted-foreground pt-0.5'>
+                {!folderPath && selectedPeerIds.length === 0
+                  ? '← Please select a local folder (Step 1) and choose at least one target device (Step 3)'
+                  : !folderPath
+                  ? '← Please select a local folder (Step 1) to synchronize'
+                  : '← Please select at least one online target device (Step 3)'}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -544,11 +591,17 @@ export function Sync() {
             const isTransferring = phase?.phase === 'transferring'
             const modeMeta = MODE_META[lib.mode || 'two-way'] || MODE_META['two-way']
             const ModeIcon = modeMeta.icon
+            const libError = libraryErrors[lib.id]
 
             return (
               <div
                 key={lib.id}
-                className='glass-card rounded-2xl border border-border/60 p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-border/90'
+                className={cn(
+                  'glass-card rounded-2xl border p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all',
+                  lib.status === 'error' || libError
+                    ? 'border-destructive/40 bg-destructive/5 hover:border-destructive/60'
+                    : 'border-border/60 hover:border-border/90'
+                )}
               >
                 <div className='flex items-start gap-3.5 min-w-0 flex-1'>
                   <div
@@ -590,12 +643,20 @@ export function Sync() {
                       {lib.localPath}
                     </p>
 
-                    <div className='flex items-center gap-3 text-[10px] text-muted-foreground font-medium'>
+                    {/* Inline error feedback if present */}
+                    {(lib.status === 'error' || libError) && (
+                      <div className='flex items-center gap-1.5 text-[11px] text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-md px-2 py-1 mt-1'>
+                        <AlertCircle className='h-3.5 w-3.5 shrink-0' />
+                        <span className='truncate'>{libError || 'Folder synchronization encountered an issue. Check folder permissions or peer connection.'}</span>
+                      </div>
+                    )}
+
+                    <div className='flex items-center gap-3 text-[10px] text-muted-foreground font-medium pt-0.5'>
                       <span>{lib.fileCount} file{lib.fileCount === 1 ? '' : 's'}</span>
                       <span>·</span>
                       <span>{formatBytes(lib.totalSize)}</span>
                       <span>·</span>
-                      <span>Replicated {formatRelativeTime(lib.lastSyncAt || lib.lastScanAt)}</span>
+                      <span>{lib.lastSyncAt || lib.lastScanAt ? `Replicated ${formatRelativeTime(lib.lastSyncAt || lib.lastScanAt)}` : 'Awaiting initial sync'}</span>
                     </div>
 
                     {/* Live Progress & Speed Telemetry */}
@@ -654,7 +715,7 @@ export function Sync() {
                       variant='ghost'
                       className='h-8 w-8 p-0 hover:text-amber-400 cursor-pointer'
                       onClick={() => handleOpenTrash(lib.localPath)}
-                      title='Open .meshdrop-trash archive'
+                      title='View Deleted / Archived Files (.meshdrop-trash)'
                     >
                       <Archive className='h-4 w-4' />
                     </Button>
@@ -684,10 +745,10 @@ export function Sync() {
                       size='sm'
                       variant='ghost'
                       className='h-8 w-8 p-0 text-destructive hover:bg-destructive/10 cursor-pointer'
-                      onClick={() => handleRemove(lib.id)}
-                      title='Remove folder sync link'
+                      onClick={() => handleRemove(lib)}
+                      title='Unlink & remove sync folder'
                     >
-                      <Trash2 className='h-4 w-4' />
+                      <Unlink className='h-4 w-4' />
                     </Button>
                   </div>
                 </div>
@@ -717,8 +778,11 @@ export function Sync() {
                   <span className='font-bold text-foreground truncate'>{act.title}</span>
                   <span className='text-muted-foreground truncate font-mono text-[11px]'>{act.detail}</span>
                 </div>
-                <span className='text-[10px] text-muted-foreground shrink-0'>
-                  {act.timestamp.toLocaleTimeString()}
+                <span
+                  className='text-[10px] text-muted-foreground shrink-0'
+                  title={act.timestamp.toLocaleString()}
+                >
+                  {formatRelativeTime(act.timestamp.getTime())}
                 </span>
               </div>
             ))}
@@ -732,6 +796,16 @@ export function Sync() {
         MeshDrop uses a 3-Way Baseline Snapshot Engine. Files stream directly between your devices with end-to-end encryption.
         Deleted files are safely moved to the local <code className='text-foreground font-mono'>.meshdrop-trash</code> archive, never permanently deleted without warning.
       </div>
+
+      {/* ── Confirm Removal Dialog ─────────────────────────────────────── */}
+      <ConfirmDialog
+        open={Boolean(removingLib)}
+        onOpenChange={(open) => !open && setRemovingLib(null)}
+        title='Remove Sync Mapping'
+        description={`Stop synchronizing "${removingLib?.name}"? Your local files on disk will NOT be deleted. The linked peer will be notified to disconnect this sync link.`}
+        confirmLabel='Unlink Sync'
+        onConfirm={confirmRemove}
+      />
     </div>
   )
 }

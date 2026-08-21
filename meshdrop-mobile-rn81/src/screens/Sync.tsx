@@ -28,6 +28,9 @@ import {
   Film,
   Info,
   AlertCircle,
+  ArrowUpRight,
+  ArrowDownLeft,
+  ArrowLeftRight,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
 import { pickFolder } from '../filePicker'
@@ -291,13 +294,15 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
       {/* Action Controls */}
       <View style={styles.libActions}>
         <TouchableOpacity
-          style={styles.actionPillBtn}
+          style={[styles.actionPillBtn, isPaused && { opacity: 0.7 }]}
           onPress={() => onTrigger(lib)}
-          disabled={isSyncing || isPaused}
+          disabled={isSyncing}
           activeOpacity={0.7}
         >
-          <RefreshCw size={13} color={theme.primary} />
-          <Text style={styles.actionPillText}>{isSyncing ? 'Syncing…' : 'Rescan'}</Text>
+          <RefreshCw size={13} color={isPaused ? theme.muted : theme.primary} />
+          <Text style={[styles.actionPillText, isPaused && { color: theme.muted }]}>
+            {isSyncing ? 'Syncing…' : 'Rescan'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -335,6 +340,8 @@ export function Sync({ identity: _identity }: { identity?: any }) {
   const [newFolderName, setNewFolderName] = useState('')
   const [newFolderPath, setNewFolderPath] = useState('')
   const [selectedDevice, setSelectedDevice] = useState<string>('')
+  const [selectedInvite, setSelectedInvite] = useState<SyncInvite | null>(null)
+  const [inviteCustomPath, setInviteCustomPath] = useState<string>('')
   // Mobile is the source of truth: the default mode is one-way push (send-only)
   // so the desktop mirror can never modify the phone's folder. Two-way must be
   // chosen explicitly for folders where that is desired.
@@ -551,6 +558,10 @@ export function Sync({ identity: _identity }: { identity?: any }) {
   }
 
   const handleTriggerSync = useCallback(async (lib: SyncLibrary) => {
+    if (lib.paused) {
+      Alert.alert('Sync Paused', `"${lib.name}" is currently paused. Resume sync before rescanning.`)
+      return
+    }
     setSyncingId(lib.id)
     try {
       await call('triggerSync', { id: lib.id })
@@ -577,7 +588,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
   const handleDeleteLibrary = useCallback((lib: SyncLibrary) => {
     Alert.alert(
       'Remove Sync Mapping',
-      `Stop syncing "${lib.name}"? Files on disk will NOT be deleted.`,
+      `Stop syncing "${lib.name}"? Your local files on this device will NOT be deleted. The linked peer device will also be notified to disconnect.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -596,10 +607,13 @@ export function Sync({ identity: _identity }: { identity?: any }) {
     )
   }, [refresh])
 
-  const handleAcceptInvite = useCallback(async (inv: SyncInvite) => {
+  const handleAcceptInvite = useCallback(async (inv: SyncInvite, customPath?: string) => {
     setBusy(true)
     try {
-      await call('acceptSyncInvite', { id: inv.id })
+      const chosen = customPath || inv.defaultPath
+      await call('acceptSyncInvite', { id: inv.id, customPath: chosen })
+      setSelectedInvite(null)
+      setInviteCustomPath('')
       Alert.alert('Sync Folder Linked', `"${inv.name}" is now continuously syncing.`)
       refresh()
     } catch (err: any) {
@@ -609,9 +623,22 @@ export function Sync({ identity: _identity }: { identity?: any }) {
     }
   }, [refresh])
 
+  const handleBrowseInviteFolder = async () => {
+    try {
+      const res = await pickFolder()
+      if (res && res.path) {
+        setInviteTargetFolder(res.path)
+      }
+    } catch (err: any) {
+      Alert.alert('Folder Picker Error', err?.message || 'Could not open folder picker.')
+    }
+  }
+
   const handleDeclineInvite = useCallback(async (inv: SyncInvite) => {
     try {
       await call('declineSyncInvite', { id: inv.id })
+      setSelectedInvite(null)
+      setInviteCustomPath('')
       refresh()
     } catch {}
   }, [refresh])
@@ -697,8 +724,17 @@ export function Sync({ identity: _identity }: { identity?: any }) {
                   <FolderSync size={20} color={theme.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>{inv.name}</Text>
-                  <Text style={{ color: theme.muted, fontSize: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>{inv.name}</Text>
+                    {inv.mode && (
+                      <View style={{ backgroundColor: theme.primarySoft, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                        <Text style={{ color: theme.primary, fontSize: 8.5, fontWeight: '800' }}>
+                          {inv.mode === 'push' ? 'RECEIVE' : inv.mode === 'receive_only' ? 'BACKUP' : '2-WAY'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={{ color: theme.muted, fontSize: 12, marginTop: 2 }}>
                     From {inv.peerName || 'Remote Peer'} · {inv.fileCount ? `${inv.fileCount} file(s)` : 'Folder sync'}
                   </Text>
                 </View>
@@ -706,10 +742,10 @@ export function Sync({ identity: _identity }: { identity?: any }) {
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
                 <TouchableOpacity
                   style={{ flex: 1, backgroundColor: theme.primary, paddingVertical: 9, borderRadius: 8, alignItems: 'center' }}
-                  onPress={() => handleAcceptInvite(inv)}
+                  onPress={() => setSelectedInvite(inv)}
                   activeOpacity={0.8}
                 >
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Accept & Link</Text>
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Review & Link</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ flex: 1, backgroundColor: theme.bgElevated, paddingVertical: 9, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
@@ -727,7 +763,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
       {/* Header & Add Button */}
       <View style={styles.sectionHeaderRow}>
         <SectionHeader
-          title="Hypercore Sync Hub"
+          title="Mesh Sync Hub"
           badge={libraries.length}
         />
         <TouchableOpacity
@@ -761,7 +797,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
           <FolderSync size={32} color={theme.primary} style={{ marginBottom: 8 }} />
           <Text style={styles.emptyTitle}>No Synced Folders Yet</Text>
           <Text style={styles.emptySub}>
-            Map local folders for automated bidirectional Hypercore replication across your mesh devices.
+            Keep folders continuously synchronized across your paired devices with direct peer-to-peer encryption.
           </Text>
           <Btn
             label="Create First Sync Folder"
@@ -777,7 +813,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
       <SimpleModal
         visible={showCreateModal}
         title="New Sync Library"
-        subtitle="Configure Hypercore continuous synchronization"
+        subtitle="Configure peer-to-peer folder synchronization"
         onClose={() => setShowCreateModal(false)}
       >
         <View style={styles.modalBody}>
@@ -822,7 +858,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
           {/* Already-Saved Trusted Peers Binding */}
           {devices.length > 0 && (
             <View style={styles.peerSection}>
-              <Text style={styles.inputLabel}>Bind to Saved Trusted Peer</Text>
+              <Text style={styles.inputLabel}>Bind to Target Peer</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -882,6 +918,11 @@ export function Sync({ identity: _identity }: { identity?: any }) {
                   )
                 })}
               </ScrollView>
+              <Text style={{ color: theme.muted, fontSize: 10, marginTop: 4, fontStyle: 'italic' }}>
+                {selectedDevice
+                  ? `Sync offer will be sent to the selected paired device.`
+                  : `Sync offer will be announced to all paired mesh devices.`}
+              </Text>
             </View>
           )}
 
@@ -954,13 +995,19 @@ export function Sync({ identity: _identity }: { identity?: any }) {
 
           {/* Mode Helper Card */}
           <View style={styles.modeHelpCard}>
-            <Info size={13} color={theme.primary} style={{ marginTop: 1 }} />
+            {syncMode === 'send-only' ? (
+              <ArrowUpRight size={14} color={theme.primary} style={{ marginTop: 2 }} />
+            ) : syncMode === 'two-way' ? (
+              <ArrowLeftRight size={14} color={theme.primary} style={{ marginTop: 2 }} />
+            ) : (
+              <ArrowDownLeft size={14} color={theme.primary} style={{ marginTop: 2 }} />
+            )}
             <Text style={styles.modeHelpText}>
               {syncMode === 'send-only'
-                ? '⬆️ Phone is the master copy. Remote edits will not modify or delete files on your phone.'
+                ? 'Send-Only Backup: Phone is the master copy. Remote edits will not modify or delete files on this device.'
                 : syncMode === 'two-way'
-                ? '🔄 Bidirectional sync. Edits and deletes on either device synchronize automatically.'
-                : '⬇️ Remote device is the master. Phone receives files and never pushes changes.'}
+                ? 'Two-Way Sync: Full bidirectional synchronization. Edits and deletes synchronize automatically across devices.'
+                : 'Receive-Only Mirror: Remote device is the master. Phone receives files and never pushes changes.'}
             </Text>
           </View>
 
@@ -975,6 +1022,75 @@ export function Sync({ identity: _identity }: { identity?: any }) {
             />
           </View>
         </View>
+      </SimpleModal>
+
+      {/* Accept Incoming Sync Invite Modal */}
+      <SimpleModal
+        visible={Boolean(selectedInvite)}
+        title="Incoming Folder Sync"
+        subtitle={`From ${selectedInvite?.peerName || 'Remote Peer'}`}
+        onClose={() => {
+          setSelectedInvite(null)
+          setInviteCustomPath('')
+        }}
+      >
+        {selectedInvite && (
+          <View style={styles.modalBody}>
+            <View style={{ backgroundColor: theme.primarySoft, padding: 12, borderRadius: 10, marginBottom: 12 }}>
+              <Text style={{ color: theme.text, fontSize: 14, fontWeight: '800' }}>{selectedInvite.name}</Text>
+              <Text style={{ color: theme.muted, fontSize: 11, marginTop: 2 }}>
+                {selectedInvite.fileCount ? `${selectedInvite.fileCount} file(s) · ` : ''}
+                {selectedInvite.mode === 'push'
+                  ? 'Receive-Only Mirror (Incoming backup)'
+                  : selectedInvite.mode === 'receive_only'
+                  ? 'Send-Only Backup'
+                  : 'Two-Way Synchronization'}
+              </Text>
+            </View>
+
+            <Text style={styles.inputLabel}>Target Destination on this Phone</Text>
+            <TouchableOpacity
+              style={styles.folderPickerCard}
+              onPress={handleBrowseInviteFolder}
+              activeOpacity={0.7}
+            >
+              <View style={styles.folderPickerIconBox}>
+                <Folder size={18} color={theme.primary} />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.folderPickerTitle} numberOfLines={1}>
+                  {inviteCustomPath || selectedInvite.defaultPath || `${ANDROID_STORAGE_ROOT}/Download/Sync/${selectedInvite.name}`}
+                </Text>
+                <Text style={styles.folderPickerSub}>
+                  {inviteCustomPath ? 'Custom Target Folder' : 'Default Sync Folder'}
+                </Text>
+              </View>
+              <View style={styles.browseButton}>
+                <FolderOpen size={13} color={theme.primary} />
+                <Text style={styles.browseButtonText}>Change</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: theme.bgElevated, paddingVertical: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: theme.border }}
+                onPress={() => {
+                  handleDeclineInvite(selectedInvite)
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: theme.danger, fontWeight: '700', fontSize: 13 }}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1.5, backgroundColor: theme.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                onPress={() => handleAcceptInvite(selectedInvite, inviteCustomPath || selectedInvite.defaultPath)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Accept & Link</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </SimpleModal>
     </ScrollView>
   )
