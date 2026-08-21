@@ -164,28 +164,27 @@ jobs:
           name: android-apk-build
           path: release-assets/mobile
 
-      - name: Create or Update Dev Pre-Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: dev-preview
-          name: "MeshDrop Dev Preview"
-          repository: aamirali51/meshdrop-releases
-          body: |
-            ## 🧪 MeshDrop Pre-Release / Dev Test Build
-            * **Branch:** `dev`
-            * **Commit:** `${{ github.sha }}`
-            
-            ### 📦 Download Test Assets:
-            - **Windows PC:** Download the `.exe` installer below
-            - **Android Phone:** Download the `.apk` and install on device
-            
-            > *Note: This is an internal testing build. When verified, it will be merged into `main`.*
-          prerelease: true
-          draft: false
-          files: |
+      - name: Publish Dev Pre-Release to meshdrop-releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_PAT }}
+          TAG: dev-preview
+        run: |
+          set -e
+          if ! gh release view "$TAG" --repo aamirali51/meshdrop-releases >/dev/null 2>&1; then
+            gh release create "$TAG" --repo aamirali51/meshdrop-releases \
+              --title "MeshDrop Dev Preview" --prerelease \
+              --notes "## 🧪 MeshDrop Pre-Release / Dev Test Build\n* **Branch:** dev\n* **Commit:** ${{ github.sha }}" || true
+          fi
+
+          shopt -s nullglob
+          assets=(
             release-assets/desktop/*.exe
             release-assets/desktop/*.yml
             release-assets/mobile/*.apk
             release-assets/mobile/latest.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT || secrets.GITHUB_TOKEN }}
+          )
+          if [ ${#assets[@]} -gt 0 ]; then
+            gh release upload "$TAG" "${assets[@]}" --clobber --repo aamirali51/meshdrop-releases
+          fi
+          echo "Dev release published successfully to aamirali51/meshdrop-releases"
