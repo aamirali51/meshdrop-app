@@ -20,6 +20,7 @@ build/*
 !build/metainfo.xml
 !build/snapcraft.yaml
 !build/AppxManifest.xml
+!build/installer.nsh
 
 # Local multi-instance testing profile
 .p2p-test-profile/
