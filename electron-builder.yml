@@ -55,6 +55,7 @@ win:
   icon: build/icon.ico
 
 nsis:
+  include: build/installer.nsh
   oneClick: false
   perMachine: true
   allowElevation: true

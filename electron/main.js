@@ -810,6 +810,23 @@ if (!allowMultipleInstances && !testPeer) {
   }
 }
 
+function ensureWindowsFirewallRule() {
+  if (process.platform !== 'win32') return
+  try {
+    const { exec } = require('child_process')
+    const exePath = process.execPath
+    if (!exePath || exePath.toLowerCase().includes('electron.exe')) return
+    exec('netsh advfirewall firewall show rule name="MeshDrop"', (err, stdout) => {
+      if (err || !stdout || !stdout.includes('MeshDrop')) {
+        exec(
+          `netsh advfirewall firewall add rule name="MeshDrop" dir=in action=allow program="${exePath}" enable=yes profile=any & netsh advfirewall firewall add rule name="MeshDrop" dir=out action=allow program="${exePath}" enable=yes profile=any`,
+          () => {}
+        )
+      }
+    })
+  } catch {}
+}
+
 {
   app.on('second-instance', (evt, args) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -830,6 +847,7 @@ if (!allowMultipleInstances && !testPeer) {
 
 
   app.whenReady().then(() => {
+    ensureWindowsFirewallRule()
     // CSP is owned by index.html (dev meta) and the vite build transform
     // (production meta). No header override needed.
 

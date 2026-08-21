@@ -98,8 +98,27 @@ const NOISY_EVENTS = new Set([
   'device.online',
   'device.offline',
   'device.updated',
-  'connection.changed'
+  'connection.changed',
+  // Transfer progress fires many times per second during an active transfer;
+  // logging each one floods the terminal with [object Object] noise.
+  'transfer.progress'
 ])
+
+// Render an IPC payload as readable text for the dev console. Passing the raw
+// object as a second console.log arg renders as "[object Object]" when the
+// main process forwards renderer logs to the terminal (Electron's
+// console-message event carries only a flat string).
+function formatLogArg(v: unknown): string {
+  if (v === undefined || v === null) return String(v)
+  if (typeof v === 'object') {
+    try {
+      return JSON.stringify(v)
+    } catch {
+      return String(v)
+    }
+  }
+  return String(v)
+}
 
 async function doCall(method: MethodName, params?: unknown): Promise<unknown> {
   if (!method || typeof method !== 'string') {
@@ -109,7 +128,7 @@ async function doCall(method: MethodName, params?: unknown): Promise<unknown> {
   const isNoisy = NOISY_METHODS.has(method)
   const ts = new Date().toISOString().slice(11, 23)
   if (!isNoisy) {
-    console.log(`[IPC ${ts}] >> ${id} ${method}`, params !== undefined ? params : '')
+    console.log(`[IPC ${ts}] >> ${id} ${method}`, formatLogArg(params))
   }
 
   if (!isBridgeAvailable) {
@@ -229,7 +248,7 @@ function startBridge(): void {
       }
     } else if (msg.type === 'event') {
       if (!NOISY_EVENTS.has(msg.event)) {
-        console.log(`[IPC ${ts}] >> EVENT ${msg.event}`, msg.data !== undefined ? msg.data : '')
+        console.log(`[IPC ${ts}] >> EVENT ${msg.event}`, formatLogArg(msg.data))
       }
       if ((msg.event as string) === (EVENTS.WORKER_READY as string) && !ready) {
         ready = true
