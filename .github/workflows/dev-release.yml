@@ -1,0 +1,146 @@
+name: Build Dev Pre-Release (Desktop & Mobile)
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-desktop:
+    name: Build Windows Desktop
+    runs-on: windows-latest
+    steps:
+      - name: Checkout meshdrop-app
+        uses: actions/checkout@v4
+        with:
+          path: meshdrop-app
+
+      - name: Checkout meshdrop-core (dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: aamirali51/meshdrop-core
+          path: meshdrop-core
+          ref: dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: meshdrop-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: meshdrop-app
+        run: npm ci
+
+      - name: Build Electron Desktop Release
+        working-directory: meshdrop-app
+        run: |
+          npm run build
+          npx electron-builder --windows --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Desktop Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-build
+          path: meshdrop-app/dist/*.exe
+          if-no-files-found: error
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout meshdrop-app
+        uses: actions/checkout@v4
+        with:
+          path: meshdrop-app
+
+      - name: Checkout meshdrop-core (dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: aamirali51/meshdrop-core
+          path: meshdrop-core
+          ref: dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: meshdrop-app/meshdrop-mobile-rn81/package-lock.json
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Mobile Dependencies
+        working-directory: meshdrop-app/meshdrop-mobile-rn81
+        run: npm ci
+
+      - name: Bundle Engine Assets
+        working-directory: meshdrop-app/meshdrop-mobile-rn81
+        run: npm run build:engine
+
+      - name: Build Android Release APK
+        working-directory: meshdrop-app/meshdrop-mobile-rn81/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-build
+          path: meshdrop-app/meshdrop-mobile-rn81/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+  publish-pre-release:
+    name: Publish Dev Pre-Release
+    needs: [build-desktop, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Desktop Build
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-windows-build
+          path: release-assets/desktop
+
+      - name: Download Android Build
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk-build
+          path: release-assets/mobile
+
+      - name: Create or Update Dev Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev-preview
+          name: "MeshDrop Dev Preview"
+          body: |
+            ## 🧪 MeshDrop Pre-Release / Dev Test Build
+            * **Branch:** `dev`
+            * **Commit:** `${{ github.sha }}`
+            
+            ### 📦 Download Test Assets:
+            - **Windows PC:** Download the `.exe` installer below
+            - **Android Phone:** Download the `.apk` and install on device
+            
+            > *Note: This is an internal testing build. When verified, it will be merged into `main`.*
+          prerelease: true
+          draft: false
+          files: |
+            release-assets/desktop/*.exe
+            release-assets/mobile/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
