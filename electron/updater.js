@@ -69,7 +69,7 @@ try {
   console.warn('[Main] Warning: electron-updater module could not be required:', err?.message)
 }
 
-let updateChannel = 'beta'
+let updateChannel = 'stable'
 let downloadedUpdatePath = null
 let portableDownloadedPath = null
 let downloadStartedAt = 0
@@ -100,7 +100,19 @@ async function portableFetchLatest(force = false) {
   if (portableFetchPromise) return portableFetchPromise
   portableFetchPromise = (async () => {
     let release
-    if (updateChannel === 'stable') {
+    if (updateChannel === 'dev') {
+      try {
+        release = await fetchJson(
+          `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/tags/dev-preview`
+        )
+      } catch {
+        // Fallback to most recent release if tag is not yet created
+        const allReleases = await fetchJson(
+          `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases`
+        )
+        release = Array.isArray(allReleases) ? allReleases[0] : null
+      }
+    } else if (updateChannel === 'stable') {
       release = await fetchJson(
         `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/latest`
       )
@@ -595,11 +607,14 @@ function setupUpdater({ sendToAll, version: appVersion, appName, enabled = true,
   ipcMain.handle('updater:getChannel', () => updateChannel)
 
   ipcMain.handle('updater:setChannel', (evt, channel) => {
-    if (['stable', 'beta', 'nightly'].includes(channel)) {
+    if (['stable', 'dev', 'beta', 'nightly'].includes(channel)) {
       updateChannel = channel
+      portableLatest = null
       if (autoUpdater) {
-        autoUpdater.allowPrerelease = channel !== 'stable'
-        if (channel === 'nightly') {
+        autoUpdater.allowPrerelease = channel === 'dev' || channel === 'nightly' || channel === 'beta'
+        if (channel === 'dev') {
+          autoUpdater.channel = 'dev'
+        } else if (channel === 'nightly') {
           autoUpdater.channel = 'nightly'
         } else if (channel === 'beta') {
           autoUpdater.channel = 'beta'

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Switch,
+  TextInput,
   TouchableOpacity,
   Alert,
   Linking,
@@ -31,6 +32,7 @@ import {
   FolderSync,
   Heart,
   QrCode,
+  FlaskConical,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
 import {
@@ -39,6 +41,7 @@ import {
   Pill,
   SectionHeader,
   DeviceAvatar,
+  SimpleModal,
 } from '../components'
 import { QRCodeModal } from '../components/QRCodeModal'
 import {
@@ -63,6 +66,8 @@ import {
   checkForUpdate,
   refreshVersion,
   isUpdaterSupported,
+  getUpdateChannel,
+  setUpdateChannel,
 } from '../updater'
 
 export function Settings({ identity }: { identity?: any }) {
@@ -88,6 +93,52 @@ export function Settings({ identity }: { identity?: any }) {
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [showBtcQr, setShowBtcQr] = useState(false)
   const [copiedBtc, setCopiedBtc] = useState(false)
+
+  // Developer Mode & 7-Tap Channel Switch
+  const [tapCount, setTapCount] = useState(0)
+  const [devUnlocked, setDevUnlocked] = useState(false)
+  const [showDevModal, setShowDevModal] = useState(false)
+  const [devPassInput, setDevPassInput] = useState('')
+  const [currentChannel, setCurrentChannel] = useState<'stable' | 'dev'>(getUpdateChannel())
+
+  const handleVersionTap = () => {
+    const next = tapCount + 1
+    setTapCount(next)
+    if (next >= 7) {
+      setTapCount(0)
+      if (!devUnlocked) {
+        setShowDevModal(true)
+      } else {
+        Alert.alert('Developer Mode', 'Developer options are already active.')
+      }
+    } else if (next >= 4) {
+      const remaining = 7 - next
+      Alert.alert(
+        'Developer Mode',
+        `You are ${remaining} step${remaining === 1 ? '' : 's'} away from unlocking Developer Options.`
+      )
+    }
+  }
+
+  const handleDevUnlock = () => {
+    if (devPassInput.trim() === 'meshdev') {
+      setDevUnlocked(true)
+      setShowDevModal(false)
+      setDevPassInput('')
+      Alert.alert('Developer Mode Unlocked', 'You can now switch between Stable and Dev release channels.')
+    } else {
+      Alert.alert('Access Denied', 'Incorrect developer passcode.')
+    }
+  }
+
+  const handleToggleChannel = (ch: 'stable' | 'dev') => {
+    setUpdateChannel(ch)
+    setCurrentChannel(ch)
+    Alert.alert(
+      'Channel Switched',
+      `Update feed is now set to ${ch === 'dev' ? 'Dev Pre-Release (dev-preview)' : 'Official Stable'}.`
+    )
+  }
 
   const BITCOIN_ADDRESS = '12bNXZEg6vDtJZUMdauhkvUqg92UPeWJfs'
 
@@ -504,7 +555,12 @@ export function Settings({ identity }: { identity?: any }) {
 
       {isUpdaterSupported() && (
         <>
-          <SectionHeader title="Software Update" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <SectionHeader title="Software Update" />
+            {currentChannel === 'dev' && (
+              <Pill label="🧪 Dev Feed" color={theme.primary} />
+            )}
+          </View>
           <Card style={styles.card}>
             <View style={styles.permRow}>
               <View style={styles.permInfo}>
@@ -515,12 +571,66 @@ export function Settings({ identity }: { identity?: any }) {
                 {installedVersion ? `v${installedVersion}` : '—'}
               </Text>
             </View>
+
+            {devUnlocked && (
+              <View style={[styles.permRow, styles.borderTop]}>
+                <View style={styles.flex1}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <FlaskConical size={14} color={theme.primary} />
+                    <Text style={styles.switchTitle}>Release Channel</Text>
+                  </View>
+                  <Text style={styles.switchSub}>
+                    {currentChannel === 'dev'
+                      ? 'Fetching bleeding-edge dev APK from dev-preview'
+                      : 'Fetching official production releases'}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.exemptionBtn,
+                      currentChannel === 'stable' && { backgroundColor: theme.primary },
+                    ]}
+                    onPress={() => handleToggleChannel('stable')}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.exemptionBtnText,
+                        currentChannel === 'stable' && { color: '#FFFFFF' },
+                      ]}
+                    >
+                      Stable
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.exemptionBtn,
+                      currentChannel === 'dev' && { backgroundColor: theme.primary },
+                    ]}
+                    onPress={() => handleToggleChannel('dev')}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.exemptionBtnText,
+                        currentChannel === 'dev' && { color: '#FFFFFF' },
+                      ]}
+                    >
+                      Dev
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             <View style={[styles.permRow, styles.borderTop]}>
               <View style={styles.flex1}>
                 <Text style={styles.switchTitle}>Check for Updates</Text>
                 <Text style={styles.switchSub}>
-                  This build is sideloaded (not on an app store) — fetches the
-                  newest APK from the release feed
+                  {currentChannel === 'dev'
+                    ? 'Checks for newest dev pre-release APK on GitHub'
+                    : 'This build is sideloaded — fetches newest official APK from release feed'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -600,15 +710,22 @@ export function Settings({ identity }: { identity?: any }) {
       {/* About */}
       <SectionHeader title="About" />
       <Card style={styles.card}>
-        <View style={styles.permRow}>
+        <TouchableOpacity
+          style={styles.permRow}
+          onPress={handleVersionTap}
+          activeOpacity={0.7}
+        >
           <View style={styles.permInfo}>
             <Zap size={16} color={theme.primary} />
             <Text style={styles.permName}>Version</Text>
           </View>
-          <Text style={styles.statValue}>
-            {installedVersion ? `v${installedVersion}` : '—'}
-          </Text>
-        </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {devUnlocked && <Pill label="Dev Unlocked" color={theme.success} />}
+            <Text style={styles.statValue}>
+              {installedVersion ? `v${installedVersion}` : '—'}
+            </Text>
+          </View>
+        </TouchableOpacity>
         <View style={[styles.permRow, styles.borderTop]}>
           <View style={styles.permInfo}>
             <Info size={16} color={theme.primary} />
@@ -639,6 +756,75 @@ export function Settings({ identity }: { identity?: any }) {
           <Text style={[styles.statValue, { color: theme.primary }]}>View →</Text>
         </TouchableOpacity>
       </Card>
+
+      {/* Developer Passcode Modal */}
+      <SimpleModal
+        visible={showDevModal}
+        title="Unlock Developer Options"
+        subtitle="Enter developer passcode to enable dev preview release updates."
+        onClose={() => {
+          setShowDevModal(false)
+          setDevPassInput('')
+        }}
+      >
+        <View style={{ paddingVertical: 6 }}>
+          <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
+            Developer Passcode
+          </Text>
+          <TextInput
+            style={{
+              backgroundColor: theme.bgElevated,
+              borderColor: theme.border,
+              borderWidth: 1,
+              borderRadius: 10,
+              padding: 12,
+              color: theme.text,
+              fontSize: 14,
+              marginBottom: 14,
+            }}
+            placeholder="Enter passcode (e.g. meshdev)"
+            placeholderTextColor={theme.muted}
+            secureTextEntry
+            value={devPassInput}
+            onChangeText={setDevPassInput}
+            autoFocus
+          />
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: theme.bgElevated,
+                paddingVertical: 12,
+                borderRadius: 10,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}
+              onPress={() => {
+                setShowDevModal(false)
+                setDevPassInput('')
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: theme.muted, fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                flex: 1.5,
+                backgroundColor: theme.primary,
+                paddingVertical: 12,
+                borderRadius: 10,
+                alignItems: 'center',
+              }}
+              onPress={handleDevUnlock}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Unlock</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SimpleModal>
 
       {/* Bitcoin QR Modal */}
       <QRCodeModal

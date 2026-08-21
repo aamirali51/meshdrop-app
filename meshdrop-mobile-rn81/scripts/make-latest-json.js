@@ -48,10 +48,15 @@ const { versionCode, versionName } = readVersion()
 const bytes = fs.readFileSync(apk)
 const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
 
+const TAG = process.env.UPDATE_TAG || ''
+const downloadUrl = TAG
+  ? `https://github.com/${OWNER}/${REPO}/releases/download/${TAG}/${path.basename(apk)}`
+  : `https://github.com/${OWNER}/${REPO}/releases/latest/download/${path.basename(apk)}`
+
 const manifest = {
   versionCode,
   versionName,
-  url: `https://github.com/${OWNER}/${REPO}/releases/latest/download/${path.basename(apk)}`,
+  url: downloadUrl,
   size: bytes.length,
   sha256,
   notes: '',

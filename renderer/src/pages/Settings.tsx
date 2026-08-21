@@ -27,6 +27,7 @@ import { METHODS, EVENTS } from '@/types/protocol'
 import { formatBytes } from '@/lib/format'
 import type { PortableStatus, UpdateStatusData } from '@/types/bridge'
 import { Button } from '@/components/ui/button'
+import { Modal } from '@/components/Modal'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
@@ -114,6 +115,30 @@ export function Settings() {
   const [checking, setChecking] = useState(false)
   const [portableInfo, setPortableInfo] = useState<PortableStatus | null>(null)
   const [showPortableModal, setShowPortableModal] = useState(false)
+  const [showDevModal, setShowDevModal] = useState(false)
+  const [devPassword, setDevPassword] = useState('')
+
+  const handleChannelChange = (newChannel: string) => {
+    if (newChannel === 'dev') {
+      setShowDevModal(true)
+      return
+    }
+    set('releaseChannel', newChannel)
+    window.bridge?.setUpdateChannel?.(newChannel)
+    toast.success('Channel Switched', `Switched update channel to ${newChannel}.`)
+  }
+
+  const handleDevUnlock = () => {
+    if (devPassword.trim() === 'meshdev') {
+      set('releaseChannel', 'dev')
+      window.bridge?.setUpdateChannel?.('dev')
+      setShowDevModal(false)
+      setDevPassword('')
+      toast.success('Dev Channel Unlocked', 'Switched to Developer pre-release updates.')
+    } else {
+      toast.error('Access Denied', 'Incorrect developer passcode.')
+    }
+  }
 
   useEffect(() => {
     window.bridge?.portableStatus?.().then(setPortableInfo).catch(() => {})
@@ -587,10 +612,11 @@ export function Settings() {
                   </div>
                   <select
                     value={settings.releaseChannel}
-                    onChange={(e) => set('releaseChannel', e.target.value)}
+                    onChange={(e) => handleChannelChange(e.target.value)}
                     className='rounded-xl border border-border/60 bg-background px-3 py-1.5 font-bold text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
                   >
-                    <option value='stable'>Stable Release</option>
+                    <option value='stable'>Stable Release (Official)</option>
+                    <option value='dev'>🧪 Dev Pre-Release (Password Protected)</option>
                     <option value='beta'>Beta Channel</option>
                     <option value='nightly'>Nightly Builds</option>
                   </select>
@@ -735,6 +761,59 @@ export function Settings() {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Developer Passcode Modal */}
+      <Modal
+        open={showDevModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowDevModal(false)
+            setDevPassword('')
+          }
+        }}
+        title='Unlock Developer Release Channel'
+        description='Dev pre-releases are bleeding-edge builds compiled directly from GitHub Actions. Enter the developer passcode to switch.'
+      >
+        <div className='space-y-4 pt-1'>
+          <div className='space-y-1.5'>
+            <label className='block text-[10px] font-bold uppercase tracking-wider text-muted-foreground'>
+              Developer Passcode
+            </label>
+            <input
+              type='password'
+              placeholder='Enter passcode (e.g. meshdev)'
+              value={devPassword}
+              onChange={(e) => setDevPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleDevUnlock()
+              }}
+              className='w-full rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5 text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
+              autoFocus
+            />
+          </div>
+
+          <div className='flex items-center justify-end gap-2 pt-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => {
+                setShowDevModal(false)
+                setDevPassword('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size='sm'
+              className='font-bold'
+              onClick={handleDevUnlock}
+              disabled={!devPassword.trim()}
+            >
+              Unlock Dev Channel
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

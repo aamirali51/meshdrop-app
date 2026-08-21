@@ -98,11 +98,22 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
+      - name: Generate Dev Manifest
+        working-directory: meshdrop-app/meshdrop-mobile-rn81
+        run: |
+          node scripts/make-latest-json.js android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/latest.json
+        env:
+          UPDATE_TAG: dev-preview
+          UPDATE_OWNER: aamirali51
+          UPDATE_REPO: meshdrop-app
+
       - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk-build
-          path: meshdrop-app/meshdrop-mobile-rn81/android/app/build/outputs/apk/release/*.apk
+          path: |
+            meshdrop-app/meshdrop-mobile-rn81/android/app/build/outputs/apk/release/*.apk
+            meshdrop-app/meshdrop-mobile-rn81/android/app/build/outputs/apk/release/latest.json
           if-no-files-found: error
 
   publish-pre-release:
@@ -142,5 +153,6 @@ jobs:
           files: |
             release-assets/desktop/*.exe
             release-assets/mobile/*.apk
+            release-assets/mobile/latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

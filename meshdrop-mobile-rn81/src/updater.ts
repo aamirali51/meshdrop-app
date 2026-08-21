@@ -25,6 +25,23 @@ export const UPDATE_OWNER = 'aamirali51'
 export const UPDATE_REPO = 'meshdrop-releases'
 export const UPDATE_MANIFEST_URL = `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest/download/latest.json`
 
+let updateChannel: 'stable' | 'dev' = 'stable'
+
+export function getUpdateChannel(): 'stable' | 'dev' {
+  return updateChannel
+}
+
+export function setUpdateChannel(ch: 'stable' | 'dev') {
+  updateChannel = ch
+}
+
+export function getUpdateManifestUrl(): string {
+  if (updateChannel === 'dev') {
+    return `https://github.com/${UPDATE_OWNER}/meshdrop-app/releases/download/dev-preview/latest.json`
+  }
+  return UPDATE_MANIFEST_URL
+}
+
 export type UpdateInfo = {
   versionCode: number
   versionName: string
@@ -122,12 +139,13 @@ export async function refreshVersion(): Promise<string | null> {
 }
 
 async function fetchManifest(): Promise<UpdateInfo | null> {
+  const manifestUrl = getUpdateManifestUrl()
   try {
-    const res = await fetch(UPDATE_MANIFEST_URL)
+    const res = await fetch(manifestUrl)
     if (!res.ok) {
       // Not silently "up to date": a failed feed fetch must be visible in the
       // logs, or an unreachable host looks identical to "no update".
-      console.warn(`[updater] manifest fetch failed: HTTP ${res.status} (${UPDATE_MANIFEST_URL})`)
+      console.warn(`[updater] manifest fetch failed: HTTP ${res.status} (${manifestUrl})`)
       return null
     }
     const data = await res.json()
