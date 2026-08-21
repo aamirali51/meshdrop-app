@@ -665,26 +665,27 @@ async function createWindow() {
       console.error('[Main] Engine failed to start:', err)
     })
 
-  // Dynamic context menu update on peer topology changes
+  // Dynamic context menu update on peer topology and pairing changes
   try {
-    engineBridge.engine.on('peer:connected', async () => {
-      if (process.platform === 'win32') {
-        const settings = await getPersistedSettings()
-        if (settings.contextMenu !== false) {
-          const devices = await engineBridge.engine.listDevices().catch(() => [])
-          registerWindowsContextMenu({ devices }).catch(() => {})
-        }
-      }
-    })
-    engineBridge.engine.on('peer:disconnected', async () => {
-      if (process.platform === 'win32') {
-        const settings = await getPersistedSettings()
-        if (settings.contextMenu !== false) {
-          const devices = await engineBridge.engine.listDevices().catch(() => [])
-          registerWindowsContextMenu({ devices }).catch(() => {})
-        }
-      }
-    })
+    let contextMenuTimer = null
+    const scheduleContextMenuUpdate = () => {
+      if (process.platform !== 'win32') return
+      clearTimeout(contextMenuTimer)
+      contextMenuTimer = setTimeout(async () => {
+        try {
+          const settings = await getPersistedSettings()
+          if (settings.contextMenu !== false && engineBridge.engine) {
+            const devices = await engineBridge.engine.listDevices().catch(() => [])
+            await registerWindowsContextMenu({ devices })
+          }
+        } catch {}
+      }, 500)
+    }
+
+    engineBridge.engine.on('peer:connected', scheduleContextMenuUpdate)
+    engineBridge.engine.on('peer:disconnected', scheduleContextMenuUpdate)
+    engineBridge.engine.on('trust:paired', scheduleContextMenuUpdate)
+    engineBridge.engine.on('device:paired', scheduleContextMenuUpdate)
   } catch {}
 }
 

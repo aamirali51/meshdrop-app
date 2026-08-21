@@ -12,10 +12,18 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-const SHELL_REG_ROOTS = [
-  'HKCU\\Software\\Classes\\*\\shell\\MeshDrop',
-  'HKCU\\Software\\Classes\\Directory\\shell\\MeshDrop'
+const SHELL_REG_TARGETS = [
+  { root: 'HKCU\\Software\\Classes\\*\\shell\\MeshDrop', subKeyPath: '*\\shell\\MeshDrop' },
+  { root: 'HKCU\\Software\\Classes\\Directory\\shell\\MeshDrop', subKeyPath: 'Directory\\shell\\MeshDrop' }
 ]
+
+function runReg(args) {
+  return new Promise((resolve) => {
+    execFile('reg.exe', args, { windowsHide: true }, (err, stdout, stderr) => {
+      resolve({ err, stdout, stderr })
+    })
+  })
+}
 
 /**
  * Register Windows Explorer context menu handlers.
@@ -23,76 +31,75 @@ const SHELL_REG_ROOTS = [
  * @param {string} [options.execPath] Path to MeshDrop executable
  * @param {Array} [options.devices] List of paired/online devices for cascading sub-menus
  */
-function registerWindowsContextMenu({ execPath, devices = [] } = {}) {
-  if (process.platform !== 'win32') return Promise.resolve()
+async function registerWindowsContextMenu({ execPath, devices = [] } = {}) {
+  if (process.platform !== 'win32') return
 
-  const binPath = execPath || process.execPath
-  const safeBin = `"${binPath}"`
+  const binPath = execPath || (process.env.APPIMAGE || process.execPath)
+  if (!binPath) return
 
-  return new Promise((resolve) => {
-    // 1. Root context menu for files and directories
-    const commands = []
-
-    for (const root of SHELL_REG_ROOTS) {
-      commands.push(`reg add "${root}" /ve /d "Send via MeshDrop" /f`)
-      commands.push(`reg add "${root}" /v "Icon" /d ${safeBin} /f`)
+  try {
+    for (const { root, subKeyPath } of SHELL_REG_TARGETS) {
+      // 1. Set root verb properties
+      await runReg(['add', root, '/ve', '/d', 'Send via MeshDrop', '/f'])
+      await runReg(['add', root, '/v', 'MUIVerb', '/d', 'Send via MeshDrop', '/f'])
+      await runReg(['add', root, '/v', 'Icon', '/d', binPath, '/f'])
 
       if (devices.length > 0) {
-        // If we have paired devices, create a cascading submenu
-        commands.push(`reg add "${root}" /v "SubCommands" /d "" /f`)
-      } else {
-        // Direct root click invokes quick device picker
-        commands.push(`reg delete "${root}" /v "SubCommands" /f 2>nul`)
-        commands.push(`reg add "${root}\\command" /ve /d "${safeBin} --send \\"%1\\"" /f`)
-      }
-    }
+        // Cascading sub-menu mode via ExtendedSubCommandsKey
+        await runReg(['add', root, '/v', 'ExtendedSubCommandsKey', '/d', subKeyPath, '/f'])
+        await runReg(['delete', root, '/v', 'SubCommands', '/f'])
+        await runReg(['delete', `${root}\\command`, '/f'])
 
-    // 2. Populate dynamic sub-commands if devices exist
-    if (devices.length > 0) {
-      for (const root of SHELL_REG_ROOTS) {
-        // Add "Choose device..." general option first
-        commands.push(`reg add "${root}\\shell\\0_picker" /v "MUIVerb" /d "Select Device in MeshDrop..." /f`)
-        commands.push(`reg add "${root}\\shell\\0_picker\\command" /ve /d "${safeBin} --send \\"%1\\"" /f`)
+        // Purge old child shell items
+        await runReg(['delete', `${root}\\shell`, '/f'])
 
-        devices.slice(0, 8).forEach((dev, idx) => {
+        // Option 0: Open in-app device picker
+        const pickerKey = `${root}\\shell\\0_picker`
+        await runReg(['add', pickerKey, '/ve', '/d', 'Select Device in MeshDrop...', '/f'])
+        await runReg(['add', pickerKey, '/v', 'MUIVerb', '/d', 'Select Device in MeshDrop...', '/f'])
+        await runReg(['add', pickerKey, '/v', 'Icon', '/d', binPath, '/f'])
+        await runReg(['add', `${pickerKey}\\command`, '/ve', '/d', `"${binPath}" --send "%1"`, '/f'])
+
+        // Option 1..N: Individual paired / online devices (up to 12)
+        const displayDevices = devices.slice(0, 12)
+        for (let idx = 0; idx < displayDevices.length; idx++) {
+          const dev = displayDevices[idx]
           const devId = (dev.id || dev.publicKey || `dev_${idx}`).replace(/[^a-zA-Z0-9_-]/g, '')
           const devKey = dev.publicKey || dev.id
           const peerName = (dev.name || 'Unnamed Device').replace(/"/g, '')
           const statusSuffix = dev.isOnline ? ' (Online)' : ''
           const label = `${peerName}${statusSuffix}`
 
-          commands.push(`reg add "${root}\\shell\\${idx + 1}_${devId}" /v "MUIVerb" /d "${label}" /f`)
-          commands.push(`reg add "${root}\\shell\\${idx + 1}_${devId}\\command" /ve /d "${safeBin} --send-to \\"${devKey}\\" \\"%1\\"" /f`)
-        })
+          const itemKey = `${root}\\shell\\${idx + 1}_${devId}`
+          await runReg(['add', itemKey, '/ve', '/d', label, '/f'])
+          await runReg(['add', itemKey, '/v', 'MUIVerb', '/d', label, '/f'])
+          await runReg(['add', itemKey, '/v', 'Icon', '/d', binPath, '/f'])
+          await runReg(['add', `${itemKey}\\command`, '/ve', '/d', `"${binPath}" --send-to "${devKey}" "%1"`, '/f'])
+        }
+      } else {
+        // Flat mode: single action opens MeshDrop picker
+        await runReg(['delete', root, '/v', 'ExtendedSubCommandsKey', '/f'])
+        await runReg(['delete', root, '/v', 'SubCommands', '/f'])
+        await runReg(['delete', `${root}\\shell`, '/f'])
+        await runReg(['add', `${root}\\command`, '/ve', '/d', `"${binPath}" --send "%1"`, '/f'])
       }
     }
-
-    // Execute registry updates sequentially
-    const fullCmd = commands.join(' & ')
-    exec(fullCmd, { windowsHide: true }, (err) => {
-      if (err) {
-        console.warn('[ContextMenu] Failed to register Windows context menu:', err.message)
-      } else {
-        console.log('[ContextMenu] Windows Explorer context menu registered successfully')
-      }
-      resolve()
-    })
-  })
+    console.log('[ContextMenu] Windows Explorer context menu registered successfully')
+  } catch (err) {
+    console.warn('[ContextMenu] Failed to register Windows context menu:', err.message)
+  }
 }
 
 /**
  * Remove Windows Explorer context menu registry keys.
  */
-function unregisterWindowsContextMenu() {
-  if (process.platform !== 'win32') return Promise.resolve()
+async function unregisterWindowsContextMenu() {
+  if (process.platform !== 'win32') return
 
-  return new Promise((resolve) => {
-    const commands = SHELL_REG_ROOTS.map((root) => `reg delete "${root}" /f 2>nul`)
-    exec(commands.join(' & '), { windowsHide: true }, () => {
-      console.log('[ContextMenu] Windows Explorer context menu removed')
-      resolve()
-    })
-  })
+  for (const { root } of SHELL_REG_TARGETS) {
+    await runReg(['delete', root, '/f'])
+  }
+  console.log('[ContextMenu] Windows Explorer context menu removed')
 }
 
 /**

@@ -84,6 +84,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Engine Dependencies
+        working-directory: meshdrop-core
+        run: npm ci
+
       - name: Install Mobile Dependencies
         working-directory: meshdrop-app/meshdrop-mobile-rn81
         run: npm ci
@@ -92,11 +96,27 @@ jobs:
         working-directory: meshdrop-app/meshdrop-mobile-rn81
         run: npm run build:engine
 
+      - name: Configure release signing (keystore from secrets)
+        working-directory: meshdrop-app/meshdrop-mobile-rn81/android/app
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.MESHDROP_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MESHDROP_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > meshdrop-release.keystore
+            printf 'storeFile=meshdrop-release.keystore\nstorePassword=%s\nkeyAlias=meshdrop\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > keystore.properties
+            echo "::notice::Release signing configured from secrets"
+          else
+            echo "::warning::MESHDROP_KEYSTORE_B64 / MESHDROP_KEYSTORE_PASSWORD not set — APK will be signed with the CI debug key"
+          fi
+
       - name: Build Android Release APK
         working-directory: meshdrop-app/meshdrop-mobile-rn81/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
 
       - name: Generate Dev Manifest
         working-directory: meshdrop-app/meshdrop-mobile-rn81
