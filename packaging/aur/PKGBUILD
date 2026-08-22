@@ -1,0 +1,58 @@
+# Maintainer: Aamir Ali <https://github.com/aamirali51>
+pkgname=meshdrop-bin
+pkgver=1.0.37
+pkgrel=1
+pkgdesc="MeshDrop — zero-cloud, direct peer-to-peer file sharing and folder synchronization"
+arch=('x86_64')
+url="https://github.com/aamirali51/meshdrop-app"
+license=('MIT')
+depends=('fuse2' 'gtk3' 'libnotify' 'nss' 'libxss' 'libxtst' 'xdg-utils')
+optdepends=('libappindicator-gtk3: Status icon support')
+provides=('meshdrop')
+conflicts=('meshdrop')
+options=('!strip')
+
+source_x86_64=(
+    "meshdrop-${pkgver}.AppImage::https://github.com/aamirali51/meshdrop-releases/releases/download/v${pkgver}/MeshDrop-${pkgver}-linux-x86_64.AppImage"
+    "meshdrop.desktop"
+)
+sha256sums_x86_64=(
+    'SKIP'
+    'SKIP'
+)
+
+prepare() {
+    chmod +x "${srcdir}/meshdrop-${pkgver}.AppImage"
+    cd "${srcdir}"
+    ./meshdrop-${pkgver}.AppImage --appimage-extract
+}
+
+package() {
+    install -d "${pkgdir}/usr/lib/${pkgname}"
+    cp -r "${srcdir}/squashfs-root/"* "${pkgdir}/usr/lib/${pkgname}/"
+
+    # Remove appimage runtime artifacts from unpacked directory
+    rm -f "${pkgdir}/usr/lib/${pkgname}/AppRun"
+
+    # Install launcher script into /usr/bin/meshdrop
+    install -d "${pkgdir}/usr/bin"
+    cat << 'EOF' > "${pkgdir}/usr/bin/meshdrop"
+#!/bin/sh
+exec /usr/lib/meshdrop-bin/meshdrop "$@"
+EOF
+    chmod 755 "${pkgdir}/usr/bin/meshdrop"
+
+    # Install desktop entry
+    install -Dm644 "${srcdir}/meshdrop.desktop" "${pkgdir}/usr/share/applications/meshdrop.desktop"
+
+    # Install icons
+    for size in 16 32 48 64 128 256 512; do
+        if [ -f "${srcdir}/squashfs-root/usr/share/icons/hicolor/${size}x${size}/apps/meshdrop.png" ]; then
+            install -Dm644 "${srcdir}/squashfs-root/usr/share/icons/hicolor/${size}x${size}/apps/meshdrop.png" \
+                "${pkgdir}/usr/share/icons/hicolor/${size}x${size}/apps/meshdrop.png"
+        fi
+    done
+    if [ -f "${srcdir}/squashfs-root/meshdrop.png" ]; then
+        install -Dm644 "${srcdir}/squashfs-root/meshdrop.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/meshdrop.png"
+    fi
+}

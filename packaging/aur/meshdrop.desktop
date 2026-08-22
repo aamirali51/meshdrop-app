@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=MeshDrop
+Comment=Zero-cloud, direct peer-to-peer file sharing and folder synchronization
+Exec=meshdrop %U
+Terminal=false
+Type=Application
+Icon=meshdrop
+Categories=Network;FileTransfer;Utility;
+StartupWMClass=MeshDrop
+MimeType=x-scheme-handler/meshdrop;
