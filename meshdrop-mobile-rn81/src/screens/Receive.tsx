@@ -22,13 +22,14 @@ import {
   ArrowDownToLine,
   ClipboardCheck,
 } from 'lucide-react-native'
-import { call } from '../bridge'
+import { call, on } from '../bridge'
 import {
   Card,
   Btn,
   Pill,
 } from '../components'
 import { QRScannerModal } from '../components/QRScannerModal'
+import { DropPreviewModal, type ClaimPreview } from '../components/DropPreviewModal'
 import { formatCodeInput } from '../utils/formatCode'
 import { getClipboardText } from '../clipboard'
 import { theme, fonts } from '../theme'
@@ -40,6 +41,7 @@ export function Receive() {
   const [error, setError] = useState('')
   const [showScanner, setShowScanner] = useState(false)
   const [detectedClipboardCode, setDetectedClipboardCode] = useState<string | null>(null)
+  const [claimPreview, setClaimPreview] = useState<ClaimPreview | null>(null)
 
   // Smart Clipboard Detection on Mount
   useEffect(() => {
@@ -54,7 +56,17 @@ export function Receive() {
         setDetectedClipboardCode(formatted)
       }
     }).catch(() => {})
-    return () => { active = false }
+
+    const unsubPreview = on('claim:preview', (preview: any) => {
+      if (preview && preview.shareId) {
+        setClaimPreview(preview)
+      }
+    })
+
+    return () => {
+      active = false
+      unsubPreview()
+    }
   }, [])
 
   const handleClaimWithCode = async (targetCode: string) => {
@@ -74,6 +86,31 @@ export function Receive() {
     } finally {
       setBusy(false)
     }
+  }
+
+  const handleConfirmPreview = async (selectedIndices: number[]) => {
+    if (!claimPreview) return
+    try {
+      await call('confirmClaimDownload', {
+        shareId: claimPreview.shareId,
+        selectedIndices
+      })
+      setMsg(`Downloading ${selectedIndices.length} file(s) from ${claimPreview.code}`)
+      setClaimPreview(null)
+    } catch (e: any) {
+      Alert.alert('Download Error', e?.message || 'Could not start download.')
+    }
+  }
+
+  const handleCancelPreview = async () => {
+    if (!claimPreview) return
+    try {
+      await call('cancelClaimDownload', {
+        shareId: claimPreview.shareId,
+        code: claimPreview.code
+      })
+    } catch {}
+    setClaimPreview(null)
   }
 
   const handleClaim = () => handleClaimWithCode(code)
@@ -217,6 +254,14 @@ export function Receive() {
         visible={showScanner}
         onClose={() => setShowScanner(false)}
         onScan={handleScanCode}
+      />
+
+      {/* Folder & Multi-File Perusal Modal */}
+      <DropPreviewModal
+        visible={!!claimPreview}
+        preview={claimPreview}
+        onConfirm={handleConfirmPreview}
+        onCancel={handleCancelPreview}
       />
     </ScrollView>
   )

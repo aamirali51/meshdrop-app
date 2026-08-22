@@ -40,6 +40,7 @@ import { Settings } from './src/screens/Settings'
 import { TransferApprovalDialog } from './src/components/TransferApprovalDialog'
 import { FloatingTransferPill } from './src/components/FloatingTransferPill'
 import { UpdateAvailableModal } from './src/components/UpdateAvailableModal'
+import { WhatsNewModal } from './src/components/WhatsNewModal'
 import { ShareTargetModal } from './src/components/ShareTargetModal'
 import { startBridge, watchNetworkChanges, on, call, probeNetwork } from './src/bridge'
 import { initStore } from './src/store'
@@ -420,6 +421,9 @@ function App(): React.JSX.Element {
 
       {/* Global Optional "Update available" Modal (store-free APK updater) */}
       <UpdateAvailableModal />
+
+      {/* Global "What's New" Changelog Modal (shown once per version update) */}
+      <WhatsNewModal />
 
       {/* Global Native Share Target Modal (System Share Sheet Receiver) */}
       <ShareTargetModal

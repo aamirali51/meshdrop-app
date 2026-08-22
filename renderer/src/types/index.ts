@@ -109,6 +109,22 @@ export interface PendingShareFile {
   fileType?: string
 }
 
+export interface ClaimPreviewFile {
+  index: number
+  filename: string
+  fileSize: number
+  fileType?: string
+}
+
+export interface ClaimPreview {
+  code: string
+  shareId: string
+  folderName?: string | null
+  totalSize: number
+  totalFiles: number
+  files: ClaimPreviewFile[]
+}
+
 export interface PendingShare {
   id: string
   code: string

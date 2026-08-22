@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { METHODS, EVENTS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
 import { useToast } from '@/hooks/useToast'
-import type { PendingShare } from '@/types'
+import type { PendingShare, ClaimPreview } from '@/types'
 
 // A pre-filled share composer: files picked in a system dialog, or files
 // dragged onto the window. DropCodeModal consumes this on open.
@@ -18,9 +18,11 @@ interface SharesContextValue {
   isOneTimeReceiveOpen: boolean
   deepLinkCode: string
   shareDraft: ShareDraft | null
+  claimPreview: ClaimPreview | null
   toggleDropCodeModal: () => void
   toggleOneTimeReceiveModal: () => void
   clearDeepLinkCode: () => void
+  clearClaimPreview: () => void
   openShareWith: (draft: ShareDraft) => void
   clearShareDraft: () => void
   cancelShareCode: (id: string) => Promise<unknown>
@@ -32,6 +34,8 @@ interface SharesContextValue {
     maxDownloads: number
   }) => Promise<unknown>
   claimFileWithCode: (code: string) => Promise<unknown>
+  confirmClaimDownload: (params: { shareId: string; selectedIndices?: number[] }) => Promise<unknown>
+  cancelClaimDownload: (params: { shareId: string; code?: string }) => Promise<unknown>
 }
 
 const SharesContext = createContext<SharesContextValue | null>(null)
@@ -41,6 +45,7 @@ export function SharesProvider({ children }: { children: ReactNode }) {
   const [pendingShares, setPendingShares] = useState<PendingShare[]>([])
   const [isDropCodeModalOpen, setIsDropCodeModalOpen] = useState(false)
   const [isOneTimeReceiveOpen, setIsOneTimeReceiveOpen] = useState(false)
+  const [claimPreview, setClaimPreview] = useState<ClaimPreview | null>(null)
   // A DROP code arriving via deep link (meshdrop://drop/…) is stashed
   // here so OneTimeReceiveModal can pre-fill its input.
   const [deepLinkCode, setDeepLinkCode] = useState('')
@@ -69,6 +74,13 @@ export function SharesProvider({ children }: { children: ReactNode }) {
         toast.error('Claim Failed', `${d.code} — ${d.error || 'Share expired or invalid code'}`)
       }
     })
+
+    const unsubClaimPreview = on(EVENTS.CLAIM_PREVIEW_RECEIVED, (preview: any) => {
+      if (preview && preview.shareId) {
+        setClaimPreview(preview)
+      }
+    })
+
     refreshPendingShares()
 
     const unsubDeepLink = window.bridge?.onDeepLink?.((data) => {
@@ -92,6 +104,7 @@ export function SharesProvider({ children }: { children: ReactNode }) {
       unsubShareExpired()
       unsubShareClaimed()
       unsubClaimFailed()
+      unsubClaimPreview()
       unsubDeepLink?.()
     }
   }, [refreshPendingShares, toast])
@@ -115,6 +128,10 @@ export function SharesProvider({ children }: { children: ReactNode }) {
 
   const clearDeepLinkCode = useCallback(() => {
     setDeepLinkCode('')
+  }, [])
+
+  const clearClaimPreview = useCallback(() => {
+    setClaimPreview(null)
   }, [])
 
   const cancelShareCode = useCallback((id: string) => {
@@ -143,6 +160,14 @@ export function SharesProvider({ children }: { children: ReactNode }) {
     return call(METHODS.FILES_CLAIM_CODE, { code })
   }, [])
 
+  const confirmClaimDownload = useCallback((params: { shareId: string; selectedIndices?: number[] }) => {
+    return call(METHODS.FILES_CONFIRM_CLAIM, params)
+  }, [])
+
+  const cancelClaimDownload = useCallback((params: { shareId: string; code?: string }) => {
+    return call(METHODS.FILES_CANCEL_CLAIM, params)
+  }, [])
+
   return (
     <SharesContext.Provider
       value={{
@@ -151,15 +176,19 @@ export function SharesProvider({ children }: { children: ReactNode }) {
         isOneTimeReceiveOpen,
         deepLinkCode,
         shareDraft,
+        claimPreview,
         toggleDropCodeModal,
         toggleOneTimeReceiveModal,
         clearDeepLinkCode,
+        clearClaimPreview,
         openShareWith,
         clearShareDraft,
         cancelShareCode,
         extendShareExpiration,
         createDropCode,
-        claimFileWithCode
+        claimFileWithCode,
+        confirmClaimDownload,
+        cancelClaimDownload
       }}
     >
       {children}

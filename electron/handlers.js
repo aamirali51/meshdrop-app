@@ -451,7 +451,15 @@ handlers[METHODS.FILES_CLAIM_CODE] = async (params) => {
   if (mdCode) {
     return handlers[METHODS.DEVICES_PAIR_CODE]({ code: mdCode })
   }
-  return engine.claimDropCode(params?.code)
+  return engine.claimDropCode(params?.code, { interactive: true })
+}
+
+handlers[METHODS.FILES_CONFIRM_CLAIM] = async (params) => {
+  return engine.confirmClaimDownload(params)
+}
+
+handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
+  return engine.cancelClaimDownload(params)
 }
 
   // ─── Transfers ────────────────────────────────────────────────────────────

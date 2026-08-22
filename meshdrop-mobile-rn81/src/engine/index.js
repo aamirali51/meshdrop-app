@@ -12,6 +12,36 @@
 const path = require('bare-path')
 const b4a = require('b4a')
 
+// Disable file descriptor locking on Android / Bare Worklet to prevent
+// "File descriptor could not be locked" error on Android FUSE / emulated storage.
+try {
+  const fsx = require('fs-native-extensions')
+  if (fsx) {
+    fsx.tryLock = function tryLock() { return true }
+    fsx.waitForLock = async function waitForLock() { return true }
+    fsx.waitForLockSync = function waitForLockSync() { return true }
+    fsx.tryDowngradeLock = function tryDowngradeLock() { return true }
+    fsx.waitForDowngradeLock = async function waitForDowngradeLock() { return true }
+    fsx.waitForDowngradeLockSync = function waitForDowngradeLockSync() { return true }
+    fsx.tryUpgradeLock = function tryUpgradeLock() { return true }
+    fsx.waitForUpgradeLock = async function waitForUpgradeLock() { return true }
+    fsx.waitForUpgradeLockSync = function waitForUpgradeLockSync() { return true }
+    fsx.unlock = function unlock() {}
+  }
+} catch {}
+
+try {
+  const FDLock = require('fd-lock')
+  if (FDLock && FDLock.prototype) {
+    FDLock.prototype._resume = async function _resume() {
+      this._locked = true
+    }
+    FDLock.prototype._suspend = async function _suspend() {
+      this._locked = false
+    }
+  }
+} catch {}
+
 console.error('MESHDROP worklet boot: BareKit=' + typeof BareKit + ' IPC=' + !!(typeof BareKit !== 'undefined' && BareKit.IPC))
 
 const IPC = (typeof BareKit !== 'undefined' && BareKit.IPC) ? BareKit.IPC : null
@@ -187,7 +217,8 @@ async function boot() {
       'sync:conflict',
       'sync:error',
       'sync:invite:received',
-      'sync:phase'
+      'sync:phase',
+      'claim:preview'
     ]
     for (const evt of EVENTS) {
       engine.on(evt, (data) => {
@@ -325,7 +356,11 @@ function call(method, params) {
     case 'listPendingShares':
       return engine.listPendingShares()
     case 'claimDropCode':
-      return engine.claimDropCode(params.code)
+      return engine.claimDropCode(params?.code, { interactive: true })
+    case 'confirmClaimDownload':
+      return engine.confirmClaimDownload(params)
+    case 'cancelClaimDownload':
+      return engine.cancelClaimDownload(params)
     case 'cancelCode':
     case 'cancelDropCode':
     case 'cancelShare':

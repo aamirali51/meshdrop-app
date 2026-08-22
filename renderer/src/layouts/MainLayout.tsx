@@ -25,6 +25,8 @@ import { DropCodeModal } from '@/components/DropCodeModal'
 import { OneTimeReceiveModal } from '@/components/OneTimeReceiveModal'
 import { TransferApprovalDialog } from '@/components/TransferApprovalDialog'
 import { SyncInviteModal } from '@/components/SyncInviteModal'
+import { DropPreviewModal } from '@/components/DropPreviewModal'
+import { WhatsNewModal } from '@/components/WhatsNewModal'
 import { useDevices } from '@/hooks/useDevices'
 
 const pages: Record<string, React.FC> = {
@@ -119,6 +121,8 @@ export function MainLayout() {
       <QRCodeModal isOpen={isQRCodeModalOpen} onClose={toggleQRCodeModal} />
       <DropCodeModal />
       <OneTimeReceiveModal />
+      <DropPreviewModal />
+      <WhatsNewModal />
       <TransferApprovalDialog />
       <SyncInviteModal />
 
