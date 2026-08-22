@@ -30,7 +30,7 @@ import { QRCodeModal } from '../components/QRCodeModal'
 import { QRScannerModal } from '../components/QRScannerModal'
 import { formatCodeInput } from '../utils/formatCode'
 import { pickFiles } from '../filePicker'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 interface Device {
   id: string
@@ -48,6 +48,7 @@ interface Device {
 let memoryCachedDevices: Device[] = []
 
 export function Devices({ identity }: { identity?: any }) {
+  const { theme } = useTheme()
   const [devices, setDevices] = useState<Device[]>(() =>
     memoryCachedDevices.map((d) => ({ ...d, isOnline: false }))
   )
@@ -81,96 +82,86 @@ export function Devices({ identity }: { identity?: any }) {
         }
       })
       .catch(() => {})
-
-    call('getIdentity')
-      .then((res: any) => {
-        if (res && res.pairingCode) setMyCode(res.pairingCode)
-      })
-      .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    refresh()
+
+    const unsubPeers = on('peers', () => {
+      refresh()
+    })
+
+    const unsubStatus = on('status', () => {
+      refresh()
+    })
+
+    return () => {
+      unsubPeers()
+      unsubStatus()
+    }
+  }, [refresh])
 
   useEffect(() => {
     if (identity?.pairingCode) {
       setMyCode(identity.pairingCode)
     }
-  }, [identity])
+  }, [identity?.pairingCode])
 
-  useEffect(() => {
-    refresh()
-    const t1 = setTimeout(refresh, 400)
-    const t2 = setTimeout(refresh, 1500)
-    const t3 = setTimeout(refresh, 3500)
-    const events = [
-      '__engine',
-      'trust:paired',
-      'peer:connected',
-      'peer:disconnected',
-      'device:updated',
-      'device:removed',
-    ]
-    const unsubs = events.map((e) => on(e, refresh))
-    return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
-      clearTimeout(t3)
-      unsubs.forEach((u) => u())
-    }
-  }, [refresh])
-
-  const copyMyCode = () => {
+  const handleCopyCode = () => {
     if (!myCode) return
     setCodeCopied(true)
     setTimeout(() => setCodeCopied(false), 2000)
-    Alert.alert('Code Copied', `${myCode} copied to clipboard.`)
+    call('copyToClipboard', { text: myCode }).catch(() => {})
   }
 
-  const handlePairWithCode = async (targetCode: string) => {
-    const formatted = targetCode.trim().toUpperCase()
-    if (!formatted) return
+  const handleRefreshCode = () => {
+    setCodeLoading(true)
+    call('rotatePairingCode')
+      .then((res: any) => {
+        if (res?.pairingCode) setMyCode(res.pairingCode)
+      })
+      .finally(() => setCodeLoading(false))
+  }
+
+  const handlePair = () => {
+    if (!pairCodeInput.trim()) return
     setPairLoading(true)
-    try {
-      await call('pairWithCode', { code: formatted })
-      setShowPairModal(false)
-      setPairCodeInput('')
-      Alert.alert('Success', 'Device paired successfully over Hyperswarm DHT!')
-      refresh()
-    } catch (err: any) {
-      Alert.alert('Pairing Failed', err?.message || 'Could not verify pairing code.')
-    } finally {
-      setPairLoading(false)
-    }
+    call('pairDevice', { code: pairCodeInput.trim() })
+      .then(() => {
+        setShowPairModal(false)
+        setPairCodeInput('')
+        refresh()
+        Alert.alert('Success', 'Pairing request dispatched to mesh peer.')
+      })
+      .catch((err: any) => {
+        Alert.alert('Pairing Failed', err?.message || 'Could not verify pairing code.')
+      })
+      .finally(() => setPairLoading(false))
   }
 
-  const handlePair = () => handlePairWithCode(pairCodeInput)
-
-  const handleScanCode = (scannedValue: string) => {
-    let clean = scannedValue.trim().toUpperCase()
-    if (clean.includes('CODE=')) {
-      const match = clean.match(/CODE=([A-Z0-9-]+)/i)
-      if (match && match[1]) clean = match[1]
-    }
-    setPairCodeInput(clean)
-    setShowPairModal(true)
-    handlePairWithCode(clean)
+  const handleToggleTrust = (dev: Device) => {
+    const nextTrust = !dev.isTrusted
+    call('setDeviceTrust', { id: dev.id, trusted: nextTrust })
+      .then(() => refresh())
+      .catch(() => {})
   }
 
   const handleForgetDevice = (dev: Device) => {
     Alert.alert(
       'Remove Device',
-      `Are you sure you want to remove "${dev.name}" from your trusted mesh network?`,
+      `Forget "${dev.name}" from your mesh cluster?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await call('forgetDevice', { id: dev.id })
-              setSelectedDevice(null)
-              refresh()
-            } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Failed to remove device.')
-            }
+          onPress: () => {
+            call('forgetDevice', { id: dev.id })
+              .then(() => {
+                setSelectedDevice(null)
+                refresh()
+              })
+              .catch(() => {})
           },
         },
       ]
@@ -178,38 +169,41 @@ export function Devices({ identity }: { identity?: any }) {
   }
 
   const handleDirectSend = async (dev: Device) => {
-    try {
-      const files = await pickFiles()
-      if (!files || files.length === 0) return
-      for (const file of files) {
-        await call('sendOffer', {
-          recipientPeerId: dev.id,
-          filePath: file.path,
-          filename: file.name,
-          fileSize: file.size,
-        })
-      }
-      Alert.alert('Files Sent', `Offered ${files.length} file(s) to ${dev.name}.`)
-    } catch (err: any) {
-      Alert.alert('Send Failed', err?.message || 'Could not send files.')
+    const picked = await pickFiles()
+    if (!picked || picked.length === 0) return
+
+    for (const f of picked) {
+      call('sendFileOffer', {
+        targetDeviceId: dev.id,
+        filePath: f.path,
+        fileName: f.name,
+        size: f.size,
+      }).catch((err: any) => {
+        Alert.alert('Send Error', err?.message || 'Failed to dispatch file.')
+      })
     }
   }
 
   const filteredDevices = useMemo(() => {
     return devices.filter((d) => {
-      const matchesQuery =
+      const matchQuery =
         !query ||
         d.name.toLowerCase().includes(query.toLowerCase()) ||
-        (d.os && d.os.toLowerCase().includes(query.toLowerCase()))
+        (d.os && d.os.toLowerCase().includes(query.toLowerCase())) ||
+        (d.ipAddress && d.ipAddress.includes(query))
 
-      if (!matchesQuery) return false
+      if (!matchQuery) return false
 
       if (activeTab === 'online') return d.isOnline
       if (activeTab === 'trusted') return d.isTrusted
-      if (activeTab === 'desktops')
-        return (d.os || '').toLowerCase().match(/win|mac|linux|darwin/)
-      if (activeTab === 'mobile')
-        return (d.os || '').toLowerCase().match(/android|ios|iphone|ipad/)
+      if (activeTab === 'desktops') {
+        const os = (d.os || '').toLowerCase()
+        return os.match(/win|mac|linux|darwin/)
+      }
+      if (activeTab === 'mobile') {
+        const os = (d.os || '').toLowerCase()
+        return os.match(/android|ios|iphone|ipad/)
+      }
       return true
     })
   }, [devices, query, activeTab])
@@ -218,63 +212,57 @@ export function Devices({ identity }: { identity?: any }) {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.bg }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Pairing Code Hero Card */}
+      {/* Node Pairing Code Hero Card */}
       <PairingCodeCard
         code={myCode}
-        onCopy={copyMyCode}
+        onCopy={handleCopyCode}
         onShowQR={() => setShowQRModal(true)}
-        onRefresh={refresh}
+        onRefresh={handleRefreshCode}
         copied={codeCopied}
         loading={codeLoading}
       />
 
-      {/* Action Header & Scan Trigger */}
+      {/* Action Header with Pair & QR Trigger */}
       <View style={styles.actionHeaderRow}>
-        <View style={styles.flex1}>
-          <SectionHeader
-            title="Mesh Swarm"
-            badge={devices.length}
-          />
-        </View>
-
+        <SectionHeader title="Swarm Nodes" badge={devices.length} />
         <View style={styles.topBtnGroup}>
           <TouchableOpacity
-            style={styles.scanCodeBtn}
+            style={[styles.scanCodeBtn, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}
             onPress={() => setShowScanner(true)}
             activeOpacity={0.8}
           >
             <Camera size={14} color={theme.primary} />
-            <Text style={styles.scanCodeText}>Scan QR</Text>
+            <Text style={[styles.scanCodeText, { color: theme.primary }]}>Scan QR</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.pairCodeBtn}
+            style={[styles.pairCodeBtn, { backgroundColor: theme.primary }]}
             onPress={() => setShowPairModal(true)}
             activeOpacity={0.8}
           >
             <Plus size={14} color="#FFFFFF" />
-            <Text style={styles.pairCodeText}>Pair</Text>
+            <Text style={styles.pairCodeText}>Pair Code</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchBar}>
+      {/* Fast Filter / Search Input */}
+      <View style={[styles.searchBar, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <Search size={15} color={theme.muted} style={{ marginRight: 8 }} />
         <TextInput
-          style={styles.searchInput}
-          placeholder="Search devices by name or OS…"
+          style={[styles.searchInput, { color: theme.text }]}
+          placeholder="Search peers by name or OS…"
           placeholderTextColor={theme.muted}
           value={query}
           onChangeText={setQuery}
         />
-        {query.length > 0 && (
+        {!!query && (
           <TouchableOpacity onPress={() => setQuery('')}>
-            <Text style={styles.clearSearchText}>Clear</Text>
+            <Text style={[styles.clearSearchText, { color: theme.muted }]}>Clear</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -285,36 +273,54 @@ export function Devices({ identity }: { identity?: any }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabScroll}
       >
-        {[
-          { key: 'all', label: `All (${devices.length})` },
-          { key: 'online', label: `Online (${onlineCount})` },
-          { key: 'trusted', label: 'Trusted' },
-          { key: 'desktops', label: 'Desktops' },
-          { key: 'mobile', label: 'Mobile' },
-        ].map((tab) => {
-          const isActive = activeTab === tab.key
+        {(
+          [
+            { key: 'all', label: `All (${devices.length})` },
+            { key: 'online', label: `Online (${onlineCount})` },
+            { key: 'trusted', label: 'Trusted' },
+            { key: 'desktops', label: 'Desktops' },
+            { key: 'mobile', label: 'Mobile' },
+          ] as const
+        ).map((t) => {
+          const isActive = activeTab === t.key
           return (
             <TouchableOpacity
-              key={tab.key}
-              style={[styles.filterChip, isActive && styles.filterChipActive]}
-              onPress={() => setActiveTab(tab.key as any)}
-              activeOpacity={0.8}
+              key={t.key}
+              onPress={() => setActiveTab(t.key)}
+              style={[
+                styles.filterChip,
+                { backgroundColor: theme.bgCard, borderColor: theme.border },
+                isActive && { backgroundColor: theme.primarySoft, borderColor: theme.primary + '50' },
+              ]}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
                   styles.filterChipText,
-                  isActive && styles.filterChipTextActive,
+                  { color: theme.muted },
+                  isActive && { color: theme.primary, fontWeight: '800' },
                 ]}
               >
-                {tab.label}
+                {t.label}
               </Text>
             </TouchableOpacity>
           )
         })}
       </ScrollView>
 
-      {/* Device List or Empty Radar State */}
-      {filteredDevices.length > 0 ? (
+      {/* Devices List / Empty Radar Pulse State */}
+      {filteredDevices.length === 0 ? (
+        <RadarPulseEmptyState
+          title={query ? 'No matching peers found' : 'Scanning Hyperswarm Network…'}
+          subtitle={
+            query
+              ? 'Try modifying your search filter.'
+              : 'Devices running MeshDrop on your Wi-Fi or DHT will automatically appear here.'
+          }
+          actionLabel="Enter Pairing Code"
+          onAction={() => setShowPairModal(true)}
+        />
+      ) : (
         <View style={styles.deviceList}>
           {filteredDevices.map((dev) => (
             <DeviceCard
@@ -322,39 +328,37 @@ export function Devices({ identity }: { identity?: any }) {
               device={dev}
               onPress={() => setSelectedDevice(dev)}
               onSendFile={() => handleDirectSend(dev)}
+              onToggleTrust={() => handleToggleTrust(dev)}
+              onForget={() => handleForgetDevice(dev)}
             />
           ))}
         </View>
-      ) : (
-        <RadarPulseEmptyState
-          topicName="DHT Swarm Nodes"
-          onScanQR={() => setShowScanner(true)}
-        />
       )}
 
-      {/* QR Code Modal for Self Identity */}
+      {/* QR Code Presentation Modal */}
       <QRCodeModal
         visible={showQRModal}
+        title="Node QR Matrix"
+        subtitle="Scan this matrix with MeshDrop mobile or desktop camera to pair instantly"
         value={myCode}
-        title="Your Node Pairing Matrix"
-        subtitle="Scan with another MeshDrop node to link devices instantly"
         onClose={() => setShowQRModal(false)}
       />
 
-      {/* QR Code Camera Scanner Modal */}
+      {/* Native Camera QR Scanner Modal */}
       <QRScannerModal
         visible={showScanner}
-        title="Scan Pairing QR Code"
-        instruction="Align camera with the QR code on your other device"
-        onScan={handleScanCode}
         onClose={() => setShowScanner(false)}
+        onScanSuccess={(code) => {
+          setPairCodeInput(code)
+          setShowPairModal(true)
+        }}
       />
 
-      {/* Manual Pair Code Modal */}
+      {/* Manual Pairing Input Modal */}
       <SimpleModal
         visible={showPairModal}
-        title="Pair Node"
-        subtitle="Enter the 16-character code shown on the other device"
+        title="Pair Remote Node"
+        subtitle="Enter the 16-character alphanumeric code displayed on your other device"
         onClose={() => {
           setShowPairModal(false)
           setPairCodeInput('')
@@ -362,30 +366,32 @@ export function Devices({ identity }: { identity?: any }) {
       >
         <View style={styles.pairModalContent}>
           <TextInput
-            style={styles.pairInput}
+            style={[styles.pairInput, { backgroundColor: theme.bgElevated, borderColor: theme.border, color: theme.primary }]}
             placeholder="MD-XXXX-XXXX-XXXX-XXXX"
             placeholderTextColor={theme.muted}
             value={pairCodeInput}
-            onChangeText={(t) => setPairCodeInput(formatCodeInput(t))}
+            onChangeText={(txt) => setPairCodeInput(formatCodeInput(txt))}
             autoCapitalize="characters"
             autoCorrect={false}
           />
 
           <View style={styles.pairActionsRow}>
             <Btn
-              label="Cancel"
-              variant="ghost"
+              label="Scan Camera"
+              icon={Camera}
+              variant="secondary"
               onPress={() => {
                 setShowPairModal(false)
-                setPairCodeInput('')
+                setShowScanner(true)
               }}
               style={styles.flex1}
             />
             <Btn
-              label="Pair Node"
+              label="Establish Mesh"
+              icon={ShieldCheck}
               variant="primary"
               onPress={handlePair}
-              disabled={!pairCodeInput.trim() || pairLoading}
+              disabled={pairCodeInput.length < 8}
               loading={pairLoading}
               style={styles.flex1}
             />
@@ -393,7 +399,7 @@ export function Devices({ identity }: { identity?: any }) {
         </View>
       </SimpleModal>
 
-      {/* Device Detail & Management Modal */}
+      {/* Device Details Bottom Modal */}
       {selectedDevice && (
         <SimpleModal
           visible={Boolean(selectedDevice)}
@@ -402,9 +408,9 @@ export function Devices({ identity }: { identity?: any }) {
           onClose={() => setSelectedDevice(null)}
         >
           <View style={styles.detailContainer}>
-            <View style={styles.detailCard}>
+            <View style={[styles.detailCard, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Connection Status</Text>
+                <Text style={[styles.detailLabel, { color: theme.muted }]}>Connection Status</Text>
                 <Pill
                   label={selectedDevice.isOnline ? 'Online · Connected' : 'Offline'}
                   color={selectedDevice.isOnline ? theme.success : theme.muted}
@@ -413,12 +419,12 @@ export function Devices({ identity }: { identity?: any }) {
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Operating System</Text>
-                <Text style={styles.detailValue}>{selectedDevice.os || 'Unknown'}</Text>
+                <Text style={[styles.detailLabel, { color: theme.muted }]}>Operating System</Text>
+                <Text style={[styles.detailValue, { color: theme.text }]}>{selectedDevice.os || 'Unknown'}</Text>
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Trust Level</Text>
+                <Text style={[styles.detailLabel, { color: theme.muted }]}>Trust Level</Text>
                 <Pill
                   label={selectedDevice.isTrusted ? 'Verified & Trusted' : 'Standard Peer'}
                   color={selectedDevice.isTrusted ? theme.primary : theme.muted}
@@ -428,8 +434,8 @@ export function Devices({ identity }: { identity?: any }) {
 
               {selectedDevice.ipAddress && (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Direct IP</Text>
-                  <Text style={styles.detailValueMono}>{selectedDevice.ipAddress}</Text>
+                  <Text style={[styles.detailLabel, { color: theme.muted }]}>Direct IP</Text>
+                  <Text style={[styles.detailValueMono, { color: theme.primary }]}>{selectedDevice.ipAddress}</Text>
                 </View>
               )}
             </View>
@@ -470,7 +476,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
   },
   content: {
     padding: 16,
@@ -491,15 +496,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: theme.primarySoft,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
     borderWidth: 1,
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 8,
   },
   scanCodeText: {
-    color: theme.primary,
     fontSize: 12,
     fontWeight: '800',
   },
@@ -507,11 +509,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: theme.primary,
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 8,
-    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -524,14 +524,11 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 12,
-    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
     shadowRadius: 3,
@@ -539,12 +536,10 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: theme.text,
     fontSize: 13,
     padding: 0,
   },
   clearSearchText: {
-    color: theme.muted,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -556,22 +551,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: theme.border,
-  },
-  filterChipActive: {
-    backgroundColor: theme.primarySoft,
-    borderColor: 'rgba(79, 70, 229, 0.3)',
   },
   filterChipText: {
-    color: theme.muted,
     fontSize: 11.5,
     fontWeight: '700',
-  },
-  filterChipTextActive: {
-    color: theme.primary,
-    fontWeight: '800',
   },
   deviceList: {
     marginTop: 4,
@@ -580,12 +564,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   pairInput: {
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 10,
     padding: 14,
-    color: theme.primary,
     fontSize: 15,
     fontWeight: '900',
     fontFamily: fonts.mono,
@@ -601,10 +582,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   detailCard: {
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 10,
     padding: 14,
     marginBottom: 16,
     gap: 12,
@@ -615,17 +594,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   detailLabel: {
-    color: theme.muted,
     fontSize: 12.5,
     fontWeight: '700',
   },
   detailValue: {
-    color: theme.text,
     fontSize: 13,
     fontWeight: '800',
   },
   detailValueMono: {
-    color: theme.primary,
     fontSize: 12,
     fontWeight: '800',
     fontFamily: fonts.mono,

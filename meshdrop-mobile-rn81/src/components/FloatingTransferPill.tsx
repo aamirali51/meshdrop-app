@@ -8,7 +8,7 @@ import {
 } from 'react-native'
 import { ArrowUp, ArrowDown, Zap, Sparkles } from 'lucide-react-native'
 import { on } from '../bridge'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 function formatSpeed(bytesPerSec?: number): string {
   if (!bytesPerSec || bytesPerSec <= 0) return 'Syncing…'
@@ -19,6 +19,7 @@ function formatSpeed(bytesPerSec?: number): string {
 }
 
 export function FloatingTransferPill({ onExpand }: { onExpand?: () => void }) {
+  const { theme } = useTheme()
   const [activeTransfer, setActiveTransfer] = useState<any | null>(null)
   const lastUpdateRef = useRef<number>(0)
   const progressAnim = useRef(new Animated.Value(0)).current
@@ -119,10 +120,17 @@ export function FloatingTransferPill({ onExpand }: { onExpand?: () => void }) {
       <TouchableOpacity
         onPress={onExpand}
         activeOpacity={0.9}
-        style={styles.touchable}
+        style={[styles.touchable, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
       >
         <View style={styles.contentRow}>
-          <View style={[styles.directionBadge, isSend ? styles.sendBg : styles.recvBg]}>
+          <View
+            style={[
+              styles.directionBadge,
+              isSend
+                ? { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }
+                : { backgroundColor: theme.accentSoft, borderColor: theme.accent + '35' },
+            ]}
+          >
             {isSend ? (
               <ArrowUp size={15} color={theme.primary} />
             ) : (
@@ -132,23 +140,23 @@ export function FloatingTransferPill({ onExpand }: { onExpand?: () => void }) {
 
           <View style={styles.textContainer}>
             <View style={styles.titleRow}>
-              <Text style={styles.filename} numberOfLines={1}>
+              <Text style={[styles.filename, { color: theme.text }]} numberOfLines={1}>
                 {activeTransfer.filename || 'P2P File Transfer'}
               </Text>
             </View>
-            <Text style={styles.subtext}>
+            <Text style={[styles.subtext, { color: theme.textSecondary }]}>
               {isSend ? 'Direct Beam' : 'Receiving'} · {progressPercent}%
             </Text>
           </View>
 
-          <View style={styles.speedBadge}>
+          <View style={[styles.speedBadge, { backgroundColor: theme.successBg, borderColor: theme.successBorder }]}>
             <Zap size={11} color={theme.success} />
-            <Text style={styles.speedText}>{speedText}</Text>
+            <Text style={[styles.speedText, { color: theme.success }]}>{speedText}</Text>
           </View>
         </View>
 
         {/* 60fps Native Interpolated Progress Bar */}
-        <View style={styles.progressBarBg}>
+        <View style={[styles.progressBarBg, { backgroundColor: theme.bgElevated }]}>
           <Animated.View
             style={[
               styles.progressBarFill,
@@ -176,12 +184,9 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   touchable: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: theme.radius,
+    borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.1,
     shadowRadius: 14,
@@ -199,16 +204,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendBg: {
-    backgroundColor: theme.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
-  },
-  recvBg: {
-    backgroundColor: theme.accentSoft,
-    borderWidth: 1,
-    borderColor: 'rgba(8, 145, 178, 0.2)',
   },
   textContainer: {
     flex: 1,
@@ -218,12 +214,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filename: {
-    color: theme.text,
     fontSize: 13.5,
     fontWeight: '800',
   },
   subtext: {
-    color: theme.textSecondary,
     fontSize: 11,
     marginTop: 2,
     fontFamily: fonts.mono,
@@ -231,8 +225,6 @@ const styles = StyleSheet.create({
   speedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.successBg,
-    borderColor: theme.successBorder,
     borderWidth: 1,
     paddingVertical: 4,
     paddingHorizontal: 9,
@@ -240,17 +232,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   speedText: {
-    color: theme.success,
     fontSize: 11,
     fontWeight: '900',
     fontFamily: fonts.mono,
   },
   progressBarBg: {
     height: 3.5,
-    backgroundColor: theme.bgElevated,
     width: '100%',
   },
   progressBarFill: {
     height: '100%',
   },
 })
+

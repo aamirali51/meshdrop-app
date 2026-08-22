@@ -43,7 +43,7 @@ import {
   StatCard,
   DeviceAvatar,
 } from '../components'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts, theme } from '../theme'
 
 interface SyncLibrary {
   id: string
@@ -177,6 +177,7 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
   onTogglePause: (lib: SyncLibrary) => void
   onDelete: (lib: SyncLibrary) => void
 }) {
+  const { theme } = useTheme()
   const isSyncing = syncingId === lib.id || lib.status === 'syncing'
   const isPaused = lib.paused || lib.status === 'paused'
   const isError = lib.status === 'error'
@@ -185,14 +186,14 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
   const isTransferring = phase?.phase === 'transferring'
 
   return (
-    <Card glow={isSyncing} style={styles.libCard}>
+    <Card glow={isSyncing} style={[styles.libCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
       <View style={styles.libHeader}>
-        <View style={styles.folderIconBox}>
+        <View style={[styles.folderIconBox, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
           <Folder size={20} color={theme.primary} />
         </View>
         <View style={styles.flex1}>
           <View style={styles.libTitleRow}>
-            <Text style={styles.libName} numberOfLines={1}>
+            <Text style={[styles.libName, { color: theme.text }]} numberOfLines={1}>
               {lib.name}
             </Text>
             <Pill
@@ -332,6 +333,7 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
 })
 
 export function Sync({ identity: _identity }: { identity?: any }) {
+  const { theme } = useTheme()
   const [libraries, setLibraries] = useState<SyncLibrary[]>([])
   const [devices, setDevices] = useState<PairedDevice[]>([])
   const [invites, setInvites] = useState<SyncInvite[]>([])
@@ -627,7 +629,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
     try {
       const res = await pickFolder()
       if (res && res.path) {
-        setInviteTargetFolder(res.path)
+        setInviteCustomPath(res.path)
       }
     } catch (err: any) {
       Alert.alert('Folder Picker Error', err?.message || 'Could not open folder picker.')

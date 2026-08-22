@@ -26,6 +26,8 @@ const DEFAULT_SETTINGS = {
   // until the user explicitly accepts (Require Manual File Acceptance).
   autoAcceptOffers: true,
   preferOwnRelay: true,
+  relayMode: 'auto',
+  customRelayUrl: '',
   noiseEncryption: true,
   autoUpdate: true,
   releaseChannel: 'stable',
@@ -367,7 +369,9 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     return mergeSettings({
       ...(entry?.value || {}),
       autoAcceptOffers: live.autoAcceptOffers,
-      preferOwnRelay: live.preferOwnRelay
+      preferOwnRelay: live.preferOwnRelay,
+      relayMode: live.relayMode,
+      customRelayUrl: live.customRelayUrl
     })
   }
 
@@ -389,6 +393,12 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     }
     if (typeof merged.preferOwnRelay === 'boolean') {
       await engine.setPreferOwnRelay(merged.preferOwnRelay)
+    }
+    if (typeof merged.relayMode === 'string') {
+      await engine.setRelayMode(merged.relayMode)
+    }
+    if (typeof merged.customRelayUrl === 'string') {
+      await engine.setCustomRelayUrl(merged.customRelayUrl)
     }
     if (updateAutoStart) {
       updateAutoStart(merged)

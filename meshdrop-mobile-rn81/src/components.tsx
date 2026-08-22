@@ -36,9 +36,11 @@ import {
   Cpu,
   Sparkles,
 } from 'lucide-react-native'
-import { theme, fonts } from './theme'
+import { useTheme, fonts, type ThemeTokens } from './theme'
 
-export function PulseIndicator({ color = theme.success, size = 8 }: { color?: string; size?: number }) {
+export function PulseIndicator({ color, size = 8 }: { color?: string; size?: number }) {
+  const { theme } = useTheme()
+  const resolvedColor = color || theme.success
   const scale = useRef(new Animated.Value(1)).current
   const opacity = useRef(new Animated.Value(0.8)).current
 
@@ -86,7 +88,7 @@ export function PulseIndicator({ color = theme.success, size = 8 }: { color?: st
             width: size * 2,
             height: size * 2,
             borderRadius: size,
-            backgroundColor: color,
+            backgroundColor: resolvedColor,
             transform: [{ scale }],
             opacity,
           },
@@ -99,7 +101,8 @@ export function PulseIndicator({ color = theme.success, size = 8 }: { color?: st
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: color,
+            backgroundColor: resolvedColor,
+            shadowColor: resolvedColor,
           },
         ]}
       />
@@ -118,16 +121,18 @@ export function Card({
   glow?: boolean
   variant?: 'default' | 'elevated' | 'glass' | 'accent'
 }) {
+  const { theme } = useTheme()
+
   const getVariantStyle = () => {
     switch (variant) {
       case 'elevated':
-        return styles.cardElevated
+        return { backgroundColor: theme.bgElevated, borderColor: theme.border }
       case 'glass':
-        return styles.cardGlass
+        return { backgroundColor: theme.bgGlassHeavy, borderColor: theme.border }
       case 'accent':
-        return styles.cardAccent
+        return { backgroundColor: theme.primarySoft, borderColor: 'rgba(79, 70, 229, 0.25)' }
       default:
-        return styles.cardDefault
+        return { backgroundColor: theme.bgCard, borderColor: theme.cardBorder }
     }
   }
 
@@ -135,8 +140,20 @@ export function Card({
     <View
       style={[
         styles.card,
+        {
+          borderRadius: theme.radius,
+          shadowColor: theme.shadowSm.shadowColor,
+          shadowOpacity: theme.shadowSm.shadowOpacity,
+          shadowRadius: theme.shadowSm.shadowRadius,
+          elevation: theme.shadowSm.elevation,
+        },
         getVariantStyle(),
-        glow && styles.cardGlow,
+        glow && {
+          borderColor: theme.primaryGlow ? theme.primary : 'rgba(99, 102, 241, 0.35)',
+          shadowColor: theme.primary,
+          shadowOpacity: theme.isDark ? 0.25 : 0.1,
+          shadowRadius: 12,
+        },
         style,
       ]}
     >
@@ -149,7 +166,7 @@ export function StatCard({
   label,
   value,
   icon: IconComponent,
-  color = theme.primary,
+  color,
   subtext,
 }: {
   label: string
@@ -158,21 +175,35 @@ export function StatCard({
   color?: string
   subtext?: string
 }) {
+  const { theme } = useTheme()
+  const resolvedColor = color || theme.primary
+
   return (
-    <View style={styles.statCard}>
+    <View
+      style={[
+        styles.statCard,
+        {
+          backgroundColor: theme.bgCard,
+          borderColor: theme.border,
+          borderRadius: theme.radiusSm,
+          shadowColor: theme.shadowSm.shadowColor,
+          shadowOpacity: theme.shadowSm.shadowOpacity,
+        },
+      ]}
+    >
       <View style={styles.statTop}>
         {IconComponent && (
-          <View style={[styles.statIconBox, { backgroundColor: color + '14', borderColor: color + '25' }]}>
-            <IconComponent size={15} color={color} />
+          <View style={[styles.statIconBox, { backgroundColor: resolvedColor + '18', borderColor: resolvedColor + '30' }]}>
+            <IconComponent size={15} color={resolvedColor} />
           </View>
         )}
-        <Text style={[styles.statValue, { color }]}>{value}</Text>
+        <Text style={[styles.statValue, { color: resolvedColor }]}>{value}</Text>
       </View>
-      <Text style={styles.statLabel} numberOfLines={1}>
+      <Text style={[styles.statLabel, { color: theme.textSecondary }]} numberOfLines={1}>
         {label}
       </Text>
       {subtext && (
-        <Text style={styles.statSubtext} numberOfLines={1}>
+        <Text style={[styles.statSubtext, { color: theme.muted }]} numberOfLines={1}>
           {subtext}
         </Text>
       )}
@@ -201,6 +232,8 @@ export function Btn({
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean
 }) {
+  const { theme } = useTheme()
+
   const getColors = () => {
     switch (variant) {
       case 'primary':
@@ -210,7 +243,7 @@ export function Btn({
       case 'purple':
         return { bg: theme.purple, fg: '#FFFFFF', border: 'transparent', shadow: theme.purpleGlow }
       case 'secondary':
-        return { bg: '#FFFFFF', fg: theme.text, border: theme.border, shadow: 'transparent' }
+        return { bg: theme.bgElevated, fg: theme.text, border: theme.border, shadow: 'transparent' }
       case 'danger':
         return { bg: theme.dangerBg, fg: theme.danger, border: theme.dangerBorder, shadow: theme.dangerGlow }
       case 'outline':
@@ -233,11 +266,15 @@ export function Btn({
       style={[
         styles.btn,
         pad,
-        { backgroundColor: c.bg, borderColor: c.border },
+        {
+          backgroundColor: c.bg,
+          borderColor: c.border,
+          borderRadius: theme.radiusSm,
+        },
         c.border !== 'transparent' && styles.btnBordered,
         disabled && styles.btnDisabled,
-        variant === 'primary' && styles.btnPrimaryShadow,
-        variant === 'cyan' && styles.btnCyanShadow,
+        variant === 'primary' && { shadowColor: theme.primary, shadowOpacity: theme.isDark ? 0.35 : 0.2 },
+        variant === 'cyan' && { shadowColor: theme.accent, shadowOpacity: theme.isDark ? 0.35 : 0.2 },
         style,
       ]}
     >
@@ -253,7 +290,7 @@ export function Btn({
 
 export function Pill({
   label,
-  color = theme.accent,
+  color,
   icon: IconComponent,
   dot = false,
 }: {
@@ -262,11 +299,23 @@ export function Pill({
   icon?: React.ElementType
   dot?: boolean
 }) {
+  const { theme } = useTheme()
+  const resolvedColor = color || theme.accent
+
   return (
-    <View style={[styles.pill, { borderColor: color + '30', backgroundColor: color + '12' }]}>
-      {dot && <View style={[styles.pillDot, { backgroundColor: color }]} />}
-      {IconComponent && <IconComponent size={12} color={color} style={{ marginRight: 4 }} />}
-      <Text style={[styles.pillText, { color }]}>{label}</Text>
+    <View
+      style={[
+        styles.pill,
+        {
+          borderColor: resolvedColor + '35',
+          backgroundColor: resolvedColor + (theme.isDark ? '22' : '12'),
+          borderRadius: theme.radiusFull,
+        },
+      ]}
+    >
+      {dot && <View style={[styles.pillDot, { backgroundColor: resolvedColor }]} />}
+      {IconComponent && <IconComponent size={12} color={resolvedColor} style={{ marginRight: 4 }} />}
+      <Text style={[styles.pillText, { color: resolvedColor }]}>{label}</Text>
     </View>
   )
 }
@@ -282,6 +331,8 @@ export function DeviceAvatar({
   size?: number
   isTrusted?: boolean
 }) {
+  const { theme } = useTheme()
+
   const getInitials = (n: string) => {
     const parts = (n || 'Peer').split(/[\s-_]+/).filter(Boolean)
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
@@ -296,7 +347,7 @@ export function DeviceAvatar({
           width: size,
           height: size,
           borderRadius: size * 0.38,
-          borderColor: isTrusted ? theme.primary + '50' : isOnline ? theme.accent + '40' : theme.border,
+          borderColor: isTrusted ? theme.primary + '60' : isOnline ? theme.accent + '50' : theme.border,
           backgroundColor: isOnline ? theme.primarySoft : theme.bgElevated,
         },
       ]}
@@ -309,7 +360,7 @@ export function DeviceAvatar({
           styles.avatarDot,
           {
             backgroundColor: isOnline ? theme.success : theme.subtle,
-            borderColor: '#FFFFFF',
+            borderColor: theme.bgCard,
           },
         ]}
       />
@@ -332,6 +383,8 @@ export function PairingCodeCard({
   copied?: boolean
   loading?: boolean
 }) {
+  const { theme } = useTheme()
+
   const formatCode = (c: string) => {
     if (!c || c === '…') return 'MD - •••• - •••• - •••• - ••••'
     const parts = c.split('-').map((s) => s.trim()).filter(Boolean)
@@ -342,29 +395,33 @@ export function PairingCodeCard({
   return (
     <Card glow style={styles.codeHeroCard}>
       <View style={styles.codeHeroHeader}>
-        <View style={styles.keyIconCircle}>
+        <View style={[styles.keyIconCircle, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
           <KeyRound size={18} color={theme.primary} />
         </View>
         <View style={styles.flex1}>
-          <Text style={styles.codeHeroTitle}>Node Pairing Code</Text>
-          <Text style={styles.codeHeroSub}>
+          <Text style={[styles.codeHeroTitle, { color: theme.text }]}>Node Pairing Code</Text>
+          <Text style={[styles.codeHeroSub, { color: theme.textSecondary }]}>
             Share with another device to establish trusted P2P sync
           </Text>
         </View>
         {onRefresh && (
-          <TouchableOpacity onPress={onRefresh} style={styles.refreshIconBtn} activeOpacity={0.7}>
+          <TouchableOpacity onPress={onRefresh} style={[styles.refreshIconBtn, { backgroundColor: theme.bgElevated }]} activeOpacity={0.7}>
             <RefreshCw size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
       </View>
 
-      <TouchableOpacity activeOpacity={0.85} onPress={onCopy} style={styles.codeBox}>
-        <Text style={styles.codeMonospace} numberOfLines={1} adjustsFontSizeToFit>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={onCopy}
+        style={[styles.codeBox, { backgroundColor: theme.bgElevated, borderColor: theme.border, borderRadius: theme.radiusSm }]}
+      >
+        <Text style={[styles.codeMonospace, { color: theme.primary }]} numberOfLines={1} adjustsFontSizeToFit>
           {formatCode(code)}
         </Text>
         <View style={styles.codeCopyHintRow}>
           <Copy size={11} color={theme.primary} />
-          <Text style={styles.codeCopyHint}>{copied ? 'Copied to Clipboard!' : 'Tap to Copy Code'}</Text>
+          <Text style={[styles.codeCopyHint, { color: theme.primary }]}>{copied ? 'Copied to Clipboard!' : 'Tap to Copy Code'}</Text>
         </View>
       </TouchableOpacity>
 
@@ -413,6 +470,7 @@ export function DeviceCard({
   onToggleTrust?: () => void
   onForget?: () => void
 }) {
+  const { theme } = useTheme()
   const isDesktop = (device.os || '').toLowerCase().match(/win|mac|linux|darwin/)
   const OsIcon = isDesktop ? Monitor : Smartphone
 
@@ -422,7 +480,12 @@ export function DeviceCard({
       onPress={onPress}
       style={[
         styles.deviceCard,
-        device.isOnline && styles.deviceCardOnline,
+        {
+          backgroundColor: theme.bgCard,
+          borderColor: theme.border,
+          borderRadius: theme.radius,
+        },
+        device.isOnline && { borderColor: theme.primary + '50' },
       ]}
     >
       <View style={styles.deviceCardHeader}>
@@ -435,11 +498,11 @@ export function DeviceCard({
 
         <View style={styles.deviceInfoCol}>
           <View style={styles.deviceNameRow}>
-            <Text style={styles.deviceName} numberOfLines={1}>
+            <Text style={[styles.deviceName, { color: theme.text }]} numberOfLines={1}>
               {device.name}
             </Text>
             {device.isTrusted && (
-              <View style={styles.trustBadge}>
+              <View style={[styles.trustBadge, { backgroundColor: theme.primarySoft }]}>
                 <ShieldCheck size={12} color={theme.primary} />
               </View>
             )}
@@ -447,7 +510,7 @@ export function DeviceCard({
 
           <View style={styles.deviceMetaRow}>
             <OsIcon size={12} color={theme.muted} />
-            <Text style={styles.deviceMetaText}>
+            <Text style={[styles.deviceMetaText, { color: theme.muted }]}>
               {device.os || 'Mesh Node'} · {device.isOnline ? 'Online' : 'Offline'}
               {(device as any).relayedViaOwnPeer ? ' · via your Desktop' : ''}
             </Text>
@@ -481,7 +544,7 @@ export function DeviceCard({
 
         {onSendFile && device.isOnline && (
           <TouchableOpacity
-            style={styles.quickSendBtn}
+            style={[styles.quickSendBtn, { backgroundColor: theme.primary, shadowColor: theme.primary }]}
             onPress={onSendFile}
             activeOpacity={0.7}
           >
@@ -506,6 +569,8 @@ export function SimpleModal({
   children: React.ReactNode
   onClose: () => void
 }) {
+  const { theme } = useTheme()
+
   return (
     <Modal
       visible={visible}
@@ -513,23 +578,33 @@ export function SimpleModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalBackdrop}>
+      <View style={[styles.modalBackdrop, { backgroundColor: theme.modalBackdrop }]}>
         <TouchableOpacity
           style={styles.modalBackdropTouch}
           activeOpacity={1}
           onPress={onClose}
         />
-        <View style={styles.modalContent}>
-          <View style={styles.modalDragHandle} />
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: theme.bgCard,
+              borderColor: theme.border,
+              borderTopLeftRadius: theme.radiusXl,
+              borderTopRightRadius: theme.radiusXl,
+            },
+          ]}
+        >
+          <View style={[styles.modalDragHandle, { backgroundColor: theme.hairline }]} />
 
           <View style={styles.modalHeader}>
             <View style={styles.flex1}>
-              <Text style={styles.modalTitle}>{title}</Text>
-              {subtitle && <Text style={styles.modalSubtitle}>{subtitle}</Text>}
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{title}</Text>
+              {subtitle && <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>{subtitle}</Text>}
             </View>
             <TouchableOpacity
               onPress={onClose}
-              style={styles.modalCloseBtn}
+              style={[styles.modalCloseBtn, { backgroundColor: theme.bgElevated }]}
               activeOpacity={0.7}
             >
               <X size={18} color={theme.muted} />
@@ -560,20 +635,22 @@ export function SectionHeader({
   onAction?: () => void
   badge?: string | number
 }) {
+  const { theme } = useTheme()
+
   return (
     <View style={styles.sectionHeaderRow}>
       <View style={styles.sectionTitleWrap}>
-        <View style={styles.sectionAccentBar} />
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <View style={[styles.sectionAccentBar, { backgroundColor: theme.primary }]} />
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
         {badge !== undefined && (
-          <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>{badge}</Text>
+          <View style={[styles.sectionBadge, { backgroundColor: theme.primarySoft }]}>
+            <Text style={[styles.sectionBadgeText, { color: theme.primary }]}>{badge}</Text>
           </View>
         )}
       </View>
       {actionLabel && onAction && (
         <TouchableOpacity onPress={onAction} activeOpacity={0.7}>
-          <Text style={styles.sectionAction}>{actionLabel}</Text>
+          <Text style={[styles.sectionAction, { color: theme.primary }]}>{actionLabel}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -620,64 +697,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   pulseDot: {
-    shadowColor: theme.success,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 4,
   },
   card: {
-    borderRadius: theme.radius,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  cardDefault: {
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  cardElevated: {
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  cardGlass: {
-    backgroundColor: theme.bgGlassHeavy,
-    borderColor: theme.border,
-  },
-  cardAccent: {
-    backgroundColor: theme.primarySoft,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
-  },
-  cardGlow: {
-    borderColor: 'rgba(79, 70, 229, 0.25)',
-    shadowColor: theme.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
     padding: 12,
     minWidth: 100,
-    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
     elevation: 1,
   },
   statTop: {
@@ -700,33 +735,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
   },
   statLabel: {
-    color: theme.textSecondary,
     fontSize: 11,
     fontWeight: '700',
   },
   statSubtext: {
-    color: theme.muted,
     fontSize: 10,
     marginTop: 2,
   },
   btn: {
-    borderRadius: theme.radiusSm,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  btnPrimaryShadow: {
-    shadowColor: theme.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  btnCyanShadow: {
-    shadowColor: theme.accent,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
   },
   padSm: {
     paddingVertical: 7,
@@ -764,7 +782,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 4,
     paddingHorizontal: 9,
-    borderRadius: theme.radiusFull,
     borderWidth: 1,
     alignSelf: 'flex-start',
     gap: 5,
@@ -812,33 +829,25 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
   },
   codeHeroTitle: {
-    color: theme.text,
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: -0.2,
   },
   codeHeroSub: {
-    color: theme.textSecondary,
     fontSize: 11,
     marginTop: 1,
   },
   refreshIconBtn: {
     padding: 6,
     borderRadius: 8,
-    backgroundColor: theme.bgElevated,
   },
   codeBox: {
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
     paddingVertical: 14,
     paddingHorizontal: 12,
     alignItems: 'center',
@@ -846,7 +855,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   codeMonospace: {
-    color: theme.primary,
     fontSize: 17,
     fontWeight: '900',
     fontFamily: fonts.mono,
@@ -859,7 +867,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   codeCopyHint: {
-    color: theme.primary,
     fontSize: 10,
     fontWeight: '700',
   },
@@ -868,20 +875,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   deviceCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radius,
     padding: 14,
     marginBottom: 10,
-    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
-  },
-  deviceCardOnline: {
-    borderColor: 'rgba(79, 70, 229, 0.25)',
   },
   deviceCardHeader: {
     flexDirection: 'row',
@@ -897,7 +897,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   deviceName: {
-    color: theme.text,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -905,7 +904,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
-    backgroundColor: theme.primarySoft,
   },
   deviceMetaRow: {
     flexDirection: 'row',
@@ -914,7 +912,6 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   deviceMetaText: {
-    color: theme.muted,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -922,35 +919,27 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: theme.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end',
   },
   modalBackdropTouch: {
     flex: 1,
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: theme.radiusXl,
-    borderTopRightRadius: theme.radiusXl,
     borderTopWidth: 1,
-    borderColor: theme.border,
     paddingHorizontal: 20,
     paddingBottom: 24,
     paddingTop: 12,
     maxHeight: '92%',
-    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 12,
   },
@@ -961,7 +950,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(15, 23, 42, 0.15)',
     alignSelf: 'center',
     marginBottom: 16,
   },
@@ -972,20 +960,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
-    color: theme.text,
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: -0.3,
   },
   modalSubtitle: {
-    color: theme.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   modalCloseBtn: {
     padding: 6,
     borderRadius: 10,
-    backgroundColor: theme.bgElevated,
   },
   sectionContainer: {
     marginBottom: 20,
@@ -1005,29 +990,24 @@ const styles = StyleSheet.create({
     width: 3,
     height: 14,
     borderRadius: 2,
-    backgroundColor: theme.primary,
   },
   sectionTitle: {
-    color: theme.text,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   sectionBadge: {
-    backgroundColor: theme.primarySoft,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 9999,
   },
   sectionBadgeText: {
-    color: theme.primary,
     fontSize: 10,
     fontWeight: '800',
     fontFamily: fonts.mono,
   },
   sectionAction: {
-    color: theme.primary,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1067,3 +1047,4 @@ const styles = StyleSheet.create({
     color: '#A855F7',
   },
 })
+

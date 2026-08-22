@@ -23,7 +23,7 @@ import {
   Music,
 } from 'lucide-react-native'
 import { SimpleModal, Btn } from '../components'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 export interface ClaimPreviewFile {
   index: number
@@ -44,8 +44,10 @@ export interface ClaimPreview {
 interface DropPreviewModalProps {
   visible: boolean
   preview: ClaimPreview | null
-  onConfirm: (indices: number[]) => void
-  onCancel: () => void
+  onAccept?: () => void
+  onDecline?: () => void
+  onConfirm?: (indices: number[]) => void
+  onCancel?: () => void
 }
 
 function formatBytes(bytes?: number): string {
@@ -60,7 +62,7 @@ function formatBytes(bytes?: number): string {
   return `${val.toFixed(val >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function getFileIcon(filename: string) {
+function getFileIcon(filename: string, mutedColor: string) {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
   if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp'].includes(ext)) {
     return <ImageIcon size={18} color="#38BDF8" />
@@ -77,17 +79,23 @@ function getFileIcon(filename: string) {
   if (['js', 'ts', 'tsx', 'jsx', 'json', 'html', 'css', 'py', 'go', 'rs', 'c', 'cpp'].includes(ext)) {
     return <FileCode size={18} color="#818CF8" />
   }
-  return <FileText size={18} color={theme.muted} />
+  return <FileText size={18} color={mutedColor} />
 }
 
 export function DropPreviewModal({
   visible,
   preview,
+  onAccept,
+  onDecline,
   onConfirm,
   onCancel,
 }: DropPreviewModalProps) {
+  const { theme } = useTheme()
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set())
   const [filterQuery, setFilterQuery] = useState('')
+
+  const handleCancelAction = onCancel || onDecline || (() => {})
+  const handleConfirmAction = onConfirm || (() => onAccept && onAccept())
 
   useEffect(() => {
     if (preview && preview.files) {
@@ -138,16 +146,16 @@ export function DropPreviewModal({
       visible={visible}
       title={title}
       subtitle={`Code ${preview.code} · ${formatBytes(preview.totalSize)}`}
-      onClose={onCancel}
+      onClose={handleCancelAction}
     >
       <View style={styles.container}>
         {/* Search & Selection Header */}
         <View style={styles.headerToolbar}>
           {files.length > 4 && (
-            <View style={styles.searchBox}>
+            <View style={[styles.searchBox, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
               <Search size={14} color={theme.muted} />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: theme.text }]}
                 placeholder="Search files..."
                 placeholderTextColor={theme.muted}
                 value={filterQuery}
@@ -168,38 +176,51 @@ export function DropPreviewModal({
             ) : (
               <Square size={16} color={theme.muted} />
             )}
-            <Text style={styles.selectAllText}>
+            <Text style={[styles.selectAllText, { color: theme.text }]}>
               {selectedIndices.size === files.length ? 'Deselect All' : 'Select All'}
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.selectedCountText}>
+          <Text style={[styles.selectedCountText, { color: theme.muted }]}>
             {selectedIndices.size}/{files.length} ({formatBytes(selectedBytes)})
           </Text>
         </View>
 
         {/* Scrollable File List */}
-        <ScrollView style={styles.fileList} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={[styles.fileList, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
+          showsVerticalScrollIndicator={false}
+        >
           {filteredFiles.map((file) => {
             const isSelected = selectedIndices.has(file.index)
             return (
               <TouchableOpacity
                 key={file.index}
-                style={[styles.fileRow, isSelected && styles.fileRowSelected]}
+                style={[
+                  styles.fileRow,
+                  { borderBottomColor: theme.hairline },
+                  isSelected && { backgroundColor: theme.primarySoft },
+                ]}
                 onPress={() => toggleFile(file.index)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                <View
+                  style={[
+                    styles.checkbox,
+                    { borderColor: theme.border, backgroundColor: theme.bg },
+                    isSelected && { backgroundColor: theme.primary, borderColor: theme.primary },
+                  ]}
+                >
                   {isSelected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
                 </View>
 
-                <View style={styles.iconWrap}>{getFileIcon(file.filename)}</View>
+                <View style={styles.iconWrap}>{getFileIcon(file.filename, theme.muted)}</View>
 
                 <View style={styles.flex1}>
-                  <Text style={styles.fileName} numberOfLines={1}>
+                  <Text style={[styles.fileName, { color: theme.text }]} numberOfLines={1}>
                     {file.filename}
                   </Text>
-                  <Text style={styles.fileSize}>{formatBytes(file.fileSize)}</Text>
+                  <Text style={[styles.fileSize, { color: theme.muted }]}>{formatBytes(file.fileSize)}</Text>
                 </View>
               </TouchableOpacity>
             )
@@ -207,7 +228,7 @@ export function DropPreviewModal({
 
           {filteredFiles.length === 0 && (
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>No files matching "{filterQuery}"</Text>
+              <Text style={[styles.emptyText, { color: theme.muted }]}>No files matching "{filterQuery}"</Text>
             </View>
           )}
         </ScrollView>
@@ -218,7 +239,7 @@ export function DropPreviewModal({
             label="Cancel"
             icon={X}
             variant="ghost"
-            onPress={onCancel}
+            onPress={handleCancelAction}
             style={styles.flex1}
           />
           {selectedIndices.size < files.length && selectedIndices.size > 0 && (
@@ -227,7 +248,7 @@ export function DropPreviewModal({
               icon={Download}
               variant="primary"
               disabled={selectedIndices.size === 0}
-              onPress={() => onConfirm(Array.from(selectedIndices))}
+              onPress={() => handleConfirmAction(Array.from(selectedIndices) as any)}
               style={styles.flex1}
             />
           )}
@@ -235,7 +256,7 @@ export function DropPreviewModal({
             label="Download All"
             icon={Download}
             variant={selectedIndices.size === files.length ? 'primary' : 'secondary'}
-            onPress={() => onConfirm(files.map((f) => f.index))}
+            onPress={() => handleConfirmAction(files.map((f) => f.index) as any)}
             style={styles.flex1}
           />
         </View>
@@ -264,8 +285,6 @@ const styles = StyleSheet.create({
     minWidth: 120,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 8,
@@ -275,7 +294,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 34,
-    color: theme.text,
     fontSize: 12,
     paddingVertical: 0,
   },
@@ -287,21 +305,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   selectAllText: {
-    color: theme.text,
     fontSize: 11.5,
     fontWeight: '700',
   },
   selectedCountText: {
-    color: theme.muted,
     fontSize: 11,
     fontFamily: fonts.mono,
   },
   fileList: {
     maxHeight: 280,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
-    backgroundColor: theme.bgElevated,
+    borderRadius: 10,
     marginBottom: 14,
   },
   fileRow: {
@@ -310,25 +324,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
     gap: 10,
-  },
-  fileRowSelected: {
-    backgroundColor: theme.primarySoft,
   },
   checkbox: {
     width: 18,
     height: 18,
     borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: theme.border,
-    backgroundColor: theme.bg,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  checkboxSelected: {
-    backgroundColor: theme.primary,
-    borderColor: theme.primary,
   },
   iconWrap: {
     width: 28,
@@ -337,12 +341,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fileName: {
-    color: theme.text,
     fontSize: 12.5,
     fontWeight: '700',
   },
   fileSize: {
-    color: theme.muted,
     fontSize: 11,
     fontFamily: fonts.mono,
     marginTop: 2,
@@ -353,7 +355,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyText: {
-    color: theme.muted,
     fontSize: 12,
   },
   btnRow: {
@@ -361,3 +362,4 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 })
+

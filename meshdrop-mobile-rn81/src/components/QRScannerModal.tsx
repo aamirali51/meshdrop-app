@@ -14,12 +14,13 @@ import {
 } from 'react-native'
 import { Camera } from 'react-native-camera-kit'
 import { X, Zap, ZapOff, QrCode, AlertCircle, Sparkles } from 'lucide-react-native'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 interface QRScannerModalProps {
   visible: boolean
   onClose: () => void
-  onScan: (code: string) => void
+  onScan?: (code: string) => void
+  onScanSuccess?: (code: string) => void
   title?: string
   instruction?: string
 }
@@ -28,9 +29,11 @@ export function QRScannerModal({
   visible,
   onClose,
   onScan,
+  onScanSuccess,
   title = 'Scan Node QR Code',
   instruction = 'Align camera with the QR code on the desktop or peer device',
 }: QRScannerModalProps) {
+  const { theme } = useTheme()
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [torchOn, setTorchOn] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -105,7 +108,11 @@ export function QRScannerModal({
     const cleaned = rawValue.trim()
     console.log('[QRScanner] Scanned raw value:', cleaned)
 
-    onScan(cleaned)
+    if (onScanSuccess) {
+      onScanSuccess(cleaned)
+    } else if (onScan) {
+      onScan(cleaned)
+    }
     onClose()
   }
 
@@ -118,11 +125,11 @@ export function QRScannerModal({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
         {/* Top Navigation Bar */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.bgCard, borderBottomColor: theme.border }]}>
           <TouchableOpacity
-            style={styles.iconButton}
+            style={[styles.iconButton, { backgroundColor: theme.bgElevated }]}
             onPress={onClose}
             activeOpacity={0.7}
           >
@@ -131,11 +138,11 @@ export function QRScannerModal({
 
           <View style={styles.headerTitleContainer}>
             <QrCode size={16} color={theme.primary} style={{ marginRight: 6 }} />
-            <Text style={styles.headerTitle}>{title}</Text>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.iconButton, torchOn && styles.iconButtonActive]}
+            style={[styles.iconButton, { backgroundColor: theme.bgElevated }, torchOn && styles.iconButtonActive]}
             onPress={() => setTorchOn((prev) => !prev)}
             activeOpacity={0.7}
           >
@@ -166,18 +173,20 @@ export function QRScannerModal({
               />
             </Suspense>
 
-            {/* Futuristic Holographic Reticle Frame */}
+            {/* Futuristic Reticle Frame */}
             <View style={styles.reticleFrame}>
-              <View style={styles.cornerTL} />
-              <View style={styles.cornerTR} />
-              <View style={styles.cornerBL} />
-              <View style={styles.cornerBR} />
+              <View style={[styles.cornerTL, { borderColor: theme.primary }]} />
+              <View style={[styles.cornerTR, { borderColor: theme.primary }]} />
+              <View style={[styles.cornerBL, { borderColor: theme.primary }]} />
+              <View style={[styles.cornerBR, { borderColor: theme.primary }]} />
 
               {/* Animated Laser Line */}
               <Animated.View
                 style={[
                   styles.laserLine,
                   {
+                    backgroundColor: theme.primary,
+                    shadowColor: theme.primary,
                     transform: [
                       {
                         translateY: laserAnim.interpolate({
@@ -192,9 +201,9 @@ export function QRScannerModal({
             </View>
 
             {/* Instruction Overlay */}
-            <View style={styles.overlayBottom}>
-              <Text style={styles.instructionText}>{instruction}</Text>
-              <Text style={styles.subText}>
+            <View style={[styles.overlayBottom, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+              <Text style={[styles.instructionText, { color: theme.text }]}>{instruction}</Text>
+              <Text style={[styles.subText, { color: theme.textSecondary }]}>
                 Supports MD-XXXX pairing codes and DROP-XXXX share codes
               </Text>
             </View>
@@ -202,12 +211,12 @@ export function QRScannerModal({
         ) : hasPermission === false ? (
           <View style={styles.centerContainer}>
             <AlertCircle size={48} color={theme.danger} />
-            <Text style={styles.permissionDeniedTitle}>Camera Access Denied</Text>
-            <Text style={styles.permissionDeniedText}>
+            <Text style={[styles.permissionDeniedTitle, { color: theme.text }]}>Camera Access Denied</Text>
+            <Text style={[styles.permissionDeniedText, { color: theme.textSecondary }]}>
               Camera permission is required to scan QR codes. Please enable Camera in device settings.
             </Text>
             <TouchableOpacity
-              style={styles.retryButton}
+              style={[styles.retryButton, { backgroundColor: theme.primary }]}
               onPress={checkCameraPermission}
               activeOpacity={0.8}
             >
@@ -217,7 +226,7 @@ export function QRScannerModal({
         ) : (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={theme.primary} />
-            <Text style={styles.loadingText}>Initializing camera…</Text>
+            <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Initializing camera…</Text>
           </View>
         )}
       </SafeAreaView>
@@ -228,7 +237,6 @@ export function QRScannerModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
   },
   header: {
     height: 56,
@@ -236,9 +244,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: theme.border,
     zIndex: 10,
   },
   headerTitleContainer: {
@@ -248,21 +254,17 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: theme.text,
     letterSpacing: 0.2,
   },
   iconButton: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: theme.bgElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconButtonActive: {
-    backgroundColor: theme.primarySoft,
     borderWidth: 1,
-    borderColor: theme.primary,
   },
   cameraContainer: {
     flex: 1,
@@ -284,7 +286,6 @@ const styles = StyleSheet.create({
     height: 24,
     borderTopWidth: 3,
     borderLeftWidth: 3,
-    borderColor: theme.primary,
     borderRadius: 2,
   },
   cornerTR: {
@@ -295,7 +296,6 @@ const styles = StyleSheet.create({
     height: 24,
     borderTopWidth: 3,
     borderRightWidth: 3,
-    borderColor: theme.primary,
     borderRadius: 2,
   },
   cornerBL: {
@@ -306,7 +306,6 @@ const styles = StyleSheet.create({
     height: 24,
     borderBottomWidth: 3,
     borderLeftWidth: 3,
-    borderColor: theme.primary,
     borderRadius: 2,
   },
   cornerBR: {
@@ -317,14 +316,11 @@ const styles = StyleSheet.create({
     height: 24,
     borderBottomWidth: 3,
     borderRightWidth: 3,
-    borderColor: theme.primary,
     borderRadius: 2,
   },
   laserLine: {
     width: '100%',
     height: 2,
-    backgroundColor: theme.primary,
-    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 6,
@@ -334,14 +330,11 @@ const styles = StyleSheet.create({
     bottom: 40,
     left: 20,
     right: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    borderRadius: theme.radius,
+    borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 18,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: theme.border,
-    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -350,13 +343,11 @@ const styles = StyleSheet.create({
   instructionText: {
     fontSize: 13,
     fontWeight: '700',
-    color: theme.text,
     textAlign: 'center',
     marginBottom: 4,
   },
   subText: {
     fontSize: 11,
-    color: theme.textSecondary,
     textAlign: 'center',
     fontFamily: fonts.mono,
   },
@@ -369,24 +360,20 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 14,
-    color: theme.textSecondary,
   },
   permissionDeniedTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: theme.text,
     marginTop: 16,
     marginBottom: 8,
   },
   permissionDeniedText: {
     fontSize: 14,
-    color: theme.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: theme.primary,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -397,3 +384,4 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 })
+

@@ -32,7 +32,7 @@ import {
   Pill,
   SectionHeader,
 } from '../components'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts, theme } from '../theme'
 
 interface Transfer {
   id: string
@@ -85,6 +85,7 @@ function formatEta(seconds?: number): string {
 }
 
 export function Transfers() {
+  const { theme } = useTheme()
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'failed'>('all')
 
@@ -132,6 +133,14 @@ export function Transfers() {
 
   const handleResume = (id: string) => {
     call('resumeTransfer', { id }).catch(() => {})
+  }
+
+  const handlePauseResume = (transfer: Transfer) => {
+    if (transfer.status === 'paused') {
+      handleResume(transfer.id)
+    } else {
+      handlePause(transfer.id)
+    }
   }
 
   const handleCancel = (id: string) => {
@@ -188,37 +197,69 @@ export function Transfers() {
   }, [activeTransfers])
 
   const filteredTransfers = useMemo(() => {
-    if (filter === 'active') return activeTransfers
-    if (filter === 'completed') return transfers.filter((t) => t.status === 'completed')
-    if (filter === 'failed')
-      return transfers.filter((t) =>
-        ['failed', 'cancelled', 'interrupted'].includes(t.status)
-      )
-    return transfers
-  }, [transfers, activeTransfers, filter])
+    return transfers.filter((t) => {
+      if (filter === 'active') {
+        return (
+          t.status === 'active' ||
+          t.status === 'queued' ||
+          t.status === 'waiting_peer' ||
+          t.status === 'paused'
+        )
+      }
+      if (filter === 'completed') return t.status === 'completed'
+      if (filter === 'failed') {
+        return (
+          t.status === 'failed' ||
+          t.status === 'cancelled' ||
+          t.status === 'interrupted'
+        )
+      }
+      return true
+    })
+  }, [transfers, filter])
+
+  const activeCount = useMemo(
+    () =>
+      transfers.filter(
+        (t) =>
+          t.status === 'active' ||
+          t.status === 'queued' ||
+          t.status === 'waiting_peer' ||
+          t.status === 'paused'
+      ).length,
+    [transfers]
+  )
+
+  const activeSpeed = useMemo(
+    () =>
+      transfers
+        .filter((t) => t.status === 'active')
+        .reduce((acc, t) => acc + (t.speed || t.speedBytesPerSec || 0), 0),
+    [transfers]
+  )
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.bg }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Live Speed & Activity Telemetry */}
+      {/* Live Metrics Grid */}
       <View style={styles.statGrid}>
         <StatCard
           label="Active Streams"
-          value={activeTransfers.length}
+          value={activeCount}
           icon={Activity}
-          color={theme.primary}
+          color={activeCount > 0 ? theme.primary : theme.muted}
         />
         <StatCard
-          label="Transfer Rate"
-          value={formatSpeed(aggregateSpeed)}
+          label="Live Speed"
+          value={activeSpeed > 0 ? `${formatBytes(activeSpeed)}/s` : '0 B/s'}
           icon={Zap}
-          color={theme.success}
+          color={activeSpeed > 0 ? theme.success : theme.muted}
         />
         <StatCard
-          label="Total History"
+          label="Total Tracked"
           value={transfers.length}
           icon={Layers}
           color={theme.accent}
@@ -229,22 +270,33 @@ export function Transfers() {
       <View style={styles.filterRow}>
         {[
           { key: 'all', label: `All (${transfers.length})` },
-          { key: 'active', label: `Live (${activeTransfers.length})` },
-          { key: 'completed', label: 'Completed' },
-          { key: 'failed', label: 'Failed' },
+          { key: 'active', label: `Live (${activeCount})` },
+          {
+            key: 'completed',
+            label: `Done (${transfers.filter((t) => t.status === 'completed').length})`,
+          },
+          {
+            key: 'failed',
+            label: `Failed (${transfers.filter((t) => ['failed', 'cancelled', 'interrupted'].includes(t.status)).length})`,
+          },
         ].map((tab) => {
           const isActive = filter === tab.key
           return (
             <TouchableOpacity
               key={tab.key}
-              style={[styles.filterChip, isActive && styles.filterChipActive]}
+              style={[
+                styles.filterChip,
+                { backgroundColor: theme.bgCard, borderColor: theme.border },
+                isActive && { backgroundColor: theme.primarySoft, borderColor: theme.primary + '50' },
+              ]}
               onPress={() => setFilter(tab.key as any)}
               activeOpacity={0.8}
             >
               <Text
                 style={[
                   styles.filterChipText,
-                  isActive && styles.filterChipTextActive,
+                  { color: theme.muted },
+                  isActive && { color: theme.primary, fontWeight: '900' },
                 ]}
               >
                 {tab.label}
@@ -254,178 +306,137 @@ export function Transfers() {
         })}
       </View>
 
-      {/* Transfers Stream Deck */}
-      <SectionHeader
-        title="Transfer Queue"
-        badge={filteredTransfers.length}
-        actionLabel={transfers.length > 0 ? 'Clear Logs' : undefined}
-        onAction={handleClear}
-      />
+      {/* Active Transfer Stream Deck */}
+      <SectionHeader title="Payload Streams" badge={filteredTransfers.length} />
 
       {filteredTransfers.length > 0 ? (
         <View style={styles.transferList}>
-          {filteredTransfers.map((t) => {
-            const isSend = t.direction === 'send'
-            const isFinished = ['completed', 'failed', 'cancelled', 'interrupted'].includes(t.status)
-            const speed = t.speed || t.speedBytesPerSec || 0
-            const progress = t.progress != null ? Math.round(t.progress > 1 ? t.progress : t.progress * 100) : 0
+          {filteredTransfers.map((item) => {
+            const isSend = item.direction === 'send'
+            const isCompleted = item.status === 'completed'
+            const isPaused = item.status === 'paused'
+            const isFailed =
+              item.status === 'failed' ||
+              item.status === 'cancelled' ||
+              item.status === 'interrupted'
+
+            const pct = Math.round(item.progress || 0)
+            const speed = item.speed || item.speedBytesPerSec || 0
 
             return (
               <Card
-                key={t.id}
-                glow={!isFinished}
-                style={[styles.transferCard, isFinished && styles.transferCardFinished]}
+                key={item.id}
+                glow={item.status === 'active'}
+                style={[
+                  styles.transferCard,
+                  { backgroundColor: theme.bgCard, borderColor: theme.border },
+                  isCompleted && styles.transferCardFinished,
+                ]}
               >
                 <View style={styles.cardHeader}>
                   <View
                     style={[
                       styles.directionIconBox,
-                      isSend ? styles.sendBg : styles.recvBg,
+                      isSend
+                        ? { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }
+                        : { backgroundColor: theme.accentSoft, borderColor: theme.accent + '35' },
                     ]}
                   >
                     {isSend ? (
-                      <ArrowUp size={16} color={theme.primary} />
+                      <ArrowUp size={18} color={theme.primary} />
                     ) : (
-                      <ArrowDown size={16} color={theme.accent} />
+                      <ArrowDown size={18} color={theme.accent} />
                     )}
                   </View>
 
                   <View style={styles.flex1}>
-                    <Text style={styles.filename} numberOfLines={1}>
-                      {t.filename || 'P2P File Transfer'}
+                    <Text style={[styles.filename, { color: theme.text }]} numberOfLines={1}>
+                      {item.filename}
                     </Text>
-                    <Text style={styles.fileMeta}>
-                      {formatBytes(t.fileSize)} · {t.peerName ? `Peer: ${t.peerName}` : 'P2P Direct'}
+                    <Text style={[styles.fileMeta, { color: theme.textSecondary }]}>
+                      {formatBytes(item.bytesTransferred)} / {formatBytes(item.fileSize)} ·{' '}
+                      {isSend ? 'To' : 'From'} {item.peerName || 'Mesh Peer'}
                     </Text>
                   </View>
 
                   <Pill
                     label={
-                      t.status === 'active'
-                        ? `${progress}%`
-                        : t.status === 'completed'
-                        ? 'Done'
-                        : t.status === 'failed'
-                        ? 'Failed'
-                        : t.status === 'interrupted'
-                        ? 'Stopped'
-                        : t.status === 'paused'
+                      isCompleted
+                        ? '100% Synced'
+                        : isPaused
                         ? 'Paused'
-                        : t.status === 'waiting_peer'
-                        ? 'Waiting'
-                        : t.status === 'pending_approval'
-                        ? 'Approval'
-                        : t.status === 'cancelled'
-                        ? 'Cancelled'
-                        : 'Queued'
+                        : isFailed
+                        ? 'Failed'
+                        : `${pct}%`
                     }
                     color={
-                      t.status === 'completed'
+                      isCompleted
                         ? theme.success
-                        : t.status === 'failed'
+                        : isPaused
+                        ? theme.warning
+                        : isFailed
                         ? theme.danger
-                        : t.status === 'interrupted'
-                        ? theme.danger
-                        : t.status === 'paused'
-                        ? theme.warning
-                        : t.status === 'waiting_peer'
-                        ? theme.warning
-                        : t.status === 'pending_approval'
-                        ? theme.warning
                         : theme.primary
                     }
-                    dot={t.status === 'active'}
+                    dot={!isCompleted && !isFailed}
                   />
                 </View>
 
-                {/* Progress Gauge */}
-                {!isFinished && (
+                {/* Progress Indicator */}
+                {!isCompleted && !isFailed && (
                   <View style={styles.progressSection}>
-                    <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarBg, { backgroundColor: theme.bgElevated }]}>
                       <View
                         style={[
                           styles.progressBarFill,
                           {
-                            width: `${Math.max(2, Math.min(100, progress))}%`,
-                            backgroundColor: isSend ? theme.primary : theme.accent,
+                            width: `${Math.min(100, pct)}%`,
+                            backgroundColor: isPaused ? theme.warning : theme.primary,
                           },
                         ]}
                       />
                     </View>
 
                     <View style={styles.progressTelemetry}>
-                      <Text style={styles.telemetrySpeed}>
-                        {formatSpeed(speed)}
+                      <Text style={[styles.telemetrySpeed, { color: theme.success }]}>
+                        {speed > 0 ? `${formatBytes(speed)}/s` : 'Connecting…'}
                       </Text>
-                      <Text style={styles.telemetryEta}>
-                        ETA: {formatEta(t.eta)}
-                      </Text>
+                      {item.eta ? (
+                        <Text style={[styles.telemetryEta, { color: theme.muted }]}>{item.eta}s remaining</Text>
+                      ) : null}
                     </View>
                   </View>
                 )}
 
-                {/* Micro Action Buttons */}
-                {!isFinished ? (
-                  <View style={styles.actionsRow}>
-                    {t.status === 'paused' && (
+                {/* Actions */}
+                {!isCompleted && (
+                  <View style={[styles.actionsRow, { borderTopColor: theme.hairline }]}>
+                    {!isFailed && (
                       <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => handleResume(t.id)}
+                        style={[styles.actionBtn, { backgroundColor: theme.bgElevated }]}
+                        onPress={() => handlePauseResume(item)}
                         activeOpacity={0.7}
                       >
-                        <Play size={13} color={theme.success} />
-                        <Text style={styles.actionBtnText}>Resume</Text>
-                      </TouchableOpacity>
-                    )}
-                    {t.status === 'active' && (
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => handlePause(t.id)}
-                        activeOpacity={0.7}
-                      >
-                        <Pause size={13} color={theme.warning} />
-                        <Text style={styles.actionBtnText}>Pause</Text>
+                        {isPaused ? (
+                          <Play size={12} color={theme.success} />
+                        ) : (
+                          <Pause size={12} color={theme.warning} />
+                        )}
+                        <Text style={[styles.actionBtnText, { color: theme.text }]}>
+                          {isPaused ? 'Resume' : 'Pause'}
+                        </Text>
                       </TouchableOpacity>
                     )}
 
                     <TouchableOpacity
-                      style={[styles.actionBtn, styles.actionBtnDanger]}
-                      onPress={() => handleCancel(t.id)}
+                      style={[styles.actionBtn, styles.actionBtnDanger, { backgroundColor: theme.dangerBg }]}
+                      onPress={() => handleCancel(item.id)}
                       activeOpacity={0.7}
                     >
-                      <X size={13} color={theme.danger} />
-                      <Text style={[styles.actionBtnText, { color: theme.danger }]}>Cancel</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.actionBtnDanger]}
-                      onPress={() => handleDelete(t.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Trash2 size={13} color={theme.danger} />
-                      <Text style={[styles.actionBtnText, { color: theme.danger }]}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.actionsRow}>
-                    {t.status === 'failed' && (
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => handleRetry(t.id)}
-                        activeOpacity={0.7}
-                      >
-                        <RotateCcw size={13} color={theme.primary} />
-                        <Text style={[styles.actionBtnText, { color: theme.primary }]}>Retry</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.actionBtnDanger]}
-                      onPress={() => handleDelete(t.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Trash2 size={13} color={theme.danger} />
-                      <Text style={[styles.actionBtnText, { color: theme.danger }]}>Delete Log</Text>
+                      <X size={12} color={theme.danger} />
+                      <Text style={[styles.actionBtnText, { color: theme.danger }]}>
+                        {isFailed ? 'Dismiss' : 'Cancel'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -434,10 +445,10 @@ export function Transfers() {
           })}
         </View>
       ) : (
-        <Card style={styles.emptyCard}>
-          <Activity size={32} color={theme.primary} style={{ marginBottom: 8 }} />
-          <Text style={styles.emptyTitle}>No Active File Streams</Text>
-          <Text style={styles.emptySub}>
+        <Card style={[styles.emptyCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <Activity size={32} color={theme.muted} style={{ marginBottom: 8 }} />
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>No Active Payload Streams</Text>
+          <Text style={[styles.emptySub, { color: theme.muted }]}>
             Files currently being transmitted or received across your mesh swarm will appear here in real time.
           </Text>
         </Card>
@@ -452,7 +463,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
   },
   content: {
     padding: 16,
@@ -471,24 +481,13 @@ const styles = StyleSheet.create({
   filterChip: {
     flex: 1,
     paddingVertical: 7,
-    borderRadius: theme.radiusSm,
-    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: theme.border,
     alignItems: 'center',
   },
-  filterChipActive: {
-    backgroundColor: theme.primarySoft,
-    borderColor: 'rgba(79, 70, 229, 0.3)',
-  },
   filterChipText: {
-    color: theme.muted,
     fontSize: 11,
     fontWeight: '700',
-  },
-  filterChipTextActive: {
-    color: theme.primary,
-    fontWeight: '900',
   },
   transferList: {
     gap: 10,
@@ -496,8 +495,6 @@ const styles = StyleSheet.create({
   },
   transferCard: {
     padding: 14,
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
   },
   transferCardFinished: {
     opacity: 0.9,
@@ -513,24 +510,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendBg: {
-    backgroundColor: theme.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
-  },
-  recvBg: {
-    backgroundColor: theme.accentSoft,
-    borderWidth: 1,
-    borderColor: 'rgba(8, 145, 178, 0.2)',
   },
   filename: {
-    color: theme.text,
     fontSize: 14,
     fontWeight: '800',
   },
   fileMeta: {
-    color: theme.textSecondary,
     fontSize: 11,
     marginTop: 2,
     fontFamily: fonts.mono,
@@ -541,7 +527,6 @@ const styles = StyleSheet.create({
   progressBarBg: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: theme.bgElevated,
     overflow: 'hidden',
   },
   progressBarFill: {
@@ -554,13 +539,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   telemetrySpeed: {
-    color: theme.success,
     fontSize: 11,
     fontWeight: '900',
     fontFamily: fonts.mono,
   },
   telemetryEta: {
-    color: theme.muted,
     fontSize: 11,
     fontFamily: fonts.mono,
   },
@@ -570,7 +553,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: theme.hairline,
   },
   actionBtn: {
     flex: 1,
@@ -578,15 +560,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    backgroundColor: theme.bgElevated,
     paddingVertical: 6,
     borderRadius: 6,
   },
-  actionBtnDanger: {
-    backgroundColor: theme.dangerBg,
-  },
+  actionBtnDanger: {},
   actionBtnText: {
-    color: theme.text,
     fontSize: 11,
     fontWeight: '800',
   },
@@ -595,19 +573,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 32,
     paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
     borderStyle: 'dashed',
     marginTop: 8,
   },
   emptyTitle: {
-    color: theme.text,
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 4,
   },
   emptySub: {
-    color: theme.muted,
     fontSize: 12.5,
     textAlign: 'center',
     lineHeight: 18,

@@ -33,6 +33,9 @@ import {
   Heart,
   QrCode,
   FlaskConical,
+  Moon,
+  Sun,
+  Globe,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
 import {
@@ -60,7 +63,7 @@ import {
   isBatteryOptimizationIgnored,
   requestIgnoreBatteryOptimizations,
 } from '../backgroundService'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 import { copyToClipboard } from '../clipboard'
 import {
   checkForUpdate,
@@ -71,6 +74,8 @@ import {
 } from '../updater'
 
 export function Settings({ identity }: { identity?: any }) {
+  const { theme, themeMode, setThemeMode, isDark } = useTheme()
+
   const [permissions, setPermissions] = useState<PermissionStatus>({
     storage: false,
     notifications: false,
@@ -81,6 +86,8 @@ export function Settings({ identity }: { identity?: any }) {
   // Preferences
   const [autoAcceptTrusted, setAutoAcceptTrusted] = useState(false)
   const [preferOwnRelay, setPreferOwnRelay] = useState(true)
+  const [relayMode, setRelayMode] = useState<'auto' | 'relay-primary' | 'direct-only'>('auto')
+  const [customRelayUrl, setCustomRelayUrl] = useState('')
   const [backgroundKeepAlive, setBackgroundKeepAlive] = useState(true)
   const [batteryIgnored, setBatteryIgnored] = useState(true)
 
@@ -185,6 +192,16 @@ export function Settings({ identity }: { identity?: any }) {
     call('setPreferOwnRelay', { enabled: enable }).catch(() => {})
   }
 
+  const handleSelectRelayMode = (mode: 'auto' | 'relay-primary' | 'direct-only') => {
+    setRelayMode(mode)
+    call('setRelayMode', { mode }).catch(() => {})
+  }
+
+  const handleUpdateCustomRelayUrl = (url: string) => {
+    setCustomRelayUrl(url)
+    call('setCustomRelayUrl', { url }).catch(() => {})
+  }
+
   const handleRequestBatteryExemption = async () => {
     const res = await requestIgnoreBatteryOptimizations()
     if (res) {
@@ -210,11 +227,13 @@ export function Settings({ identity }: { identity?: any }) {
       })
       .catch(() => {})
 
-    // Load the real, persisted engine preference for auto-accept.
+    // Load the real, persisted engine preference for auto-accept and relay routing.
     call('getSettings')
       .then((s: any) => {
         if (s && typeof s.autoAcceptOffers === 'boolean') setAutoAcceptTrusted(s.autoAcceptOffers)
         if (s && typeof s.preferOwnRelay === 'boolean') setPreferOwnRelay(s.preferOwnRelay)
+        if (s && typeof s.relayMode === 'string') setRelayMode(s.relayMode)
+        if (s && typeof s.customRelayUrl === 'string') setCustomRelayUrl(s.customRelayUrl)
       })
       .catch(() => {})
 
@@ -274,8 +293,6 @@ export function Settings({ identity }: { identity?: any }) {
       if (!info) {
         Alert.alert('Up to date', 'You are running the latest available build.')
       }
-      // If an update IS available the shared updater store flips to "available"
-      // and the global UpdateAvailableModal surfaces automatically.
     } finally {
       setCheckingUpdate(false)
     }
@@ -308,7 +325,7 @@ export function Settings({ identity }: { identity?: any }) {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.bg }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
@@ -322,23 +339,23 @@ export function Settings({ identity }: { identity?: any }) {
             isTrusted={true}
           />
           <View style={styles.flex1}>
-            <Text style={styles.profileName}>{identity?.name || 'Local Mesh Node'}</Text>
-            <Text style={styles.profileSub}>
+            <Text style={[styles.profileName, { color: theme.text }]}>{identity?.name || 'Local Mesh Node'}</Text>
+            <Text style={[styles.profileSub, { color: theme.textSecondary }]}>
               Hyperswarm Sovereign Node · End-to-End Encrypted
             </Text>
           </View>
         </View>
 
-        <View style={styles.keyBox}>
+        <View style={[styles.keyBox, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
           <View style={styles.keyLabelRow}>
             <Lock size={12} color={theme.primary} />
-            <Text style={styles.keyLabel}>Noise Cryptographic Public Key</Text>
+            <Text style={[styles.keyLabel, { color: theme.muted }]}>Noise Cryptographic Public Key</Text>
           </View>
-          <Text style={styles.keyText} numberOfLines={1} ellipsizeMode="middle">
+          <Text style={[styles.keyText, { color: theme.primary }]} numberOfLines={1} ellipsizeMode="middle">
             {identity?.publicKey || 'Generating cryptographically secure Noise key…'}
           </Text>
           <TouchableOpacity
-            style={styles.copyKeyBtn}
+            style={[styles.copyKeyBtn, { backgroundColor: theme.primarySoft }]}
             onPress={copyPublicKey}
             activeOpacity={0.7}
           >
@@ -347,8 +364,288 @@ export function Settings({ identity }: { identity?: any }) {
             ) : (
               <Copy size={13} color={theme.primary} />
             )}
-            <Text style={styles.copyKeyText}>{copiedKey ? 'Copied' : 'Copy Key'}</Text>
+            <Text style={[styles.copyKeyText, { color: theme.primary }]}>{copiedKey ? 'Copied' : 'Copy Key'}</Text>
           </TouchableOpacity>
+        </View>
+      </Card>
+
+      {/* Color Theme Selector (Replicated from Desktop Settings) */}
+      <SectionHeader title="Color Theme" />
+      <Card style={styles.card}>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={[styles.switchTitle, { color: theme.text }]}>Interface Palette</Text>
+          <Text style={[styles.switchSub, { color: theme.muted }]}>
+            Select dark or light color scheme for your mobile mesh node.
+          </Text>
+        </View>
+
+        <View style={styles.themeOptionsGrid}>
+          <TouchableOpacity
+            style={[
+              styles.themeOptionCard,
+              { backgroundColor: theme.bgElevated, borderColor: theme.border },
+              themeMode === 'dark' && {
+                borderColor: theme.primary,
+                backgroundColor: theme.primarySoft,
+                borderWidth: 2,
+              },
+            ]}
+            onPress={() => setThemeMode('dark')}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.themeOptionIconBox,
+                { backgroundColor: themeMode === 'dark' ? theme.primary : theme.bgCard },
+              ]}
+            >
+              <Moon
+                size={18}
+                color={themeMode === 'dark' ? '#FFFFFF' : theme.muted}
+              />
+            </View>
+            <Text
+              style={[
+                styles.themeOptionTitle,
+                { color: theme.text },
+                themeMode === 'dark' && { color: theme.primary, fontWeight: '900' },
+              ]}
+            >
+              Dark Mode
+            </Text>
+            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
+              OLED Tech Slate
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.themeOptionCard,
+              { backgroundColor: theme.bgElevated, borderColor: theme.border },
+              themeMode === 'light' && {
+                borderColor: theme.primary,
+                backgroundColor: theme.primarySoft,
+                borderWidth: 2,
+              },
+            ]}
+            onPress={() => setThemeMode('light')}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.themeOptionIconBox,
+                { backgroundColor: themeMode === 'light' ? theme.primary : theme.bgCard },
+              ]}
+            >
+              <Sun
+                size={18}
+                color={themeMode === 'light' ? '#FFFFFF' : theme.warning}
+              />
+            </View>
+            <Text
+              style={[
+                styles.themeOptionTitle,
+                { color: theme.text },
+                themeMode === 'light' && { color: theme.primary, fontWeight: '900' },
+              ]}
+            >
+              Light Mode
+            </Text>
+            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
+              Pristine Light
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.themeOptionCard,
+              { backgroundColor: theme.bgElevated, borderColor: theme.border },
+              themeMode === 'system' && {
+                borderColor: theme.primary,
+                backgroundColor: theme.primarySoft,
+                borderWidth: 2,
+              },
+            ]}
+            onPress={() => setThemeMode('system')}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.themeOptionIconBox,
+                { backgroundColor: themeMode === 'system' ? theme.primary : theme.bgCard },
+              ]}
+            >
+              <Smartphone
+                size={18}
+                color={themeMode === 'system' ? '#FFFFFF' : theme.muted}
+              />
+            </View>
+            <Text
+              style={[
+                styles.themeOptionTitle,
+                { color: theme.text },
+                themeMode === 'system' && { color: theme.primary, fontWeight: '900' },
+              ]}
+            >
+              System
+            </Text>
+            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
+              Follow OS
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Card>
+
+      {/* Network Transport & Relay Strategy */}
+      <SectionHeader title="Network Transport & Relay" />
+      <Card style={styles.card}>
+        <View style={styles.themeOptionsGrid}>
+          <TouchableOpacity
+            style={[
+              styles.themeOptionCard,
+              { backgroundColor: theme.bgElevated, borderColor: theme.border },
+              (relayMode || 'auto') === 'auto' && {
+                borderColor: theme.primary,
+                backgroundColor: theme.primarySoft,
+                borderWidth: 2,
+              },
+            ]}
+            onPress={() => handleSelectRelayMode('auto')}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.themeOptionIconBox,
+                { backgroundColor: (relayMode || 'auto') === 'auto' ? theme.primary : theme.bgCard },
+              ]}
+            >
+              <Zap
+                size={18}
+                color={(relayMode || 'auto') === 'auto' ? '#FFFFFF' : theme.primary}
+              />
+            </View>
+            <Text
+              style={[
+                styles.themeOptionTitle,
+                { color: theme.text },
+                (relayMode || 'auto') === 'auto' && { color: theme.primary, fontWeight: '900' },
+              ]}
+            >
+              ⚡ Auto
+            </Text>
+            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
+              Hybrid Dual
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.themeOptionCard,
+              { backgroundColor: theme.bgElevated, borderColor: theme.border },
+              relayMode === 'relay-primary' && {
+                borderColor: theme.primary,
+                backgroundColor: theme.primarySoft,
+                borderWidth: 2,
+              },
+            ]}
+            onPress={() => handleSelectRelayMode('relay-primary')}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.themeOptionIconBox,
+                { backgroundColor: relayMode === 'relay-primary' ? theme.primary : theme.bgCard },
+              ]}
+            >
+              <Globe
+                size={18}
+                color={relayMode === 'relay-primary' ? '#FFFFFF' : theme.accent}
+              />
+            </View>
+            <Text
+              style={[
+                styles.themeOptionTitle,
+                { color: theme.text },
+                relayMode === 'relay-primary' && { color: theme.primary, fontWeight: '900' },
+              ]}
+            >
+              🌐 Cloudflare
+            </Text>
+            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
+              Relay First
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.themeOptionCard,
+              { backgroundColor: theme.bgElevated, borderColor: theme.border },
+              relayMode === 'direct-only' && {
+                borderColor: theme.primary,
+                backgroundColor: theme.primarySoft,
+                borderWidth: 2,
+              },
+            ]}
+            onPress={() => handleSelectRelayMode('direct-only')}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.themeOptionIconBox,
+                { backgroundColor: relayMode === 'direct-only' ? theme.primary : theme.bgCard },
+              ]}
+            >
+              <Lock
+                size={18}
+                color={relayMode === 'direct-only' ? '#FFFFFF' : theme.warning}
+              />
+            </View>
+            <Text
+              style={[
+                styles.themeOptionTitle,
+                { color: theme.text },
+                relayMode === 'direct-only' && { color: theme.primary, fontWeight: '900' },
+              ]}
+            >
+              🔒 Direct P2P
+            </Text>
+            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
+              No Cloud
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {relayMode !== 'direct-only' && (
+          <View style={[styles.switchRow, { borderTopColor: theme.hairline, borderTopWidth: 1, flexDirection: 'column', alignItems: 'stretch' }]}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Custom Relay Endpoint</Text>
+            <Text style={[styles.switchSub, { color: theme.muted, marginBottom: 8 }]}>
+              Leave blank to use default global Cloudflare Worker
+            </Text>
+            <TextInput
+              value={customRelayUrl}
+              onChangeText={handleUpdateCustomRelayUrl}
+              placeholder="https://meshdrop-relay.aamirabdullah33.workers.dev"
+              placeholderTextColor={theme.subtle}
+              style={[styles.customRelayInput, { backgroundColor: theme.bgElevated, borderColor: theme.border, color: theme.text }]}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        )}
+
+        <View style={[styles.switchRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
+          <View style={styles.flex1}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Prefer Paired Desktops as Relay</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
+              Tunnel via your online paired PC before public bootstrap nodes
+            </Text>
+          </View>
+          <Switch
+            value={preferOwnRelay}
+            onValueChange={handleTogglePreferOwnRelay}
+            trackColor={{ false: theme.bgElevated, true: theme.primarySoft }}
+            thumbColor={preferOwnRelay ? theme.primary : theme.subtle}
+          />
         </View>
       </Card>
 
@@ -357,29 +654,29 @@ export function Settings({ identity }: { identity?: any }) {
       <Card style={styles.card}>
         <View style={styles.switchRow}>
           <View style={styles.flex1}>
-            <Text style={styles.switchTitle}>Background Mesh Engine</Text>
-            <Text style={styles.switchSub}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Background Mesh Engine</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
               Keep P2P DHT listening active when app is minimized
             </Text>
           </View>
           <Switch
             value={backgroundKeepAlive}
             onValueChange={handleToggleBackgroundKeepAlive}
-            trackColor={{ false: '#E2E8F0', true: theme.primarySoft }}
-            thumbColor={backgroundKeepAlive ? theme.primary : '#94A3B8'}
+            trackColor={{ false: theme.bgElevated, true: theme.primarySoft }}
+            thumbColor={backgroundKeepAlive ? theme.primary : theme.subtle}
           />
         </View>
 
-        <View style={[styles.switchRow, styles.borderTop]}>
+        <View style={[styles.switchRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.flex1}>
-            <Text style={styles.switchTitle}>Battery Optimization Exemption</Text>
-            <Text style={styles.switchSub}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Battery Optimization Exemption</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
               {batteryIgnored ? 'Exempted (High Reliability)' : 'Subject to OS throttling'}
             </Text>
           </View>
           {!batteryIgnored && (
             <TouchableOpacity
-              style={styles.exemptionBtn}
+              style={[styles.exemptionBtn, { backgroundColor: theme.primary }]}
               onPress={handleRequestBatteryExemption}
               activeOpacity={0.8}
             >
@@ -395,55 +692,55 @@ export function Settings({ identity }: { identity?: any }) {
         <View style={styles.permRow}>
           <View style={styles.permInfo}>
             <HardDrive size={16} color={theme.primary} />
-            <Text style={styles.permName}>Engine Data Size</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Engine Data Size</Text>
           </View>
-          <Text style={styles.statValue}>{formatBytes(storageStats?.sizeBytes)}</Text>
+          <Text style={[styles.statValue, { color: theme.text }]}>{formatBytes(storageStats?.sizeBytes)}</Text>
         </View>
-        <View style={[styles.permRow, styles.borderTop]}>
+        <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.permInfo}>
             <FileText size={16} color={theme.accent} />
-            <Text style={styles.permName}>Transfer Records</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Transfer Records</Text>
           </View>
-          <Text style={styles.statValue}>{storageStats?.transfers ?? 0}</Text>
+          <Text style={[styles.statValue, { color: theme.text }]}>{storageStats?.transfers ?? 0}</Text>
         </View>
-        <View style={[styles.permRow, styles.borderTop]}>
+        <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.permInfo}>
             <Clock size={16} color={theme.purple} />
-            <Text style={styles.permName}>History Entries</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>History Entries</Text>
           </View>
-          <Text style={styles.statValue}>{storageStats?.history ?? 0}</Text>
+          <Text style={[styles.statValue, { color: theme.text }]}>{storageStats?.history ?? 0}</Text>
         </View>
-        <View style={[styles.permRow, styles.borderTop]}>
+        <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.permInfo}>
             <FolderSync size={16} color={theme.success} />
-            <Text style={styles.permName}>Sync Libraries</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Sync Libraries</Text>
           </View>
-          <Text style={styles.statValue}>{storageStats?.syncLibraries ?? 0}</Text>
+          <Text style={[styles.statValue, { color: theme.text }]}>{storageStats?.syncLibraries ?? 0}</Text>
         </View>
-        <View style={[styles.permRow, styles.borderTop]}>
+        <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.flex1}>
-            <Text style={styles.switchTitle}>Clear Transfer Log</Text>
-            <Text style={styles.switchSub}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Clear Transfer Log</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
               Remove completed/failed transfer records to reclaim metadata space
             </Text>
           </View>
           <TouchableOpacity
-            style={styles.exemptionBtn}
+            style={[styles.exemptionBtn, { backgroundColor: theme.primary }]}
             onPress={handleClearTransferLog}
             activeOpacity={0.8}
           >
             <Text style={styles.exemptionBtnText}>Clear</Text>
           </TouchableOpacity>
         </View>
-        <View style={[styles.permRow, styles.borderTop]}>
+        <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.flex1}>
-            <Text style={styles.switchTitle}>Compress Engine Data</Text>
-            <Text style={styles.switchSub}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Compress Engine Data</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
               Rebuild metadata to reclaim space from old sync index versions
             </Text>
           </View>
           <TouchableOpacity
-            style={styles.exemptionBtn}
+            style={[styles.exemptionBtn, { backgroundColor: theme.primary }]}
             onPress={handleCompactStorage}
             activeOpacity={0.8}
           >
@@ -458,7 +755,7 @@ export function Settings({ identity }: { identity?: any }) {
         <View style={styles.permRow}>
           <View style={styles.permInfo}>
             <HardDrive size={16} color={theme.primary} />
-            <Text style={styles.permName}>Storage Access</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Storage Access</Text>
           </View>
           <Pill
             label={permissions.storage ? 'Granted' : 'Required'}
@@ -466,10 +763,10 @@ export function Settings({ identity }: { identity?: any }) {
           />
         </View>
 
-        <View style={[styles.permRow, styles.borderTop]}>
+        <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.permInfo}>
             <Bell size={16} color={theme.purple} />
-            <Text style={styles.permName}>Push Notifications</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Push Notifications</Text>
           </View>
           <Pill
             label={permissions.notifications ? 'Active' : 'Disabled'}
@@ -477,10 +774,10 @@ export function Settings({ identity }: { identity?: any }) {
           />
         </View>
 
-        <View style={[styles.permRow, styles.borderTop]}>
+        <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.permInfo}>
             <Radio size={16} color={theme.accent} />
-            <Text style={styles.permName}>Nearby Device Discovery</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Nearby Device Discovery</Text>
           </View>
           <Pill
             label={permissions.nearbyDevices ? 'Active' : 'Optional'}
@@ -503,23 +800,23 @@ export function Settings({ identity }: { identity?: any }) {
       <Card style={styles.card}>
         <View style={styles.switchRow}>
           <View style={styles.flex1}>
-            <Text style={styles.switchTitle}>Auto-Accept Trusted Transfers</Text>
-            <Text style={styles.switchSub}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Auto-Accept Trusted Transfers</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
               Automatically download payloads from verified peers
             </Text>
           </View>
           <Switch
             value={autoAcceptTrusted}
             onValueChange={handleToggleAutoAccept}
-            trackColor={{ false: '#E2E8F0', true: theme.primarySoft }}
-            thumbColor={autoAcceptTrusted ? theme.primary : '#94A3B8'}
+            trackColor={{ false: theme.bgElevated, true: theme.primarySoft }}
+            thumbColor={autoAcceptTrusted ? theme.primary : theme.subtle}
           />
         </View>
 
-        <View style={[styles.switchRow, styles.borderTop]}>
+        <View style={[styles.switchRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.flex1}>
-            <Text style={styles.switchTitle}>Prefer My Devices as Relay</Text>
-            <Text style={styles.switchSub}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Prefer My Devices as Relay</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
               When a direct connection fails, tunnel through your own online desktop before
               public relays. Private to your mesh.
             </Text>
@@ -527,25 +824,25 @@ export function Settings({ identity }: { identity?: any }) {
           <Switch
             value={preferOwnRelay}
             onValueChange={handleTogglePreferOwnRelay}
-            trackColor={{ false: '#E2E8F0', true: theme.primarySoft }}
-            thumbColor={preferOwnRelay ? theme.primary : '#94A3B8'}
+            trackColor={{ false: theme.bgElevated, true: theme.primarySoft }}
+            thumbColor={preferOwnRelay ? theme.primary : theme.subtle}
           />
         </View>
 
-        <View style={[styles.switchRow, styles.borderTop]}>
+        <View style={[styles.switchRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.flex1}>
-            <Text style={styles.switchTitle}>LAN Multicast Discovery</Text>
-            <Text style={styles.switchSub}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>LAN Multicast Discovery</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
               Unavailable on this build — DHT-based Hyperswarm discovery stays active
             </Text>
           </View>
           <Pill label="DHT" color={theme.muted} />
         </View>
 
-        <View style={[styles.switchRow, styles.borderTop]}>
+        <View style={[styles.switchRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.flex1}>
-            <Text style={styles.switchTitle}>Wi-Fi Only Mode</Text>
-            <Text style={styles.switchSub}>
+            <Text style={[styles.switchTitle, { color: theme.text }]}>Wi-Fi Only Mode</Text>
+            <Text style={[styles.switchSub, { color: theme.muted }]}>
               Not supported — transfers run over whichever network is available
             </Text>
           </View>
@@ -565,21 +862,21 @@ export function Settings({ identity }: { identity?: any }) {
             <View style={styles.permRow}>
               <View style={styles.permInfo}>
                 <Zap size={16} color={theme.primary} />
-                <Text style={styles.permName}>Installed Version</Text>
+                <Text style={[styles.permName, { color: theme.text }]}>Installed Version</Text>
               </View>
-              <Text style={styles.statValue}>
+              <Text style={[styles.statValue, { color: theme.text }]}>
                 {installedVersion ? `v${installedVersion}` : '—'}
               </Text>
             </View>
 
             {devUnlocked && (
-              <View style={[styles.permRow, styles.borderTop]}>
+              <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
                 <View style={styles.flex1}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <FlaskConical size={14} color={theme.primary} />
-                    <Text style={styles.switchTitle}>Release Channel</Text>
+                    <Text style={[styles.switchTitle, { color: theme.text }]}>Release Channel</Text>
                   </View>
-                  <Text style={styles.switchSub}>
+                  <Text style={[styles.switchSub, { color: theme.muted }]}>
                     {currentChannel === 'dev'
                       ? 'Fetching bleeding-edge dev APK from dev-preview'
                       : 'Fetching official production releases'}
@@ -589,6 +886,7 @@ export function Settings({ identity }: { identity?: any }) {
                   <TouchableOpacity
                     style={[
                       styles.exemptionBtn,
+                      { backgroundColor: theme.bgElevated },
                       currentChannel === 'stable' && { backgroundColor: theme.primary },
                     ]}
                     onPress={() => handleToggleChannel('stable')}
@@ -597,7 +895,7 @@ export function Settings({ identity }: { identity?: any }) {
                     <Text
                       style={[
                         styles.exemptionBtnText,
-                        currentChannel === 'stable' && { color: '#FFFFFF' },
+                        { color: currentChannel === 'stable' ? '#FFFFFF' : theme.text },
                       ]}
                     >
                       Stable
@@ -606,6 +904,7 @@ export function Settings({ identity }: { identity?: any }) {
                   <TouchableOpacity
                     style={[
                       styles.exemptionBtn,
+                      { backgroundColor: theme.bgElevated },
                       currentChannel === 'dev' && { backgroundColor: theme.primary },
                     ]}
                     onPress={() => handleToggleChannel('dev')}
@@ -614,7 +913,7 @@ export function Settings({ identity }: { identity?: any }) {
                     <Text
                       style={[
                         styles.exemptionBtnText,
-                        currentChannel === 'dev' && { color: '#FFFFFF' },
+                        { color: currentChannel === 'dev' ? '#FFFFFF' : theme.text },
                       ]}
                     >
                       Dev
@@ -624,17 +923,17 @@ export function Settings({ identity }: { identity?: any }) {
               </View>
             )}
 
-            <View style={[styles.permRow, styles.borderTop]}>
+            <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
               <View style={styles.flex1}>
-                <Text style={styles.switchTitle}>Check for Updates</Text>
-                <Text style={styles.switchSub}>
+                <Text style={[styles.switchTitle, { color: theme.text }]}>Check for Updates</Text>
+                <Text style={[styles.switchSub, { color: theme.muted }]}>
                   {currentChannel === 'dev'
                     ? 'Checks for newest dev pre-release APK on GitHub'
                     : 'This build is sideloaded — fetches newest official APK from release feed'}
                 </Text>
               </View>
               <TouchableOpacity
-                style={styles.exemptionBtn}
+                style={[styles.exemptionBtn, { backgroundColor: theme.primary }]}
                 onPress={handleCheckForUpdates}
                 activeOpacity={0.8}
                 disabled={checkingUpdate}
@@ -650,31 +949,31 @@ export function Settings({ identity }: { identity?: any }) {
 
       {/* Support & Bitcoin Donation */}
       <SectionHeader title="Support MeshDrop" />
-      <Card glow style={styles.donationCard}>
+      <Card glow style={[styles.donationCard, { borderColor: 'rgba(217, 119, 6, 0.35)', backgroundColor: theme.bgCard }]}>
         <View style={styles.donationHeader}>
-          <View style={styles.bitcoinIconBox}>
+          <View style={[styles.bitcoinIconBox, { backgroundColor: theme.isDark ? 'rgba(217, 119, 6, 0.15)' : '#FFFBEB' }]}>
             <Text style={styles.bitcoinSymbol}>₿</Text>
           </View>
           <View style={styles.flex1}>
             <View style={styles.donationTitleRow}>
-              <Text style={styles.donationTitle}>Donate with Bitcoin</Text>
+              <Text style={[styles.donationTitle, { color: theme.text }]}>Donate with Bitcoin</Text>
               <Heart size={14} color="#E11D48" fill="#E11D48" />
             </View>
-            <Text style={styles.donationSub}>Direct Developer Support</Text>
+            <Text style={[styles.donationSub, { color: theme.muted }]}>Direct Developer Support</Text>
           </View>
           <Pill label="Bitcoin (BTC)" color="#D97706" />
         </View>
 
-        <Text style={styles.donationDescription}>
+        <Text style={[styles.donationDescription, { color: theme.textSecondary }]}>
           MeshDrop is 100% free and open-source software — no cloud accounts, no subscriptions, and no tracking. If MeshDrop helps you transfer files across your devices, tips via Bitcoin are deeply appreciated to support ongoing maintenance!
         </Text>
 
         <TouchableOpacity
-          style={styles.btcAddressContainer}
+          style={[styles.btcAddressContainer, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
           onPress={handleCopyBtc}
           activeOpacity={0.7}
         >
-          <Text style={styles.btcAddressText} numberOfLines={1} ellipsizeMode="middle">
+          <Text style={[styles.btcAddressText, { color: theme.text }]} numberOfLines={1} ellipsizeMode="middle">
             {BITCOIN_ADDRESS}
           </Text>
           <Copy size={13} color={theme.muted} />
@@ -682,7 +981,7 @@ export function Settings({ identity }: { identity?: any }) {
 
         <View style={styles.donationActions}>
           <TouchableOpacity
-            style={[styles.donationBtn, styles.donationBtnPrimary]}
+            style={[styles.donationBtn, styles.donationBtnPrimary, { backgroundColor: theme.primary }]}
             onPress={handleCopyBtc}
             activeOpacity={0.8}
           >
@@ -697,12 +996,12 @@ export function Settings({ identity }: { identity?: any }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.donationBtn, styles.donationBtnSecondary]}
+            style={[styles.donationBtn, styles.donationBtnSecondary, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
             onPress={() => setShowBtcQr(true)}
             activeOpacity={0.8}
           >
             <QrCode size={14} color={theme.text} />
-            <Text style={styles.donationBtnTextSecondary}>Show QR</Text>
+            <Text style={[styles.donationBtnTextSecondary, { color: theme.text }]}>Show QR</Text>
           </TouchableOpacity>
         </View>
       </Card>
@@ -717,41 +1016,41 @@ export function Settings({ identity }: { identity?: any }) {
         >
           <View style={styles.permInfo}>
             <Zap size={16} color={theme.primary} />
-            <Text style={styles.permName}>Version</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Version</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {devUnlocked && <Pill label="Dev Unlocked" color={theme.success} />}
-            <Text style={styles.statValue}>
+            <Text style={[styles.statValue, { color: theme.text }]}>
               {installedVersion ? `v${installedVersion}` : '—'}
             </Text>
           </View>
         </TouchableOpacity>
-        <View style={[styles.permRow, styles.borderTop]}>
+        <View style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.permInfo}>
             <Info size={16} color={theme.primary} />
-            <Text style={styles.permName}>License</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>License</Text>
           </View>
           <Pill label="MIT" color={theme.primary} />
         </View>
         <TouchableOpacity
-          style={[styles.permRow, styles.borderTop]}
+          style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}
           onPress={() => Linking.openURL('https://github.com/aamirali51/meshdrop-app')}
           activeOpacity={0.7}
         >
           <View style={styles.permInfo}>
             <ExternalLink size={16} color={theme.primary} />
-            <Text style={styles.permName}>Source Code</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Source Code</Text>
           </View>
           <Text style={[styles.statValue, { color: theme.primary }]}>GitHub →</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.permRow, styles.borderTop]}
+          style={[styles.permRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}
           onPress={() => Linking.openURL('https://github.com/aamirali51/meshdrop-releases/releases')}
           activeOpacity={0.7}
         >
           <View style={styles.permInfo}>
             <FileText size={16} color={theme.primary} />
-            <Text style={styles.permName}>Releases</Text>
+            <Text style={[styles.permName, { color: theme.text }]}>Releases</Text>
           </View>
           <Text style={[styles.statValue, { color: theme.primary }]}>View →</Text>
         </TouchableOpacity>
@@ -844,7 +1143,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
   },
   content: {
     padding: 16,
@@ -861,21 +1159,17 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   profileName: {
-    color: theme.text,
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: -0.3,
   },
   profileSub: {
-    color: theme.textSecondary,
     fontSize: 11.5,
     marginTop: 2,
   },
   keyBox: {
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 10,
     padding: 12,
   },
   keyLabelRow: {
@@ -885,12 +1179,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   keyLabel: {
-    color: theme.muted,
     fontSize: 11,
     fontWeight: '700',
   },
   keyText: {
-    color: theme.primary,
     fontSize: 12,
     fontWeight: '800',
     fontFamily: fonts.mono,
@@ -901,21 +1193,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: 4,
-    backgroundColor: theme.primarySoft,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 6,
   },
   copyKeyText: {
-    color: theme.primary,
     fontSize: 11,
     fontWeight: '800',
   },
   card: {
     padding: 14,
     marginBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
+  },
+  themeOptionsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  themeOptionCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  themeOptionIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  themeOptionTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  themeOptionSub: {
+    fontSize: 10,
+    marginTop: 2,
+    textAlign: 'center',
   },
   switchRow: {
     flexDirection: 'row',
@@ -923,22 +1242,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
   },
-  borderTop: {
-    borderTopWidth: 1,
-    borderTopColor: theme.hairline,
-  },
   switchTitle: {
-    color: theme.text,
     fontSize: 13.5,
     fontWeight: '800',
   },
   switchSub: {
-    color: theme.muted,
     fontSize: 11,
     marginTop: 2,
   },
+  customRelayInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 12,
+    fontFamily: fonts.mono,
+    marginTop: 4,
+  },
   exemptionBtn: {
-    backgroundColor: theme.primary,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -960,12 +1281,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   permName: {
-    color: theme.text,
     fontSize: 13,
     fontWeight: '700',
   },
   statValue: {
-    color: theme.text,
     fontSize: 13,
     fontWeight: '800',
     fontFamily: fonts.mono,
@@ -974,7 +1293,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.25)',
   },
   donationHeader: {
     flexDirection: 'row',
@@ -986,7 +1304,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: '#FFFBEB',
     borderWidth: 1,
     borderColor: 'rgba(217, 119, 6, 0.3)',
     alignItems: 'center',
@@ -1003,17 +1320,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   donationTitle: {
-    color: theme.text,
     fontSize: 14,
     fontWeight: '800',
   },
   donationSub: {
-    color: theme.muted,
     fontSize: 11,
     marginTop: 1,
   },
   donationDescription: {
-    color: theme.textSecondary,
     fontSize: 12,
     lineHeight: 17,
     marginBottom: 12,
@@ -1022,9 +1336,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.bgElevated,
     borderWidth: 1,
-    borderColor: theme.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1033,7 +1345,6 @@ const styles = StyleSheet.create({
   },
   btcAddressText: {
     flex: 1,
-    color: theme.text,
     fontSize: 12,
     fontWeight: '700',
     fontFamily: fonts.mono,
@@ -1054,17 +1365,13 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   donationBtnPrimary: {
-    backgroundColor: theme.primary,
-    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 2,
   },
   donationBtnSecondary: {
-    backgroundColor: theme.bgElevated,
     borderWidth: 1,
-    borderColor: theme.border,
   },
   donationBtnTextPrimary: {
     color: '#FFFFFF',
@@ -1072,8 +1379,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   donationBtnTextSecondary: {
-    color: theme.text,
     fontSize: 12.5,
     fontWeight: '700',
   },
 })
+

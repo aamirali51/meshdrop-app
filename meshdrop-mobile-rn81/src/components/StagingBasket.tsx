@@ -1,31 +1,42 @@
 import React from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
-import { File, X, Send, Plus, KeyRound, Sparkles, Layers } from 'lucide-react-native'
-import { theme, fonts } from '../theme'
+import { File, X, Send, Plus, KeyRound, Sparkles, Layers, Trash2 } from 'lucide-react-native'
+import { useTheme, fonts } from '../theme'
 
 export interface StagedItem {
   id: string
   name: string
   size: number
   path: string
-  type?: 'image' | 'video' | 'doc' | 'other'
+  type?: string
 }
 
 interface StagingBasketProps {
   items: StagedItem[]
+  isOpen?: boolean
+  onToggleOpen?: () => void
   onRemoveItem: (id: string) => void
-  onAddMore: () => void
-  onSelectRecipient: () => void
-  onCreateDropCode: () => void
+  onAddMore?: () => void
+  onClear?: () => void
+  onSelectRecipient?: () => void
+  onDirectSend?: () => void
+  onCreateDropCode?: () => void
+  onGenerateDropCode?: (items: StagedItem[]) => void
 }
 
 export function StagingBasket({
   items,
+  isOpen,
+  onToggleOpen,
   onRemoveItem,
   onAddMore,
+  onClear,
   onSelectRecipient,
+  onDirectSend,
   onCreateDropCode,
+  onGenerateDropCode,
 }: StagingBasketProps) {
+  const { theme } = useTheme()
   if (!items || items.length === 0) return null
 
   const totalBytes = items.reduce((acc, it) => acc + (it.size || 0), 0)
@@ -35,26 +46,50 @@ export function StagingBasket({
     return `${Math.round(b / 1024)} KB`
   }
 
+  const handleSend = onDirectSend || onSelectRecipient || (() => {})
+  const handleDrop = () => {
+    if (onGenerateDropCode) onGenerateDropCode(items)
+    else if (onCreateDropCode) onCreateDropCode()
+  }
+
   return (
-    <View style={styles.sheetContainer}>
+    <View style={[styles.sheetContainer, { backgroundColor: theme.bgCard, borderTopColor: theme.border }]}>
       {/* Header Summary */}
       <View style={styles.header}>
         <View style={styles.headerTitleWrap}>
-          <View style={styles.badgeIcon}>
+          <View style={[styles.badgeIcon, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
             <Layers size={14} color={theme.primary} />
           </View>
           <View>
-            <Text style={styles.title}>Staged Payloads</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: theme.text }]}>Staged Payloads</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               {items.length} file{items.length === 1 ? '' : 's'} · {formatBytes(totalBytes)} ready to beam
             </Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.addMoreBtn} onPress={onAddMore} activeOpacity={0.7}>
-          <Plus size={14} color={theme.text} />
-          <Text style={styles.addMoreText}>Add</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {onClear && (
+            <TouchableOpacity
+              style={[styles.addMoreBtn, { backgroundColor: theme.dangerBg, borderColor: theme.dangerBorder }]}
+              onPress={onClear}
+              activeOpacity={0.7}
+            >
+              <Trash2 size={13} color={theme.danger} />
+              <Text style={[styles.addMoreText, { color: theme.danger }]}>Clear</Text>
+            </TouchableOpacity>
+          )}
+          {onAddMore && (
+            <TouchableOpacity
+              style={[styles.addMoreBtn, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
+              onPress={onAddMore}
+              activeOpacity={0.7}
+            >
+              <Plus size={14} color={theme.text} />
+              <Text style={[styles.addMoreText, { color: theme.text }]}>Add</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Horizontal Staging Tray */}
@@ -64,11 +99,11 @@ export function StagingBasket({
         contentContainerStyle={styles.scrollList}
       >
         {items.map((item) => (
-          <View key={item.id} style={styles.itemChip}>
-            <View style={styles.fileIconBox}>
+          <View key={item.id} style={[styles.itemChip, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
+            <View style={[styles.fileIconBox, { backgroundColor: theme.primarySoft }]}>
               <File size={13} color={theme.primary} />
             </View>
-            <Text style={styles.itemName} numberOfLines={1}>
+            <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
               {item.name}
             </Text>
             <TouchableOpacity
@@ -84,12 +119,20 @@ export function StagingBasket({
 
       {/* Action Buttons */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={onCreateDropCode} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={[styles.secondaryBtn, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
+          onPress={handleDrop}
+          activeOpacity={0.8}
+        >
           <KeyRound size={15} color={theme.text} />
-          <Text style={styles.secondaryBtnText}>DROP Code</Text>
+          <Text style={[styles.secondaryBtnText, { color: theme.text }]}>DROP Code</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.primaryBtn} onPress={onSelectRecipient} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
+          onPress={handleSend}
+          activeOpacity={0.8}
+        >
           <Send size={15} color="#FFFFFF" />
           <Text style={styles.primaryBtnText}>Beam to Peer</Text>
         </TouchableOpacity>
@@ -100,18 +143,15 @@ export function StagingBasket({
 
 const styles = StyleSheet.create({
   sheetContainer: {
-    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: theme.border,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderTopLeftRadius: theme.radiusXl,
-    borderTopRightRadius: theme.radiusXl,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -6 },
+    borderRadius: 16,
+    marginBottom: 14,
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 10,
+    shadowRadius: 10,
+    elevation: 4,
   },
   header: {
     flexDirection: 'row',
@@ -128,20 +168,16 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
   },
   title: {
-    color: theme.text,
     fontSize: 14.5,
     fontWeight: '900',
     letterSpacing: -0.2,
   },
   subtitle: {
-    color: theme.textSecondary,
     fontSize: 11.5,
     marginTop: 1,
   },
@@ -150,14 +186,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 10,
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 8,
     gap: 4,
   },
   addMoreText: {
-    color: theme.text,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -168,9 +201,7 @@ const styles = StyleSheet.create({
   itemChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.bgElevated,
     borderWidth: 1,
-    borderColor: theme.border,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 10,
@@ -181,12 +212,10 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 5,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   itemName: {
-    color: theme.text,
     fontSize: 12,
     fontWeight: '700',
     flexShrink: 1,
@@ -204,15 +233,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
     borderWidth: 1,
     paddingVertical: 12,
     borderRadius: 12,
     gap: 6,
   },
   secondaryBtnText: {
-    color: theme.text,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -221,11 +247,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.primary,
     paddingVertical: 12,
     borderRadius: 12,
     gap: 6,
-    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
@@ -237,3 +261,4 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 })
+

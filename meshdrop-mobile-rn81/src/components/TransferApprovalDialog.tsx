@@ -13,7 +13,7 @@ import {
   Zap,
 } from 'lucide-react-native'
 import { SimpleModal, Btn, Pill } from '../components'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 interface TransferApprovalDialogProps {
   visible: boolean
@@ -50,6 +50,7 @@ export function TransferApprovalDialog({
   onDecline,
   onClose,
 }: TransferApprovalDialogProps) {
+  const { theme } = useTheme()
   if (!transfer) return null
 
   const resolvedId = transfer.id || transfer.transferId || ''
@@ -64,26 +65,26 @@ export function TransferApprovalDialog({
     >
       <View style={styles.container}>
         {/* File Details Hero */}
-        <View style={styles.fileCard}>
-          <View style={styles.fileIconBox}>
+        <View style={[styles.fileCard, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
+          <View style={[styles.fileIconBox, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
             <FileText size={22} color={theme.primary} />
           </View>
           <View style={styles.flex1}>
-            <Text style={styles.fileName} numberOfLines={2}>
+            <Text style={[styles.fileName, { color: theme.text }]} numberOfLines={2}>
               {transfer.filename || 'Incoming File'}
             </Text>
-            <Text style={styles.fileMeta}>
+            <Text style={[styles.fileMeta, { color: theme.textSecondary }]}>
               Size: {formatBytes(transfer.fileSize)} · Direct P2P
             </Text>
           </View>
         </View>
 
         {/* Sender Info Row */}
-        <View style={styles.senderRow}>
-          <Text style={styles.senderLabel}>From Peer:</Text>
+        <View style={[styles.senderRow, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
+          <Text style={[styles.senderLabel, { color: theme.muted }]}>From Peer:</Text>
           <View style={styles.senderBadge}>
-            <View style={styles.senderDot} />
-            <Text style={styles.senderName}>{resolvedName}</Text>
+            <View style={[styles.senderDot, { backgroundColor: theme.success }]} />
+            <Text style={[styles.senderName, { color: theme.text }]}>{resolvedName}</Text>
           </View>
         </View>
 
@@ -92,7 +93,7 @@ export function TransferApprovalDialog({
           <Pill label="Zero-Cloud Direct" color={theme.success} icon={Zap} />
         </View>
 
-        <Text style={styles.noticeText}>
+        <Text style={[styles.noticeText, { color: theme.textSecondary }]}>
           Files are received directly through encrypted Hyperswarm DHT streams and written directly to your device storage.
         </Text>
 
@@ -129,10 +130,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 10,
     padding: 14,
     marginBottom: 14,
   },
@@ -140,19 +139,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
   },
   fileName: {
-    color: theme.text,
     fontSize: 15,
     fontWeight: '800',
   },
   fileMeta: {
-    color: theme.textSecondary,
     fontSize: 12,
     marginTop: 2,
     fontFamily: fonts.mono,
@@ -162,15 +157,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-    backgroundColor: theme.bgElevated,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: theme.border,
   },
   senderLabel: {
-    color: theme.muted,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -183,10 +175,8 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.success,
   },
   senderName: {
-    color: theme.text,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -197,7 +187,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   noticeText: {
-    color: theme.textSecondary,
     fontSize: 11.5,
     lineHeight: 16,
     marginBottom: 18,
@@ -207,3 +196,4 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 })
+

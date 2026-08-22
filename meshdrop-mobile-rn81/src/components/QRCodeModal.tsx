@@ -11,7 +11,7 @@ import { Copy, Share2, Check, QrCode } from 'lucide-react-native'
 import { SimpleModal } from '../components'
 import { Btn } from '../components'
 import { copyToClipboard } from '../clipboard'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 interface QRCodeModalProps {
   visible: boolean
@@ -28,6 +28,7 @@ export function QRCodeModal({
   value,
   onClose,
 }: QRCodeModalProps) {
+  const { theme } = useTheme()
   const [copied, setCopied] = React.useState(false)
 
   const handleCopy = async () => {
@@ -63,17 +64,17 @@ export function QRCodeModal({
       <View style={styles.container}>
         {/* Holographic QR Code Plate */}
         <View style={styles.qrPlateWrap}>
-          <View style={styles.cornerTL} />
-          <View style={styles.cornerTR} />
-          <View style={styles.cornerBL} />
-          <View style={styles.cornerBR} />
-          <View style={styles.qrPlate}>
+          <View style={[styles.cornerTL, { borderColor: theme.primary }]} />
+          <View style={[styles.cornerTR, { borderColor: theme.primary }]} />
+          <View style={[styles.cornerBL, { borderColor: theme.primary }]} />
+          <View style={[styles.cornerBR, { borderColor: theme.primary }]} />
+          <View style={[styles.qrPlate, { borderColor: theme.border }]}>
             {value ? (
               <QRCode
                 value={value}
                 size={190}
-                color="#0F172A"
-                backgroundColor="#FFFFFF"
+                color={theme.qrFg}
+                backgroundColor={theme.qrBg}
               />
             ) : (
               <View style={styles.placeholder} />
@@ -82,8 +83,8 @@ export function QRCodeModal({
         </View>
 
         {/* Monospace Code Display */}
-        <View style={styles.codeBox}>
-          <Text style={styles.codeText} numberOfLines={1} adjustsFontSizeToFit>
+        <View style={[styles.codeBox, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
+          <Text style={[styles.codeText, { color: theme.primary }]} numberOfLines={1} adjustsFontSizeToFit>
             {value}
           </Text>
         </View>
@@ -131,7 +132,6 @@ const styles = StyleSheet.create({
     height: 16,
     borderTopWidth: 2,
     borderLeftWidth: 2,
-    borderColor: theme.primary,
   },
   cornerTR: {
     position: 'absolute',
@@ -141,7 +141,6 @@ const styles = StyleSheet.create({
     height: 16,
     borderTopWidth: 2,
     borderRightWidth: 2,
-    borderColor: theme.primary,
   },
   cornerBL: {
     position: 'absolute',
@@ -151,7 +150,6 @@ const styles = StyleSheet.create({
     height: 16,
     borderBottomWidth: 2,
     borderLeftWidth: 2,
-    borderColor: theme.primary,
   },
   cornerBR: {
     position: 'absolute',
@@ -161,7 +159,6 @@ const styles = StyleSheet.create({
     height: 16,
     borderBottomWidth: 2,
     borderRightWidth: 2,
-    borderColor: theme.primary,
   },
   qrPlate: {
     backgroundColor: '#FFFFFF',
@@ -175,7 +172,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
     borderWidth: 1,
-    borderColor: theme.border,
   },
   placeholder: {
     width: 190,
@@ -184,10 +180,8 @@ const styles = StyleSheet.create({
   },
   codeBox: {
     width: '100%',
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
     alignItems: 'center',
@@ -195,7 +189,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   codeText: {
-    color: theme.primary,
     fontSize: 16,
     fontWeight: '900',
     fontFamily: fonts.mono,
@@ -207,3 +200,4 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 })
+

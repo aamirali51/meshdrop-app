@@ -37,7 +37,7 @@ import { StagingBasket, type StagedItem } from '../components/StagingBasket'
 import { QRCodeModal } from '../components/QRCodeModal'
 import { pickFiles } from '../filePicker'
 import { copyToClipboard } from '../clipboard'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 interface PendingShare {
   id: string
@@ -61,277 +61,253 @@ function formatBytes(bytes?: number): string {
   return `${val.toFixed(val >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function formatRemaining(expiresAt: number): string {
-  if (!expiresAt || expiresAt <= 0) return 'Permanent'
-  const ms = expiresAt - Date.now()
-  if (ms <= 0) return 'Expired'
-  const total = Math.floor(ms / 1000)
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${m}m ${s}s`
-}
-
 export function Share() {
+  const { theme } = useTheme()
   const [activeShares, setActiveShares] = useState<PendingShare[]>([])
-  const [busy, setBusy] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [stagedItems, setStagedItems] = useState<StagedItem[]>([])
+  const [basketOpen, setBasketOpen] = useState(false)
 
-  // Staged Basket State
-  const [stagedFiles, setStagedFiles] = useState<StagedItem[]>([])
+  // QR presentation modal
+  const [qrModalShare, setQrModalShare] = useState<PendingShare | null>(null)
+
+  // Direct send device target picker modal
   const [showRecipientModal, setShowRecipientModal] = useState(false)
-  const [pairedDevices, setPairedDevices] = useState<any[]>([])
+  const [onlineDevices, setOnlineDevices] = useState<any[]>([])
 
-  // Create Modal State
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [customFileName, setCustomFileName] = useState('')
-  const [expirationPreset, setExpirationPreset] = useState<'15m' | '1h' | '24h'>('1h')
-
-  // QR Modal State
-  const [qrCodeTarget, setQrCodeTarget] = useState<string | null>(null)
-
-  const refresh = useCallback(() => {
+  const refreshShares = useCallback(() => {
     call('listPendingShares')
-      .then((shares) => {
-        if (Array.isArray(shares)) setActiveShares(shares)
-      })
-      .catch(() => {})
-
-    call('listDevices')
-      .then((devs) => {
-        if (Array.isArray(devs)) setPairedDevices(devs)
+      .then((res: any) => {
+        if (Array.isArray(res)) setActiveShares(res)
       })
       .catch(() => {})
   }, [])
 
   useEffect(() => {
-    refresh()
-    const timer = setInterval(refresh, 2500)
-    const events = ['transfer:started', 'transfer:completed', 'transfer:cancelled']
-    const unsubs = events.map((e) => on(e, refresh))
-    return () => {
-      clearInterval(timer)
-      unsubs.forEach((u) => u())
-    }
-  }, [refresh])
+    refreshShares()
+    const unsub = on('shares:updated', () => {
+      refreshShares()
+    })
+    return () => unsub()
+  }, [refreshShares])
 
-  const handlePickAndStageFiles = async () => {
-    try {
-      const files = await pickFiles()
-      if (!files || files.length === 0) return
-      const newItems: StagedItem[] = files.map((f) => ({
-        id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        name: f.name,
-        size: f.size,
-        path: f.path,
-      }))
-      setStagedFiles((prev) => [...prev, ...newItems])
-    } catch {}
+  const handlePickFiles = async () => {
+    const files = await pickFiles()
+    if (!files || files.length === 0) return
+
+    const newItems: StagedItem[] = files.map((f, i) => ({
+      id: `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+      name: f.name,
+      path: f.path,
+      size: f.size,
+      type: f.name.includes('.') ? f.name.split('.').pop() : 'file',
+    }))
+
+    setStagedItems((prev) => [...prev, ...newItems])
+    setBasketOpen(true)
   }
 
   const handleRemoveStagedItem = (id: string) => {
-    setStagedFiles((prev) => prev.filter((it) => it.id !== id))
+    setStagedItems((prev) => prev.filter((item) => item.id !== id))
   }
 
-  const handleSendToDevice = async (device: any) => {
-    if (stagedFiles.length === 0) return
-    setBusy(true)
-    try {
-      for (const item of stagedFiles) {
-        await call('sendOffer', {
-          recipientPeerId: device.id,
-          filePath: item.path,
-          filename: item.name,
-          fileSize: item.size,
-        })
-      }
-      setShowRecipientModal(false)
-      setStagedFiles([])
-      Alert.alert(
-        'Beam Dispatched',
-        `Successfully sent ${stagedFiles.length} file(s) to ${device.name}.`
-      )
-    } catch (err: any) {
-      Alert.alert('Send Failed', err?.message || 'Could not send files to device.')
-    } finally {
-      setBusy(false)
-    }
+  const handleClearStaging = () => {
+    setStagedItems([])
   }
 
-  const handleCreateDropCode = async () => {
-    if (stagedFiles.length === 0) {
-      Alert.alert('No Files Staged', 'Please select at least one file to share.')
-      return
-    }
-
-    const firstItem = stagedFiles[0]
-
-    setBusy(true)
+  const handleGenerateDropCode = async (items: StagedItem[]) => {
+    if (items.length === 0) return
     try {
-      const res: any = await call('createDropCode', {
-        files: stagedFiles.map((item) => ({
-          filePath: item.path,
-          filename: item.name,
-          fileSize: item.size,
-        })),
-        filename: customFileName.trim() || undefined,
-        expirationPreset,
+      const filePaths = items.map((i) => i.path)
+      const res: any = await call('createMultiDropShare', {
+        filePaths,
+        names: items.map((i) => i.name),
+        sizes: items.map((i) => i.size),
       })
-
-      setShowCreateModal(false)
-      setCustomFileName('')
-      setStagedFiles([])
-      refresh()
-
       if (res && res.code) {
+        setStagedItems([])
+        refreshShares()
         Alert.alert(
-          'Quantum DROP Code Created',
-          `Code: ${res.code}\nRecipient can claim this file with zero pairing required.`,
-          [
-            { text: 'Done', style: 'cancel' },
-            {
-              text: 'Share Code',
-              onPress: () => {
-                NativeShare.share({
-                  message: `MeshDrop Code: ${res.code}\nEnter this code in MeshDrop to download "${firstItem.name}" directly.`,
-                  title: 'MeshDrop One-Time Share',
-                }).catch(() => {})
-              },
-            },
-          ]
+          'Drop Code Created!',
+          `Code: ${res.code}\nShare this code with your peer to download the ${items.length} file(s).`
         )
       }
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to generate drop code.')
-    } finally {
-      setBusy(false)
+      Alert.alert('Error', err?.message || 'Could not generate drop code.')
     }
   }
 
-  const handleCancelShare = async (id: string) => {
-    try {
-      await call('cancelDropCode', { id })
-      refresh()
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to cancel share.')
-    }
+  const handleOpenDirectSendPicker = () => {
+    call('listDevices')
+      .then((res: any) => {
+        if (Array.isArray(res)) {
+          setOnlineDevices(res)
+          setShowRecipientModal(true)
+        }
+      })
+      .catch(() => {
+        Alert.alert('Swarm Error', 'Could not query online devices.')
+      })
   }
 
-  const handleCopyCode = async (code: string, id: string) => {
-    setCopiedId(id)
+  const handleSendToDevice = async (device: any) => {
+    if (stagedItems.length === 0) return
+    setShowRecipientModal(false)
+
+    for (const item of stagedItems) {
+      call('sendFileOffer', {
+        targetDeviceId: device.id,
+        filePath: item.path,
+        fileName: item.name,
+        size: item.size,
+      }).catch((err: any) => {
+        Alert.alert('Beam Error', err?.message || 'Failed to dispatch file.')
+      })
+    }
+
+    setStagedItems([])
+    Alert.alert('Beaming Files', `Offered ${stagedItems.length} file(s) to ${device.name}.`)
+  }
+
+  const handleCopyCode = async (share: PendingShare) => {
+    const ok = await copyToClipboard(share.code)
+    setCopiedId(share.id)
     setTimeout(() => setCopiedId(null), 2000)
-    const ok = await copyToClipboard(code)
     Alert.alert(
-      'Code Copied',
-      ok ? `${code} copied to clipboard.` : 'Clipboard is not available on this build.'
+      'Drop Code Copied',
+      ok ? `${share.code} copied to clipboard.` : 'Clipboard is not available.'
     )
+  }
+
+  const handleShareNative = async (share: PendingShare) => {
+    try {
+      await NativeShare.share({
+        message: `MeshDrop Code: ${share.code}\nDownload ${share.filename} (${formatBytes(share.fileSize)}) peer-to-peer on MeshDrop.`,
+        title: 'MeshDrop Share Code',
+      })
+    } catch {}
+  }
+
+  const handleDeleteShare = (id: string) => {
+    call('deletePendingShare', { id })
+      .then(() => {
+        setActiveShares((prev) => prev.filter((s) => s.id !== id))
+      })
+      .catch(() => {})
   }
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.bg }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Hero Quantum Beam Card */}
-      <Card glow style={styles.heroCard}>
+      {/* Hero Dispatch Card */}
+      <Card glow style={[styles.heroCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <View style={styles.heroHeader}>
-          <View style={styles.heroIconBox}>
+          <View style={[styles.heroIconBox, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
             <Upload size={22} color={theme.primary} />
           </View>
           <View style={styles.flex1}>
-            <Text style={styles.heroTitle}>Quantum Beam</Text>
-            <Text style={styles.heroSub}>P2P Direct File & Folder Transmission</Text>
+            <Text style={[styles.heroTitle, { color: theme.text }]}>Beam Files & Folders</Text>
+            <Text style={[styles.heroSub, { color: theme.textSecondary }]}>
+              Stage payloads to share via Drop code or direct P2P stream
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.heroDescription}>
-          Stage files to beam directly to your paired mesh swarm, or generate a 1-time DROP code for air-drop to any remote device.
+        <Text style={[styles.heroDescription, { color: theme.textSecondary }]}>
+          Select documents, photos, videos, or folders to generate high-speed zero-knowledge transmission links.
         </Text>
 
         <View style={styles.heroActionsRow}>
           <Btn
-            label="Select Files to Beam"
+            label="Pick Files to Stage"
             icon={Plus}
             variant="primary"
-            onPress={handlePickAndStageFiles}
+            onPress={handlePickFiles}
             style={styles.flex1}
           />
         </View>
       </Card>
 
-      {/* Staged Basket Tray */}
-      {stagedFiles.length > 0 && (
-        <View style={{ marginBottom: 16 }}>
-          <StagingBasket
-            items={stagedFiles}
-            onRemoveItem={handleRemoveStagedItem}
-            onAddMore={handlePickAndStageFiles}
-            onSelectRecipient={() => setShowRecipientModal(true)}
-            onCreateDropCode={() => setShowCreateModal(true)}
-          />
-        </View>
+      {/* Staged Payload Basket */}
+      {stagedItems.length > 0 && (
+        <StagingBasket
+          items={stagedItems}
+          isOpen={basketOpen}
+          onToggleOpen={() => setBasketOpen(!basketOpen)}
+          onRemoveItem={handleRemoveStagedItem}
+          onClear={handleClearStaging}
+          onDirectSend={handleOpenDirectSendPicker}
+          onGenerateDropCode={handleGenerateDropCode}
+        />
       )}
 
-      {/* Active One-Time DROP Shares */}
-      <SectionHeader
-        title="Active Quantum DROP Codes"
-        badge={activeShares.length}
-      />
+      {/* Active Shares Section */}
+      <SectionHeader title="Active Drop Codes" badge={activeShares.length} />
 
-      {activeShares.length > 0 ? (
+      {activeShares.length === 0 ? (
+        <Card style={[styles.emptySharesCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <Layers size={32} color={theme.muted} style={{ marginBottom: 8 }} />
+          <Text style={[styles.emptySharesTitle, { color: theme.text }]}>No Active Drop Codes</Text>
+          <Text style={[styles.emptySharesSub, { color: theme.muted }]}>
+            Stage and share files to create persistent, single-use, or broadcast drop codes.
+          </Text>
+        </Card>
+      ) : (
         <View style={styles.sharesList}>
           {activeShares.map((share) => {
             const isCopied = copiedId === share.id
             return (
-              <Card key={share.id} style={styles.shareCard}>
+              <Card key={share.id} style={[styles.shareCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                 <View style={styles.shareHeader}>
-                  <View style={styles.fileIconBox}>
+                  <View style={[styles.fileIconBox, { backgroundColor: theme.primarySoft }]}>
                     <FileText size={18} color={theme.primary} />
                   </View>
                   <View style={styles.flex1}>
-                    <Text style={styles.shareFilename} numberOfLines={1}>
+                    <Text style={[styles.shareFilename, { color: theme.text }]} numberOfLines={1}>
                       {share.filename}
                     </Text>
-                    <Text style={styles.shareMeta}>
-                      {formatBytes(share.fileSize)} · Expires in {formatRemaining(share.expiresAt)}
+                    <Text style={[styles.shareMeta, { color: theme.textSecondary }]}>
+                      {formatBytes(share.fileSize)} · {share.downloadCount || 0} claims
                     </Text>
                   </View>
-
                   <TouchableOpacity
-                    onPress={() => handleCancelShare(share.id)}
                     style={styles.trashBtn}
+                    onPress={() => handleDeleteShare(share.id)}
                     activeOpacity={0.7}
                   >
                     <Trash2 size={15} color={theme.danger} />
                   </TouchableOpacity>
                 </View>
 
-                {/* Monospace Code Box */}
+                {/* Drop Code Pill */}
                 <TouchableOpacity
-                  style={styles.codePill}
+                  style={[styles.codePill, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
+                  onPress={() => handleCopyCode(share)}
                   activeOpacity={0.8}
-                  onPress={() => handleCopyCode(share.code, share.id)}
                 >
-                  <Text style={styles.codeText}>{share.code}</Text>
-                  <Copy size={12} color={theme.primary} />
+                  <Text style={[styles.codeText, { color: theme.primary }]}>{share.code}</Text>
+                  <Copy size={13} color={theme.primary} />
                 </TouchableOpacity>
 
-                {/* Action Buttons */}
+                {/* Share Actions */}
                 <View style={styles.shareActions}>
                   <Btn
                     label={isCopied ? 'Copied' : 'Copy'}
                     icon={isCopied ? Check : Copy}
                     variant="secondary"
                     size="sm"
-                    onPress={() => handleCopyCode(share.code, share.id)}
+                    onPress={() => handleCopyCode(share)}
                     style={styles.flex1}
                   />
                   <Btn
-                    label="QR Matrix"
+                    label="QR Code"
                     icon={QrCode}
                     variant="secondary"
                     size="sm"
-                    onPress={() => setQrCodeTarget(share.code)}
+                    onPress={() => setQrModalShare(share)}
                     style={styles.flex1}
                   />
                   <Btn
@@ -339,12 +315,7 @@ export function Share() {
                     icon={Share2}
                     variant="primary"
                     size="sm"
-                    onPress={() => {
-                      NativeShare.share({
-                        message: `MeshDrop Code: ${share.code}\nEnter this code in MeshDrop to download "${share.filename}".`,
-                        title: 'MeshDrop Code',
-                      }).catch(() => {})
-                    }}
+                    onPress={() => handleShareNative(share)}
                     style={styles.flex1}
                   />
                 </View>
@@ -352,111 +323,59 @@ export function Share() {
             )
           })}
         </View>
-      ) : (
-        <Card style={styles.emptySharesCard}>
-          <Text style={styles.emptySharesTitle}>No Active DROP Codes</Text>
-          <Text style={styles.emptySharesSub}>
-            Select files above to create an instant 1-time DROP code with automatic expiry.
-          </Text>
-        </Card>
       )}
 
-      {/* Recipient Selection Modal */}
+      {/* QR Code Presentation Modal */}
+      {qrModalShare && (
+        <QRCodeModal
+          visible={Boolean(qrModalShare)}
+          title="Drop QR Matrix"
+          subtitle={`Scan to claim "${qrModalShare.filename}" (${formatBytes(qrModalShare.fileSize)})`}
+          value={`DROP=${qrModalShare.code}`}
+          onClose={() => setQrModalShare(null)}
+        />
+      )}
+
+      {/* Direct Send Recipient Picker Modal */}
       <SimpleModal
         visible={showRecipientModal}
-        title="Target Peer Node"
-        subtitle="Select an online peer to beam staged payload"
+        title="Select Target Device"
+        subtitle={`Beam ${stagedItems.length} staged file(s) to a connected peer`}
         onClose={() => setShowRecipientModal(false)}
       >
         <View style={styles.recipientList}>
-          {pairedDevices.length > 0 ? (
-            pairedDevices.map((dev) => (
+          {onlineDevices.length === 0 ? (
+            <Text style={[styles.noDevicesText, { color: theme.muted }]}>
+              No peer devices discovered on the mesh swarm.
+            </Text>
+          ) : (
+            onlineDevices.map((dev) => (
               <TouchableOpacity
                 key={dev.id}
-                style={[styles.recipientItem, !dev.isOnline && styles.recipientItemOffline]}
-                disabled={!dev.isOnline || busy}
+                style={[
+                  styles.recipientItem,
+                  { backgroundColor: theme.bgElevated, borderColor: theme.border },
+                  !dev.isOnline && styles.recipientItemOffline,
+                ]}
                 onPress={() => handleSendToDevice(dev)}
+                disabled={!dev.isOnline}
                 activeOpacity={0.8}
               >
                 <View style={styles.recipientInfo}>
-                  <Text style={styles.recipientName}>{dev.name}</Text>
-                  <Text style={styles.recipientMeta}>
+                  <Text style={[styles.recipientName, { color: theme.text }]}>{dev.name}</Text>
+                  <Text style={[styles.recipientMeta, { color: theme.muted }]}>
                     {dev.os || 'Mesh Node'} · {dev.isOnline ? 'Online' : 'Offline'}
                   </Text>
                 </View>
-                <Send size={16} color={dev.isOnline ? theme.primary : theme.muted} />
+                <Pill
+                  label={dev.isOnline ? 'Beam Now' : 'Offline'}
+                  color={dev.isOnline ? theme.primary : theme.muted}
+                />
               </TouchableOpacity>
             ))
-          ) : (
-            <Text style={styles.noDevicesText}>
-              No paired devices found. Pair a device in the Swarm tab first or use a DROP code.
-            </Text>
           )}
         </View>
       </SimpleModal>
-
-      {/* Create DROP Code Modal */}
-      <SimpleModal
-        visible={showCreateModal}
-        title="Create Quantum DROP Code"
-        subtitle="Generate temporary peer access code"
-        onClose={() => setShowCreateModal(false)}
-      >
-        <View style={styles.createModalContent}>
-          <Text style={styles.inputLabel}>Payload Display Name (Optional)</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder={stagedFiles[0]?.name || 'Enter display name…'}
-            placeholderTextColor={theme.muted}
-            value={customFileName}
-            onChangeText={setCustomFileName}
-          />
-
-          <Text style={styles.inputLabel}>Expiration Window</Text>
-          <View style={styles.presetsRow}>
-            {(['15m', '1h', '24h'] as const).map((p) => {
-              const isActive = expirationPreset === p
-              return (
-                <TouchableOpacity
-                  key={p}
-                  style={[styles.presetChip, isActive && styles.presetChipActive]}
-                  onPress={() => setExpirationPreset(p)}
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.presetChipText,
-                      isActive && styles.presetChipTextActive,
-                    ]}
-                  >
-                    {p === '15m' ? '15 Minutes' : p === '1h' ? '1 Hour' : '24 Hours'}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-
-          <Btn
-            label="Generate DROP Code"
-            icon={Sparkles}
-            variant="primary"
-            onPress={handleCreateDropCode}
-            loading={busy}
-            style={{ marginTop: 16 }}
-          />
-        </View>
-      </SimpleModal>
-
-      {/* QR Code Viewer Modal */}
-      {qrCodeTarget && (
-        <QRCodeModal
-          visible={Boolean(qrCodeTarget)}
-          value={qrCodeTarget}
-          title="DROP Code Matrix"
-          subtitle="Scan with recipient device to initiate instant download"
-          onClose={() => setQrCodeTarget(null)}
-        />
-      )}
     </ScrollView>
   )
 }
@@ -467,7 +386,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
   },
   content: {
     padding: 16,
@@ -487,25 +405,20 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
   },
   heroTitle: {
-    color: theme.text,
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: -0.3,
   },
   heroSub: {
-    color: theme.textSecondary,
     fontSize: 12,
     marginTop: 1,
   },
   heroDescription: {
-    color: theme.textSecondary,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 16,
@@ -521,8 +434,6 @@ const styles = StyleSheet.create({
   shareCard: {
     padding: 14,
     marginBottom: 10,
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
   },
   shareHeader: {
     flexDirection: 'row',
@@ -534,17 +445,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 9,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   shareFilename: {
-    color: theme.text,
     fontSize: 14,
     fontWeight: '800',
   },
   shareMeta: {
-    color: theme.textSecondary,
     fontSize: 11,
     marginTop: 2,
     fontFamily: fonts.mono,
@@ -556,8 +464,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 8,
@@ -565,7 +471,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   codeText: {
-    color: theme.primary,
     fontSize: 14,
     fontWeight: '900',
     fontFamily: fonts.mono,
@@ -580,19 +485,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 24,
     paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
     borderStyle: 'dashed',
     marginTop: 6,
   },
   emptySharesTitle: {
-    color: theme.text,
     fontSize: 14,
     fontWeight: '800',
     marginBottom: 4,
   },
   emptySharesSub: {
-    color: theme.muted,
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 16,
@@ -605,10 +506,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 10,
     padding: 12,
   },
   recipientItemOffline: {
@@ -618,65 +517,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   recipientName: {
-    color: theme.text,
     fontSize: 14,
     fontWeight: '800',
   },
   recipientMeta: {
-    color: theme.muted,
     fontSize: 11,
     marginTop: 2,
   },
   noDevicesText: {
-    color: theme.muted,
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 16,
   },
-  createModalContent: {
-    paddingVertical: 8,
-  },
-  inputLabel: {
-    color: theme.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 6,
-    marginTop: 8,
-  },
-  textInput: {
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
-    borderWidth: 1,
-    borderRadius: theme.radiusSm,
-    padding: 12,
-    color: theme.text,
-    fontSize: 13,
-    marginBottom: 10,
-  },
-  presetsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  presetChip: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: theme.radiusSm,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: theme.border,
-    alignItems: 'center',
-  },
-  presetChipActive: {
-    backgroundColor: theme.primarySoft,
-    borderColor: theme.primary,
-  },
-  presetChipText: {
-    color: theme.muted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  presetChipTextActive: {
-    color: theme.primary,
-    fontWeight: '900',
-  },
 })
+

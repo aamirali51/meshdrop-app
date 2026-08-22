@@ -28,6 +28,8 @@ import {
   Zap,
   Radio,
   Sparkles,
+  Sun,
+  Moon,
 } from 'lucide-react-native'
 import { Devices } from './src/screens/Devices'
 import { Sync } from './src/screens/Sync'
@@ -46,7 +48,7 @@ import { startBridge, watchNetworkChanges, on, call, probeNetwork } from './src/
 import { initStore } from './src/store'
 import { checkForUpdate, refreshVersion } from './src/updater'
 import { getInitialShare, onShareReceived, clearInitialShare, type SharedPayload } from './src/shareTarget'
-import { theme, fonts } from './src/theme'
+import { ThemeProvider, useTheme, fonts } from './src/theme'
 import { Pill, PulseIndicator } from './src/components'
 import {
   startBackgroundSync,
@@ -76,7 +78,8 @@ const TABS: { key: TabType; label: string; icon: React.ElementType }[] = [
   { key: 'settings', label: 'Node', icon: SettingsIcon },
 ]
 
-function App(): React.JSX.Element {
+function MainApp(): React.JSX.Element {
+  const { theme, isDark, toggleTheme } = useTheme()
   const [currentTab, setCurrentTab] = useState<TabType>('devices')
   const [engineStatus, setEngineStatus] = useState<'starting' | 'ready' | 'error'>('starting')
   const [identity, setIdentity] = useState<any>(null)
@@ -264,10 +267,6 @@ function App(): React.JSX.Element {
         call('getIdentity').then((res: any) => {
           if (res) setIdentity(res)
         }).catch(() => {})
-        // Re-probe the active transport: ConnectivityManager callbacks are not
-        // replayed to a frozen process, so a switch that happened while the
-        // app was backgrounded would otherwise leave the swarm bound to a dead
-        // interface. checkNow() only emits when the signature changed.
         probeNetwork()
         if (!updatePrompted.current) {
           checkForUpdate().then((info) => {
@@ -307,25 +306,25 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
+      <StatusBar barStyle={theme.statusBarStyle} backgroundColor={theme.statusBarBg} />
 
       {/* Top Sentinel HUD Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.headerBg, borderBottomColor: theme.border }]}>
         <View style={styles.brandRow}>
-          <View style={styles.logoBadge}>
+          <View style={[styles.logoBadge, { backgroundColor: theme.primary, shadowColor: theme.primary }]}>
             <Zap size={17} color="#FFFFFF" />
           </View>
           <View>
             <View style={styles.brandTitleRow}>
-              <Text style={styles.brand}>MeshDrop</Text>
-              <View style={styles.versionPill}>
-                <Text style={styles.versionText}>
+              <Text style={[styles.brand, { color: theme.text }]}>MeshDrop</Text>
+              <View style={[styles.versionPill, { backgroundColor: theme.primarySoft }]}>
+                <Text style={[styles.versionText, { color: theme.primary }]}>
                   {appVersion ? `v${appVersion}` : ''}
                 </Text>
               </View>
             </View>
-            <Text style={styles.tagline} numberOfLines={1}>
+            <Text style={[styles.tagline, { color: theme.textSecondary }]} numberOfLines={1}>
               {identity?.name ? `${identity.name} · Encrypted P2P` : 'Decentralized P2P Mesh'}
             </Text>
           </View>
@@ -335,7 +334,7 @@ function App(): React.JSX.Element {
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => setCurrentTab('diagnostics')}
-            style={styles.statusPillBtn}
+            style={[styles.statusPillBtn, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
           >
             <View style={styles.statusInner}>
               <PulseIndicator
@@ -374,10 +373,23 @@ function App(): React.JSX.Element {
 
           <TouchableOpacity
             activeOpacity={0.7}
+            onPress={toggleTheme}
+            style={[styles.headerIconBtn, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
+          >
+            {isDark ? (
+              <Sun size={16} color={theme.warning} />
+            ) : (
+              <Moon size={16} color={theme.primary} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
             onPress={() => setCurrentTab('settings')}
             style={[
               styles.headerIconBtn,
-              currentTab === 'settings' && styles.headerIconBtnActive,
+              { backgroundColor: theme.bgElevated, borderColor: theme.border },
+              currentTab === 'settings' && { borderColor: theme.primary, backgroundColor: theme.primarySoft },
             ]}
           >
             <SettingsIcon
@@ -390,13 +402,13 @@ function App(): React.JSX.Element {
 
       {/* Error Banner */}
       {engineStatus === 'error' && !!errorMessage && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorBannerText}>⚠️ {errorMessage}</Text>
+        <View style={[styles.errorBanner, { backgroundColor: theme.dangerBg, borderColor: theme.dangerBorder }]}>
+          <Text style={[styles.errorBannerText, { color: theme.danger }]}>⚠️ {errorMessage}</Text>
         </View>
       )}
 
       {/* Screen Body */}
-      <View style={styles.body}>
+      <View style={[styles.body, { backgroundColor: theme.bg }]}>
         {currentTab === 'devices' && <Devices identity={identity} />}
         {currentTab === 'share' && <Share />}
         {currentTab === 'receive' && <Receive />}
@@ -407,7 +419,6 @@ function App(): React.JSX.Element {
         {currentTab === 'settings' && <Settings identity={identity} />}
       </View>
 
-      {/* Global Transfer Approval Dialog */}
       <TransferApprovalDialog
         visible={Boolean(pendingApproval)}
         transfer={pendingApproval}
@@ -416,16 +427,12 @@ function App(): React.JSX.Element {
         onClose={() => setPendingApproval(null)}
       />
 
-      {/* Global Non-Intrusive Floating Transfer Pill */}
       <FloatingTransferPill onExpand={() => setCurrentTab('activity')} />
 
-      {/* Global Optional "Update available" Modal (store-free APK updater) */}
       <UpdateAvailableModal />
 
-      {/* Global "What's New" Changelog Modal (shown once per version update) */}
       <WhatsNewModal />
 
-      {/* Global Native Share Target Modal (System Share Sheet Receiver) */}
       <ShareTargetModal
         visible={Boolean(incomingShare)}
         payload={incomingShare}
@@ -437,7 +444,16 @@ function App(): React.JSX.Element {
 
       {/* Floating Luminous Bottom Navigation Dock */}
       <View style={styles.dockContainer}>
-        <View style={styles.dockBar}>
+        <View
+          style={[
+            styles.dockBar,
+            {
+              backgroundColor: theme.dockBg,
+              borderColor: theme.border,
+              shadowColor: theme.shadowLg?.shadowColor || '#000',
+            },
+          ]}
+        >
           {TABS.map((tab) => {
             const isActive = currentTab === tab.key
             const IconComponent = tab.icon
@@ -446,14 +462,9 @@ function App(): React.JSX.Element {
                 key={tab.key}
                 activeOpacity={0.75}
                 onPress={() => setCurrentTab(tab.key)}
-                style={[styles.dockItem, isActive && styles.dockItemActive]}
+                style={[styles.dockItem, isActive && { backgroundColor: theme.primarySoft }]}
               >
-                <View
-                  style={[
-                    styles.dockIconBox,
-                    isActive && styles.dockIconBoxActive,
-                  ]}
-                >
+                <View style={styles.dockIconBox}>
                   <IconComponent
                     size={16}
                     color={isActive ? theme.primary : theme.muted}
@@ -462,7 +473,8 @@ function App(): React.JSX.Element {
                 <Text
                   style={[
                     styles.dockLabel,
-                    isActive && styles.dockLabelActive,
+                    { color: theme.muted },
+                    isActive && { color: theme.primary, fontWeight: '900' },
                   ]}
                 >
                   {tab.label}
@@ -476,10 +488,17 @@ function App(): React.JSX.Element {
   )
 }
 
+export default function App(): React.JSX.Element {
+  return (
+    <ThemeProvider>
+      <MainApp />
+    </ThemeProvider>
+  )
+}
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.bg,
   },
   header: {
     flexDirection: 'row',
@@ -488,9 +507,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 12,
-    borderBottomColor: theme.border,
     borderBottomWidth: 1,
-    backgroundColor: '#FFFFFF',
   },
   brandRow: {
     flexDirection: 'row',
@@ -501,10 +518,8 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: theme.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -515,25 +530,21 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   brand: {
-    color: theme.text,
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: -0.4,
   },
   versionPill: {
-    backgroundColor: theme.primarySoft,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
   },
   versionText: {
-    color: theme.primary,
     fontSize: 9,
     fontWeight: '900',
     fontFamily: fonts.mono,
   },
   tagline: {
-    color: theme.textSecondary,
     fontSize: 10.5,
     fontWeight: '600',
     marginTop: 1,
@@ -544,12 +555,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statusPillBtn: {
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
     paddingVertical: 4,
     paddingHorizontal: 9,
-    borderRadius: theme.radiusFull,
+    borderRadius: 9999,
   },
   statusInner: {
     flexDirection: 'row',
@@ -565,28 +574,19 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 9,
-    backgroundColor: theme.bgElevated,
     borderWidth: 1,
-    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerIconBtnActive: {
-    borderColor: theme.primary,
-    backgroundColor: theme.primarySoft,
   },
   body: {
     flex: 1,
   },
   errorBanner: {
-    backgroundColor: theme.dangerBg,
-    borderColor: theme.dangerBorder,
     borderBottomWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   errorBannerText: {
-    color: theme.danger,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -598,15 +598,12 @@ const styles = StyleSheet.create({
   },
   dockBar: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusLg,
+    borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 4,
     justifyContent: 'space-around',
     alignItems: 'center',
-    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -619,9 +616,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 12,
   },
-  dockItemActive: {
-    backgroundColor: theme.primarySoft,
-  },
   dockIconBox: {
     width: 28,
     height: 22,
@@ -629,19 +623,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
   },
-  dockIconBoxActive: {
-    backgroundColor: 'transparent',
-  },
   dockLabel: {
-    color: theme.muted,
     fontSize: 9,
     fontWeight: '700',
     marginTop: 2,
   },
-  dockLabelActive: {
-    color: theme.primary,
-    fontWeight: '900',
-  },
 })
 
-export default App

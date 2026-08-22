@@ -14,9 +14,9 @@ import {
 } from 'lucide-react-native'
 import RNFS from 'react-native-fs'
 import { SimpleModal, Btn } from '../components'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
-const CURRENT_VERSION = '1.0.38'
+const CURRENT_VERSION = '1.0.39'
 const VERSION_FILE_PATH = `${RNFS.DocumentDirectoryPath}/.meshdrop_version`
 
 const FEATURES = [
@@ -38,6 +38,7 @@ const FEATURES = [
 ]
 
 export function WhatsNewModal() {
+  const { theme } = useTheme()
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -76,13 +77,13 @@ export function WhatsNewModal() {
           {FEATURES.map((item, idx) => {
             const IconComp = item.icon
             return (
-              <View key={idx} style={styles.itemRow}>
-                <View style={styles.iconBox}>
+              <View key={idx} style={[styles.itemRow, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
+                <View style={[styles.iconBox, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
                   <IconComp size={20} color={theme.primary} />
                 </View>
                 <View style={styles.flex1}>
-                  <Text style={styles.itemTitle}>{item.title}</Text>
-                  <Text style={styles.itemDesc}>{item.desc}</Text>
+                  <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
+                  <Text style={[styles.itemDesc, { color: theme.textSecondary }]}>{item.desc}</Text>
                 </View>
               </View>
             )
@@ -117,10 +118,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
-    borderRadius: theme.radiusSm,
+    borderRadius: 10,
     padding: 12,
     marginBottom: 10,
   },
@@ -128,20 +127,16 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
   },
   itemTitle: {
-    color: theme.text,
     fontSize: 13.5,
     fontWeight: '800',
     marginBottom: 3,
   },
   itemDesc: {
-    color: theme.textSecondary,
     fontSize: 11.5,
     lineHeight: 16,
   },
@@ -149,3 +144,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 })
+

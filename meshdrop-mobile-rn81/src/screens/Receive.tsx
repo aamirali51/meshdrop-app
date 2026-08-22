@@ -26,15 +26,15 @@ import { call, on } from '../bridge'
 import {
   Card,
   Btn,
-  Pill,
 } from '../components'
 import { QRScannerModal } from '../components/QRScannerModal'
 import { DropPreviewModal, type ClaimPreview } from '../components/DropPreviewModal'
 import { formatCodeInput } from '../utils/formatCode'
 import { getClipboardText } from '../clipboard'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 export function Receive() {
+  const { theme } = useTheme()
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
@@ -69,122 +69,119 @@ export function Receive() {
     }
   }, [])
 
-  const handleClaimWithCode = async (targetCode: string) => {
-    const clean = targetCode.trim().toUpperCase()
-    if (!clean) return
+  const handleClaimWithCode = async (claimCode: string) => {
+    const cleanCode = claimCode.trim().toUpperCase()
+    if (!cleanCode) {
+      setError('Please enter a valid 8-character drop code')
+      return
+    }
+
     setBusy(true)
-    setMsg('')
     setError('')
+    setMsg('Locating drop topic on Hyperswarm…')
+
     try {
-      await call('claimDropCode', { code: clean })
-      setMsg(`Code "${clean}" verified! Direct P2P transfer started.`)
-      setCode('')
-      setDetectedClipboardCode(null)
-    } catch (e: any) {
-      setError(e?.message || 'Could not claim the drop code.')
-      Alert.alert('Claim Failed', e?.message || 'Could not verify code.')
+      const res: any = await call('claimDrop', { code: cleanCode })
+      if (res?.preview) {
+        setClaimPreview(res.preview)
+        setMsg('')
+      } else if (res?.accepted) {
+        setMsg(`Claim verified! Inbound payload: ${res.fileName || 'file(s)'}`)
+        setCode('')
+        setDetectedClipboardCode(null)
+      } else {
+        setMsg('Claim dispatched. Connecting to peer stream…')
+        setCode('')
+        setDetectedClipboardCode(null)
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Could not locate payload with this Drop code.')
+      setMsg('')
     } finally {
       setBusy(false)
     }
   }
 
-  const handleConfirmPreview = async (selectedIndices: number[]) => {
-    if (!claimPreview) return
-    try {
-      await call('confirmClaimDownload', {
-        shareId: claimPreview.shareId,
-        selectedIndices
-      })
-      setMsg(`Downloading ${selectedIndices.length} file(s) from ${claimPreview.code}`)
-      setClaimPreview(null)
-    } catch (e: any) {
-      Alert.alert('Download Error', e?.message || 'Could not start download.')
-    }
-  }
-
-  const handleCancelPreview = async () => {
-    if (!claimPreview) return
-    try {
-      await call('cancelClaimDownload', {
-        shareId: claimPreview.shareId,
-        code: claimPreview.code
-      })
-    } catch {}
-    setClaimPreview(null)
-  }
-
   const handleClaim = () => handleClaimWithCode(code)
 
-  const handleScanCode = (scannedValue: string) => {
+  const handleScanSuccess = (scannedValue: string) => {
     let clean = scannedValue.trim().toUpperCase()
-    if (clean.includes('CODE=')) {
-      const match = clean.match(/CODE=([A-Z0-9-]+)/i)
+    if (clean.includes('DROP=')) {
+      const match = clean.match(/DROP=([A-Z0-9-]+)/i)
       if (match && match[1]) clean = match[1]
     }
     const formatted = formatCodeInput(clean)
     setCode(formatted)
+    setShowScanner(false)
     handleClaimWithCode(formatted)
+  }
+
+  const handleAcceptPreview = () => {
+    if (!claimPreview) return
+    call('acceptClaimPreview', { shareId: claimPreview.shareId })
+      .then(() => {
+        setClaimPreview(null)
+        setMsg('Download initiated from peer swarm.')
+      })
+      .catch((err: any) => {
+        Alert.alert('Download Error', err?.message || 'Failed to start payload download.')
+      })
   }
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.bg }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* Smart Clipboard Code Detection Banner */}
+      {/* Smart Clipboard Sniffer Bar */}
       {detectedClipboardCode && (
-        <TouchableOpacity
-          style={styles.clipboardBanner}
-          onPress={() => {
-            setCode(detectedClipboardCode)
-            handleClaimWithCode(detectedClipboardCode)
-          }}
-          activeOpacity={0.8}
-        >
-          <View style={styles.clipboardIconBox}>
-            <Sparkles size={16} color={theme.primary} />
+        <View style={[styles.clipboardSniffer, { backgroundColor: theme.bgCard, borderColor: theme.primary + '35' }]}>
+          <View style={[styles.clipboardIconBox, { backgroundColor: theme.primarySoft }]}>
+            <ClipboardCheck size={18} color={theme.primary} />
           </View>
           <View style={styles.flex1}>
-            <Text style={styles.clipboardTitle}>Drop Code in Clipboard</Text>
-            <Text style={styles.clipboardCode}>{detectedClipboardCode}</Text>
+            <Text style={[styles.clipboardTitle, { color: theme.textSecondary }]}>Detected Drop Code in Clipboard</Text>
+            <Text style={[styles.clipboardCode, { color: theme.primary }]}>{detectedClipboardCode}</Text>
           </View>
-          <View style={styles.clipboardActionBtn}>
+          <TouchableOpacity
+            style={[styles.clipboardActionBtn, { backgroundColor: theme.primary }]}
+            onPress={() => {
+              setCode(detectedClipboardCode)
+              handleClaimWithCode(detectedClipboardCode)
+            }}
+            activeOpacity={0.8}
+          >
             <Text style={styles.clipboardActionText}>Claim Now</Text>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
       )}
 
-      {/* Hero Claim Card */}
-      <Card glow style={styles.heroCard}>
+      {/* Hero Card */}
+      <Card glow style={[styles.heroCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <View style={styles.heroHeader}>
-          <View style={styles.heroIconBox}>
-            <Download size={22} color={theme.primary} />
+          <View style={[styles.heroIconBox, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
+            <ArrowDownToLine size={22} color={theme.primary} />
           </View>
           <View style={styles.flex1}>
-            <Text style={styles.heroTitle}>Claim Drop Code</Text>
-            <Text style={styles.heroSub}>Direct Serverless P2P Reception</Text>
+            <Text style={[styles.heroTitle, { color: theme.text }]}>Claim Drop Payload</Text>
+            <Text style={[styles.heroSub, { color: theme.muted }]}>
+              Enter a drop code or scan a matrix to download
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.heroDescription}>
-          Enter an 8-character Drop Code from the sender or scan their QR code to stream files directly to this device with end-to-end encryption.
+        <Text style={[styles.heroDescription, { color: theme.textSecondary }]}>
+          MeshDrop codes allow serverless, peer-to-peer file downloads across any device on your Wi-Fi or DHT swarm with end-to-end encryption.
         </Text>
 
-        <Btn
-          label="Scan Drop QR Code"
-          icon={Camera}
-          variant="secondary"
-          onPress={() => setShowScanner(true)}
-          style={{ marginBottom: 16 }}
-        />
-
+        {/* Input Box */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Drop Code</Text>
-          <View style={styles.inputBoxWrap}>
+          <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Drop Code</Text>
+          <View style={[styles.inputBoxWrap, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
             <TextInput
-              style={styles.input}
-              placeholder="DROP-XXXX-XXXX"
+              style={[styles.input, { color: theme.text }]}
+              placeholder="e.g. DROP-4A82-9B1C"
               placeholderTextColor={theme.muted}
               value={code}
               onChangeText={(t) => setCode(formatCodeInput(t))}
@@ -194,57 +191,67 @@ export function Receive() {
           </View>
         </View>
 
-        <Btn
-          label="Claim & Start Download"
-          icon={Zap}
-          variant="primary"
-          disabled={!code.trim() || busy}
-          loading={busy}
-          onPress={handleClaim}
-          size="lg"
-        />
+        {/* Action Buttons */}
+        <View style={styles.btnRow}>
+          <Btn
+            label="Scan Camera"
+            icon={Camera}
+            variant="secondary"
+            onPress={() => setShowScanner(true)}
+            style={styles.flex1}
+          />
+          <Btn
+            label={busy ? 'Connecting…' : 'Claim Payload'}
+            icon={Download}
+            variant="primary"
+            onPress={handleClaim}
+            disabled={!code.trim() || busy}
+            loading={busy}
+            style={styles.flex1}
+          />
+        </View>
 
-        {/* Success / Error Feedback */}
+        {/* Feedback Banners */}
         {!!msg && (
-          <View style={styles.successBanner}>
-            <Check size={16} color={theme.success} />
-            <Text style={styles.successText}>{msg}</Text>
+          <View style={[styles.successBanner, { backgroundColor: theme.successBg, borderColor: theme.successBorder }]}>
+            <Check size={14} color={theme.success} />
+            <Text style={[styles.successText, { color: theme.success }]}>{msg}</Text>
           </View>
         )}
 
         {!!error && (
-          <View style={styles.errorBanner}>
-            <AlertCircle size={16} color={theme.danger} />
-            <Text style={styles.errorText}>{error}</Text>
+          <View style={[styles.errorBanner, { backgroundColor: theme.dangerBg, borderColor: theme.dangerBorder }]}>
+            <AlertCircle size={14} color={theme.danger} />
+            <Text style={[styles.errorText, { color: theme.danger }]}>{error}</Text>
           </View>
         )}
       </Card>
 
-      {/* Security & Protocol Safeguards Card */}
-      <Card style={styles.infoCard}>
+      {/* Info Card */}
+      <Card style={[styles.infoCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <View style={styles.infoHeader}>
-          <ShieldCheck size={18} color={theme.primary} />
-          <Text style={styles.infoTitle}>P2P Transfer Security</Text>
+          <ShieldCheck size={16} color={theme.primary} />
+          <Text style={[styles.infoTitle, { color: theme.text }]}>Zero-Knowledge Transfer</Text>
         </View>
 
         <View style={styles.bulletRow}>
-          <View style={styles.bulletDot} />
-          <Text style={styles.bulletText}>
-            End-to-End Encrypted via Noise Protocol Handshake.
+          <View style={[styles.bulletDot, { backgroundColor: theme.primary }]} />
+          <Text style={[styles.bulletText, { color: theme.textSecondary }]}>
+            Files transfer directly between devices over local Wi-Fi or DHT holepunching.
           </Text>
         </View>
 
         <View style={styles.bulletRow}>
-          <View style={styles.bulletDot} />
-          <Text style={styles.bulletText}>
-            Direct stream over local Wi-Fi or Hyperswarm DHT without cloud relay.
+          <View style={[styles.bulletDot, { backgroundColor: theme.primary }]} />
+          <Text style={[styles.bulletText, { color: theme.textSecondary }]}>
+            Data never touches cloud servers, storage buckets, or intermediary relays unencrypted.
           </Text>
         </View>
 
         <View style={styles.bulletRow}>
-          <View style={styles.bulletDot} />
-          <Text style={styles.bulletText}>
-            One-time single-use codes auto-expire after transfer completion.
+          <View style={[styles.bulletDot, { backgroundColor: theme.primary }]} />
+          <Text style={[styles.bulletText, { color: theme.textSecondary }]}>
+            Once the sender closes the session, the temporary drop code expires immediately.
           </Text>
         </View>
       </Card>
@@ -253,15 +260,15 @@ export function Receive() {
       <QRScannerModal
         visible={showScanner}
         onClose={() => setShowScanner(false)}
-        onScan={handleScanCode}
+        onScanSuccess={handleScanSuccess}
       />
 
-      {/* Folder & Multi-File Perusal Modal */}
+      {/* Drop Preview Modal */}
       <DropPreviewModal
-        visible={!!claimPreview}
+        visible={Boolean(claimPreview)}
         preview={claimPreview}
-        onConfirm={handleConfirmPreview}
-        onCancel={handleCancelPreview}
+        onAccept={handleAcceptPreview}
+        onDecline={() => setClaimPreview(null)}
       />
     </ScrollView>
   )
@@ -273,45 +280,42 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
   },
   content: {
     padding: 16,
     paddingBottom: 90,
   },
-  clipboardBanner: {
+  btnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  clipboardSniffer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: theme.primarySoft,
-    borderColor: 'rgba(79, 70, 229, 0.25)',
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
     marginBottom: 14,
+    gap: 10,
   },
   clipboardIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   clipboardTitle: {
-    color: theme.textSecondary,
     fontSize: 11,
     fontWeight: '700',
   },
   clipboardCode: {
-    color: theme.primary,
     fontSize: 14,
     fontWeight: '900',
     fontFamily: fonts.mono,
     letterSpacing: 0.5,
   },
   clipboardActionBtn: {
-    backgroundColor: theme.primary,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
@@ -335,24 +339,19 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
   },
   heroTitle: {
-    color: theme.text,
     fontSize: 17,
     fontWeight: '900',
   },
   heroSub: {
-    color: theme.muted,
     fontSize: 12,
     marginTop: 2,
   },
   heroDescription: {
-    color: theme.textSecondary,
     fontSize: 12.5,
     lineHeight: 18,
     marginBottom: 16,
@@ -361,21 +360,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputLabel: {
-    color: theme.textSecondary,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 6,
   },
   inputBoxWrap: {
-    backgroundColor: theme.bgElevated,
-    borderColor: theme.border,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
   },
   input: {
     height: 48,
-    color: theme.text,
     fontSize: 15,
     fontWeight: '800',
     fontFamily: fonts.mono,
@@ -385,15 +380,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: theme.successBg,
-    borderColor: theme.successBorder,
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
     marginTop: 14,
   },
   successText: {
-    color: theme.success,
     fontSize: 12,
     fontWeight: '700',
     flex: 1,
@@ -402,15 +394,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: theme.dangerBg,
-    borderColor: theme.dangerBorder,
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
     marginTop: 14,
   },
   errorText: {
-    color: theme.danger,
     fontSize: 12,
     fontWeight: '700',
     flex: 1,
@@ -425,7 +414,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   infoTitle: {
-    color: theme.text,
     fontSize: 13.5,
     fontWeight: '800',
   },
@@ -439,11 +427,9 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: theme.primary,
     marginTop: 6,
   },
   bulletText: {
-    color: theme.textSecondary,
     fontSize: 12,
     lineHeight: 17,
     flex: 1,

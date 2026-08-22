@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, Alert } from 'react-native'
 import { SimpleModal, Btn } from '../components'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import {
   subscribeUpdate,
   isUpdaterSupported,
@@ -19,6 +19,7 @@ import {
 } from '../updater'
 
 export function UpdateAvailableModal() {
+  const { theme } = useTheme()
   const [state, setState] = useState<UpdateState | null>(null)
 
   useEffect(() => {
@@ -85,19 +86,19 @@ export function UpdateAvailableModal() {
     >
       {isDownloading ? (
         <View>
-          <Text style={styles.progressLabel}>{state.progress}%</Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.max(4, state.progress)}%` }]} />
+          <Text style={[styles.progressLabel, { color: theme.primary }]}>{state.progress}%</Text>
+          <View style={[styles.progressTrack, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}>
+            <View style={[styles.progressFill, { width: `${Math.max(4, state.progress)}%`, backgroundColor: theme.primary }]} />
           </View>
-          <Text style={styles.hint}>
+          <Text style={[styles.hint, { color: theme.muted }]}>
             The new APK is being downloaded. You will be asked to confirm the
             install by Android when it finishes.
           </Text>
         </View>
       ) : info && state.phase !== 'error' ? (
         <View>
-          {!!info.notes && <Text style={styles.notes}>{info.notes}</Text>}
-          <Text style={styles.hint}>
+          {!!info.notes && <Text style={[styles.notes, { color: theme.text }]}>{info.notes}</Text>}
+          <Text style={[styles.hint, { color: theme.muted }]}>
             Installing will open the Android installer. Since this app isn't
             published to an app store, you'll see a confirmation from Android
             before the update applies.
@@ -109,7 +110,7 @@ export function UpdateAvailableModal() {
         </View>
       ) : (
         <View>
-          <Text style={styles.errorText}>
+          <Text style={[styles.errorText, { color: theme.danger }]}>
             {state.error || 'Something went wrong checking for the update.'}
           </Text>
           <View style={styles.actions}>
@@ -124,7 +125,6 @@ export function UpdateAvailableModal() {
 
 const styles = StyleSheet.create({
   progressLabel: {
-    color: theme.primary,
     fontSize: 24,
     fontWeight: '900',
     fontFamily: 'monospace',
@@ -134,30 +134,24 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.bgElevated,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: theme.border,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: theme.primary,
     borderRadius: 4,
   },
   notes: {
-    color: theme.text,
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 12,
   },
   hint: {
-    color: theme.muted,
     fontSize: 12,
     lineHeight: 18,
     marginBottom: 18,
   },
   errorText: {
-    color: theme.danger,
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 18,
@@ -170,3 +164,4 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 })
+

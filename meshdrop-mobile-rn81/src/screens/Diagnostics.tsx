@@ -27,11 +27,11 @@ import {
   Btn,
   Pill,
   SectionHeader,
-  PulseIndicator,
 } from '../components'
-import { theme, fonts } from '../theme'
+import { useTheme, fonts } from '../theme'
 
 export function Diagnostics({ identity }: { identity?: any }) {
+  const { theme } = useTheme()
   const [status, setStatus] = useState<any>(null)
   const [paths, setPaths] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -58,208 +58,205 @@ export function Diagnostics({ identity }: { identity?: any }) {
       const s: any = await call('getStatus')
       setStatus(s)
       const peers = s?.peerCount || 0
-      const lat = s?.avgLatencyMs != null ? `${s.avgLatencyMs}ms` : '--'
-      setPingResult(`Swarm telemetry · ${peers} peer(s) · ${lat} avg latency`)
+      setPingResult(
+        `Swarm synchronized: ${peers} peer${peers === 1 ? '' : 's'} linked on DHT.`
+      )
     } catch {
-      setPingResult('Swarm telemetry unavailable')
+      setPingResult('Telemetry refresh failed.')
     }
   }
 
+  const isRunning = status?.running !== false
+
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.bg }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
-      <View style={styles.headerRow}>
-        <View style={styles.flex1}>
-          <Text style={styles.title}>Network Sentinel</Text>
-          <Text style={styles.subtitle}>
-            Hyperswarm DHT, UDX transport, and Hypercore storage telemetry
+      <View style={styles.header}>
+        <View>
+          <Text style={[styles.title, { color: theme.text }]}>Swarm Diagnostics</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Real-time telemetry, Hyperswarm DHT, & engine status
           </Text>
         </View>
         <TouchableOpacity
-          style={styles.refreshBtn}
+          style={[styles.refreshBtn, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}
           onPress={refresh}
-          disabled={loading}
           activeOpacity={0.7}
         >
-          <RefreshCw size={15} color={theme.primary} />
+          <RefreshCw size={16} color={theme.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* Overview Stat Grid */}
+      {/* Top Stat Grid */}
       <View style={styles.statGrid}>
         <StatCard
-          label="Swarm Peers"
-          value={status?.peerCount || 0}
-          icon={Radio}
-          color={theme.success}
+          label="Engine Status"
+          value={isRunning ? 'Online' : 'Stopped'}
+          icon={Activity}
+          color={isRunning ? theme.success : theme.danger}
         />
         <StatCard
-          label="Engine Status"
-          value={
-            status?.ready
-              ? 'Ready'
-              : status === null
-              ? 'Booting…'
-              : status?.connected
-              ? 'Mesh Connected'
-              : 'Starting'
-          }
-          icon={Activity}
+          label="Swarm Peers"
+          value={status?.peerCount ?? 0}
+          icon={Radio}
           color={theme.primary}
         />
         <StatCard
-          label="Protocol"
-          value="v2.0"
-          icon={Cpu}
+          label="DHT State"
+          value={status?.dhtReady ? 'Ready' : 'Binding'}
+          icon={Zap}
           color={theme.accent}
         />
       </View>
 
-      {/* Node Cryptographic Identity Card */}
-      <Card glow style={styles.card}>
+      {/* Node Cryptographic Identity */}
+      <SectionHeader title="Cryptographic Identity" />
+      <Card style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <View style={styles.cardTitleRow}>
-          <ShieldCheck size={18} color={theme.primary} />
-          <Text style={styles.cardTitle}>Cryptographic Node Identity</Text>
+          <ShieldCheck size={16} color={theme.primary} />
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Noise Sovereign Key</Text>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Node Name</Text>
-          <Text style={styles.infoValue}>{identity?.name || 'Local Mesh Node'}</Text>
+        <View style={[styles.infoRow, { borderBottomColor: theme.hairline }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Node Name</Text>
+          <Text style={[styles.infoValue, { color: theme.text }]}>{identity?.name || status?.deviceName || '—'}</Text>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Device ID</Text>
-          <Text style={styles.infoValueMono}>
-            {identity?.id ? `${identity.id.slice(0, 16)}…` : 'Generating…'}
-          </Text>
+        <View style={[styles.infoRow, { borderBottomColor: theme.hairline }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Pairing Code</Text>
+          <Text style={[styles.infoValueMono, { color: theme.primary }]}>{identity?.pairingCode || '—'}</Text>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Noise Public Key</Text>
-          <Text style={styles.infoValueMono}>
-            {identity?.publicKey ? `${identity.publicKey.slice(0, 16)}…` : 'Generating…'}
+        <View style={[styles.infoRow, { borderBottomColor: 'transparent' }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Public Key (Ed25519/Noise)</Text>
+          <Text
+            style={[styles.infoValueMono, { color: theme.primary }]}
+            numberOfLines={1}
+            ellipsizeMode="middle"
+          >
+            {identity?.publicKey || status?.publicKey || '—'}
           </Text>
         </View>
       </Card>
 
-      {/* Hyperswarm DHT Telemetry Card */}
-      <Card style={styles.card}>
+      {/* Network & Protocol Transport */}
+      <SectionHeader title="Network Transport" />
+      <Card style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <View style={styles.cardTitleRow}>
-          <Radio size={18} color={theme.primary} />
-          <Text style={styles.cardTitle}>Hyperswarm DHT Swarm</Text>
+          <Server size={16} color={theme.accent} />
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Protocol Subsystem</Text>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Transport Layer</Text>
-          <Pill label="UDX Encrypted Sockets" color={theme.primary} dot />
+        <View style={[styles.infoRow, { borderBottomColor: theme.hairline }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Discovery Subsystem</Text>
+          <Pill label="Hyperswarm DHT" color={theme.accent} />
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>NAT Traversal</Text>
-          <Text style={styles.infoValue}>
-            {status?.relayStatus === 'Enabled' ? 'DHT Relay assisted' : 'Direct UDP holepunching'}
-          </Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Avg Latency</Text>
-          <Text style={styles.infoValueMono}>
-            {status?.avgLatencyMs != null ? `${status.avgLatencyMs}ms` : '--'}
-          </Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Packet Loss</Text>
-          <Text style={styles.infoValueMono}>
-            {status?.packetLossPercent != null ? `${status.packetLossPercent}%` : '--'}
-          </Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Relay Status</Text>
-          <Text style={styles.infoValue}>
-            {status?.relayStatus === 'Enabled' ? 'Enabled' : status ? status.relayStatus : '--'}
-          </Text>
-        </View>
-
-        <View style={styles.actionsRow}>
-          <Btn
-            label="Refresh Swarm Stats"
-            icon={Zap}
-            variant="primary"
-            size="sm"
-            onPress={handleRefresh}
-            style={styles.flex1}
+        <View style={[styles.infoRow, { borderBottomColor: theme.hairline }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>DHT Bootstrap State</Text>
+          <Pill
+            label={status?.dhtReady ? 'Bootstrapped' : 'Connecting'}
+            color={status?.dhtReady ? theme.success : theme.warning}
+            dot
           />
         </View>
 
-        {pingResult && (
-          <View style={styles.pingResultBox}>
-            <Text style={styles.pingResultText}>{pingResult}</Text>
-          </View>
-        )}
+        <View style={[styles.infoRow, { borderBottomColor: theme.hairline }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Peer Discovery Rate</Text>
+          <Text style={[styles.infoValue, { color: theme.text }]}>
+            {status?.peerCount ? `${status.peerCount} Active Nodes` : 'Listening on DHT…'}
+          </Text>
+        </View>
+
+        <View style={[styles.infoRow, { borderBottomColor: 'transparent' }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Relay Connection</Text>
+          <Pill
+            label={status?.relayConnected ? 'Relay Active' : 'Direct P2P'}
+            color={status?.relayConnected ? theme.purple : theme.primary}
+          />
+        </View>
       </Card>
 
-      {/* Local Storage System Card */}
-      <Card style={styles.card}>
+      {/* Storage & Environment Paths */}
+      <SectionHeader title="Storage & Environment" />
+      <Card style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <View style={styles.cardTitleRow}>
-          <HardDrive size={18} color={theme.success} />
-          <Text style={styles.cardTitle}>Hypercore Storage Matrix</Text>
+          <HardDrive size={16} color={theme.purple} />
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Filesystem Layout</Text>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Storage Root</Text>
-          <Text style={styles.infoValueMono} numberOfLines={1}>
-            {paths?.userData || 'Internal Mesh DB'}
+        <View style={[styles.infoRow, { borderBottomColor: theme.hairline }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Downloads Inbound</Text>
+          <Text
+            style={[styles.infoValueMono, { color: theme.primary }]}
+            numberOfLines={1}
+            ellipsizeMode="head"
+          >
+            {paths?.downloads || '/storage/emulated/0/Download'}
           </Text>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Downloads Destination</Text>
-          <Text style={styles.infoValueMono} numberOfLines={1}>
-            {paths?.downloads || 'Device Storage/Downloads'}
+        <View style={[styles.infoRow, { borderBottomColor: 'transparent' }]}>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Engine Core DB</Text>
+          <Text
+            style={[styles.infoValueMono, { color: theme.primary }]}
+            numberOfLines={1}
+            ellipsizeMode="head"
+          >
+            {paths?.appData || paths?.downloads || 'Internal Engine Store'}
           </Text>
         </View>
+      </Card>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Integrity Protocol</Text>
-          <Text style={styles.infoValue}>Hypercore Merkle Verification</Text>
+      {/* Test / Trigger Actions */}
+      <Card style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <View style={styles.cardTitleRow}>
+          <Cpu size={16} color={theme.primary} />
+          <Text style={[styles.cardTitle, { color: theme.text }]}>Engine Telemetry Ping</Text>
         </View>
+
+        <Btn
+          label={loading ? 'Probing Hyperswarm…' : 'Ping Hyperswarm DHT'}
+          icon={Zap}
+          variant="primary"
+          onPress={handleRefresh}
+          loading={loading}
+        />
+
+        {pingResult && (
+          <View style={[styles.pingResultBox, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
+            <Text style={[styles.pingResultText, { color: theme.primary }]}>{pingResult}</Text>
+          </View>
+        )}
       </Card>
     </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
-  flex1: {
-    flex: 1,
-  },
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
   },
   content: {
     padding: 16,
     paddingBottom: 90,
   },
-  headerRow: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
   },
   title: {
-    color: theme.text,
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: -0.3,
   },
   subtitle: {
-    color: theme.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
@@ -267,11 +264,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: theme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
   },
   statGrid: {
     flexDirection: 'row',
@@ -281,8 +276,6 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     marginBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderColor: theme.border,
   },
   cardTitleRow: {
     flexDirection: 'row',
@@ -291,7 +284,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   cardTitle: {
-    color: theme.text,
     fontSize: 14.5,
     fontWeight: '800',
   },
@@ -301,20 +293,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 7,
     borderBottomWidth: 1,
-    borderBottomColor: theme.hairline,
   },
   infoLabel: {
-    color: theme.muted,
     fontSize: 12,
     fontWeight: '700',
   },
   infoValue: {
-    color: theme.text,
     fontSize: 12.5,
     fontWeight: '800',
   },
   infoValueMono: {
-    color: theme.primary,
     fontSize: 11.5,
     fontWeight: '800',
     fontFamily: fonts.mono,
@@ -326,8 +314,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   pingResultBox: {
-    backgroundColor: theme.primarySoft,
-    borderColor: 'rgba(79, 70, 229, 0.25)',
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
@@ -335,7 +321,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pingResultText: {
-    color: theme.primary,
     fontSize: 12,
     fontWeight: '800',
     fontFamily: fonts.mono,
