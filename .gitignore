@@ -2,7 +2,8 @@
 out/
 dist/
 renderer/dist/
-data/
+/data/
+!renderer/src/data/**
 Output/
 scratch/
 
