@@ -72,7 +72,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         const s = delta.speed || 0
         const cur = prev[delta.syncLibraryId]
         if (cur && cur.progress === p && cur.speed === s) return prev
-        return { ...prev, [delta.syncLibraryId]: { filename: (cur && cur.filename) || 'file', direction: (cur && cur.direction) || 'receive', progress: p, speed: s } }
+        return { ...prev, [delta.syncLibraryId]: { filename: delta.filename || (cur && cur.filename) || 'file', direction: delta.direction || (cur && cur.direction) || 'receive', progress: p, speed: s } }
       })
     })
     const unsubStarted = on(EVENTS.TRANSFER_STARTED || 'transfer.started', (t: any) => {
