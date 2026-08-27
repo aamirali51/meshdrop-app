@@ -23,6 +23,7 @@ import {
   Layers,
   Trash2,
   RotateCcw,
+  Film,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
 import {
@@ -32,6 +33,7 @@ import {
   Pill,
   SectionHeader,
 } from '../components'
+import { WatchPartyModal } from '../components/WatchPartyModal'
 import { useTheme, fonts, theme } from '../theme'
 
 interface Transfer {
@@ -88,6 +90,13 @@ export function Transfers() {
   const { theme } = useTheme()
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'failed'>('all')
+  const [watchPartyModal, setWatchPartyModal] = useState<{
+    visible: boolean
+    transferId?: string
+    roomTitle?: string
+    roomCode?: string
+    isHost?: boolean
+  }>({ visible: false })
 
   const refresh = useCallback(() => {
     call('listTransfers')
@@ -440,6 +449,30 @@ export function Transfers() {
                     </TouchableOpacity>
                   </View>
                 )}
+
+                {/* Mesh Party Action for Video Files */}
+                {/\.(mp4|mkv|mov|webm|ts|m4v|avi)$/i.test(item.filename || '') && (
+                  <View style={[styles.actionsRow, { borderTopColor: theme.hairline }]}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: 'rgba(129, 140, 248, 0.15)' }]}
+                      onPress={() =>
+                        setWatchPartyModal({
+                          visible: true,
+                          transferId: item.id,
+                          roomTitle: item.filename,
+                          roomCode: `PARTY-${item.id.slice(0, 8).toUpperCase()}`,
+                          isHost: isSend,
+                        })
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Film size={12} color="#818CF8" />
+                      <Text style={[styles.actionBtnText, { color: '#818CF8', fontWeight: '700' }]}>
+                        Mesh Party
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </Card>
             )
           })}
@@ -453,6 +486,15 @@ export function Transfers() {
           </Text>
         </Card>
       )}
+
+      <WatchPartyModal
+        visible={watchPartyModal.visible}
+        transferId={watchPartyModal.transferId}
+        roomTitle={watchPartyModal.roomTitle}
+        roomCode={watchPartyModal.roomCode}
+        isHost={watchPartyModal.isHost}
+        onClose={() => setWatchPartyModal({ visible: false })}
+      />
     </ScrollView>
   )
 }

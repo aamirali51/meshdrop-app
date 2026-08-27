@@ -44,6 +44,7 @@ import { FloatingTransferPill } from './src/components/FloatingTransferPill'
 import { UpdateAvailableModal } from './src/components/UpdateAvailableModal'
 import { WhatsNewModal } from './src/components/WhatsNewModal'
 import { ShareTargetModal } from './src/components/ShareTargetModal'
+import { WatchPartyModal } from './src/components/WatchPartyModal'
 import { startBridge, watchNetworkChanges, on, call, probeNetwork } from './src/bridge'
 import { initStore } from './src/store'
 import { checkForUpdate, refreshVersion } from './src/updater'
@@ -92,6 +93,14 @@ function MainApp(): React.JSX.Element {
   // System Share Target State
   const [incomingShare, setIncomingShare] = useState<SharedPayload | null>(null)
   const appState = useRef<AppStateStatus>(AppState.currentState)
+  const [watchParty, setWatchParty] = useState<{
+    visible: boolean
+    roomCode?: string
+    roomTitle?: string
+    transferId?: string
+    filePath?: string
+    isHost?: boolean
+  }>({ visible: false })
   // Avoid re-surfacing the update prompt on every background-resume.
   const updatePrompted = useRef(false)
 
@@ -277,6 +286,19 @@ function MainApp(): React.JSX.Element {
       appState.current = nextAppState
     })
 
+    const unsubWatch = on('watch:state:updated', (data: any) => {
+      if (data && (data.roomCode || data.action === 'play')) {
+        setWatchParty((prev) => ({
+          visible: true,
+          roomCode: data.roomCode || prev.roomCode || 'PARTY-MESH-P2P',
+          roomTitle: data.roomTitle || prev.roomTitle || 'Synchronized Mesh Stream',
+          transferId: data.transferId || prev.transferId,
+          filePath: data.filePath || prev.filePath,
+          isHost: false,
+        }))
+      }
+    })
+
     return () => {
       unsubEngine()
       unsubs.forEach((u) => u())
@@ -291,6 +313,7 @@ function MainApp(): React.JSX.Element {
       unsubSyncScan()
       unsubSyncUpToDate()
       unsubSyncInvite()
+      unsubWatch()
       subAppState.remove()
     }
   }, [])
@@ -440,6 +463,16 @@ function MainApp(): React.JSX.Element {
           setIncomingShare(null)
           clearInitialShare()
         }}
+      />
+
+      <WatchPartyModal
+        visible={watchParty.visible}
+        roomCode={watchParty.roomCode}
+        roomTitle={watchParty.roomTitle}
+        transferId={watchParty.transferId}
+        filePath={watchParty.filePath}
+        isHost={watchParty.isHost}
+        onClose={() => setWatchParty({ visible: false })}
       />
 
       {/* Floating Luminous Bottom Navigation Dock */}

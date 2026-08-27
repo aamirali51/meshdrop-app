@@ -188,7 +188,9 @@ async function boot() {
       'sync:error',
       'sync:invite:received',
       'sync:phase',
-      'claim:preview'
+      'claim:preview',
+      'watch:state:updated',
+      'watch:peer:status'
     ]
     for (const evt of EVENTS) {
       engine.on(evt, (data) => {
@@ -442,6 +444,12 @@ function call(method, params) {
           return { ok: false, error: String((err && err.message) || err) }
         }
       )
+    case 'broadcastWatchState':
+    case 'watchStateBroadcast':
+    case 'watch.broadcastState':
+      return engine.broadcastWatchState ? engine.broadcastWatchState(params) : { success: true }
+    case 'setPlayheadByte':
+      return engine.setPlayheadByte ? engine.setPlayheadByte(params?.transferId, params?.byteOffset) : false
     default:
       throw new Error('Unknown method: ' + method)
     }
