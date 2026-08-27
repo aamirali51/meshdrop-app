@@ -36,8 +36,7 @@ import { call, on } from '../bridge'
 import { copyToClipboard } from '../clipboard'
 import { useTheme, fonts } from '../theme'
 import { Pill, Btn } from '../components'
-
-const NativeVideoView = requireNativeComponent<any>('MeshDropVideoView')
+import { NativeVideoView } from './NativeVideoView'
 
 interface WatchPartyModalProps {
   visible: boolean

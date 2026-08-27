@@ -40,8 +40,8 @@ import { copyToClipboard } from '../clipboard'
 import { pickFiles } from '../filePicker'
 import { useTheme, fonts } from '../theme'
 import { Card, Btn, Pill, SectionHeader } from '../components'
+import { NativeVideoView } from '../components/NativeVideoView'
 
-const NativeVideoView = requireNativeComponent<any>('MeshDropVideoView')
 const REACTIONS = ['🍿', '🔥', '👏', '❤️', '😂']
 
 interface DiscoveredRoom {
