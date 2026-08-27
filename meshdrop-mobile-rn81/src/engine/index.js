@@ -280,8 +280,11 @@ function call(method, params) {
       return true
     case 'getPaths':
       return { storageDir, downloadsDir }
-    case 'pairWithCode': {
-      const pairCode = params && params.code
+    case 'pairDevice':
+    case 'pair':
+    case 'pairWithCode':
+    case 'devices.pair': {
+      const pairCode = params && (params.code || params.pairingCode)
       const pairStart = Date.now()
       console.log('[MDLOG pair] === PAIRING ATTEMPT START === code:', pairCode)
       console.log('[MDLOG pair] engine status before pair:', JSON.stringify(engine.getStatus()))
@@ -295,8 +298,13 @@ function call(method, params) {
         throw pairErr
       }
     }
+    case 'rotatePairingCode':
+    case 'devices.rotateCode':
+      return typeof engine.rotatePairingCode === 'function' ? engine.rotatePairingCode() : engine.getIdentity()
+    case 'createMultiDropShare':
     case 'createDropCode':
-    case 'createDropShare': {
+    case 'createDropShare':
+    case 'files.createCode': {
       if (params && params.filePath) {
         try {
           const fs = require('bare-fs')
@@ -324,18 +332,27 @@ function call(method, params) {
       return engine.createDropShare(params)
     }
     case 'listPendingShares':
+    case 'files.listCodes':
       return engine.listPendingShares()
+    case 'claimDrop':
     case 'claimDropCode':
+    case 'claimFile':
+    case 'files.claimCode':
       return engine.claimDropCode(params?.code, { interactive: true })
     case 'confirmClaimDownload':
       return engine.confirmClaimDownload(params)
     case 'cancelClaimDownload':
       return engine.cancelClaimDownload(params)
+    case 'deletePendingShare':
     case 'cancelCode':
     case 'cancelDropCode':
     case 'cancelShare':
     case 'cancelDropShare':
+    case 'cancelPendingShare':
+    case 'files.cancelCode':
       return engine.cancelPendingShare({ id: params?.id, code: params?.code })
+    case 'copyToClipboard':
+      return { success: true }
     case 'listTransfers':
       return engine.listTransfers()
     case 'getStorageStats':
@@ -360,10 +377,14 @@ function call(method, params) {
       return engine.clearTransfers(params)
     case 'deleteTransfer':
       return engine.deleteTransfer(params?.id)
+    case 'sendFileOffer':
     case 'sendOffer':
     case 'sendTransfer':
     case 'offerFile':
-      return engine.offerFile(params.recipientPeerId || params.peerId, params.filePath)
+    case 'transfers.offer': {
+      const targetId = params?.targetDeviceId || params?.recipientPeerId || params?.peerId
+      return engine.offerFile(targetId, params?.filePath)
+    }
     case 'createSyncLibrary':
     case 'addSyncLibrary': {
       let targetDir = (params && (params.path || params.localPath)) || null
