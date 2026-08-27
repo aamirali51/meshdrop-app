@@ -9,7 +9,10 @@ import {
   Animated,
   PanResponder,
   Alert,
+  requireNativeComponent,
+  Platform,
 } from 'react-native'
+import RNFS from 'react-native-fs'
 import {
   Play,
   Pause,
@@ -34,6 +37,8 @@ import { copyToClipboard } from '../clipboard'
 import { useTheme, fonts } from '../theme'
 import { Pill, Btn } from '../components'
 
+const NativeVideoView = requireNativeComponent<any>('MeshDropVideoView')
+
 interface WatchPartyModalProps {
   visible: boolean
   onClose: () => void
@@ -54,9 +59,11 @@ export function WatchPartyModal({
   isHost = false,
 }: WatchPartyModalProps) {
   const { theme } = useTheme()
+  const [videoSrc, setVideoSrc] = useState<string>('')
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(120)
+  const [seekTarget, setSeekTarget] = useState(0)
   const [syncWithHost, setSyncWithHost] = useState(true)
   const [copied, setCopied] = useState(false)
   const [showControls, setShowControls] = useState(true)
@@ -64,6 +71,53 @@ export function WatchPartyModal({
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSeeking, setIsSeeking] = useState(false)
+
+  // Resolve local or staging video file path
+  useEffect(() => {
+    if (!visible) {
+      setVideoSrc('')
+      setIsPlaying(false)
+      return
+    }
+
+    let active = true
+
+    const resolveVideo = async () => {
+      if (filePath) {
+        setVideoSrc(filePath)
+        return
+      }
+
+      if (transferId) {
+        const downloadDir = '/storage/emulated/0/Download'
+        const stagingDir = `${downloadDir}/.p2p-staging/${transferId}`
+        try {
+          if (await RNFS.exists(stagingDir)) {
+            const files = await RNFS.readDir(stagingDir)
+            const part = files.find((f) => f.name.endsWith('.part'))
+            if (active && part) {
+              setVideoSrc(part.path)
+              return
+            }
+          }
+        } catch {}
+
+        try {
+          const list = await call('listTransfers').catch(() => [])
+          const match = Array.isArray(list) ? list.find((t: any) => t.id === transferId) : null
+          if (active && match?.destPath) {
+            setVideoSrc(match.destPath)
+            return
+          }
+        } catch {}
+      }
+    }
+
+    resolveVideo()
+    return () => {
+      active = false
+    }
+  }, [visible, filePath, transferId])
 
   const playbackTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -163,6 +217,7 @@ export function WatchPartyModal({
     resetControlsTimer()
     const next = Math.max(0, Math.min(duration, currentTime + delta))
     setCurrentTime(next)
+    setSeekTarget(next)
     broadcast('seek', next)
   }
 
@@ -214,21 +269,44 @@ export function WatchPartyModal({
           style={[styles.viewport, isFullscreen && styles.fullscreenViewport]}
           onPress={resetControlsTimer}
         >
-          {/* Ambient Glow */}
-          <View style={styles.ambientGlow} />
-
-          {/* Video Placeholder / Player Frame */}
-          <View style={styles.videoSurface}>
-            <Film size={56} color="#475569" />
-            <Text style={styles.streamTitle} numberOfLines={1}>
-              {roomTitle || 'Streaming P2P Video Track'}
-            </Text>
-            <View style={styles.streamPill}>
-              <Text style={styles.streamPillText}>
-                {transferId ? `Transfer: ${transferId.slice(0, 14)}...` : 'Direct Local Loopback'}
+          {/* Native Video Player */}
+          {videoSrc ? (
+            <NativeVideoView
+              style={StyleSheet.absoluteFillObject}
+              src={videoSrc}
+              paused={!isPlaying}
+              muted={isMuted}
+              seek={seekTarget}
+              onReady={(e: any) => {
+                if (e.nativeEvent?.duration > 0) {
+                  setDuration(e.nativeEvent.duration)
+                }
+              }}
+              onProgress={(e: any) => {
+                if (!isSeeking && typeof e.nativeEvent?.currentTime === 'number') {
+                  setCurrentTime(e.nativeEvent.currentTime)
+                  if (e.nativeEvent?.duration > 0) {
+                    setDuration(e.nativeEvent.duration)
+                  }
+                }
+              }}
+              onError={(e: any) => {
+                console.warn('[WatchParty] Video playback error:', e.nativeEvent?.error)
+              }}
+            />
+          ) : (
+            <View style={styles.videoSurface}>
+              <Film size={56} color="#475569" />
+              <Text style={styles.streamTitle} numberOfLines={1}>
+                {roomTitle || 'Streaming P2P Video Track'}
               </Text>
+              <View style={styles.streamPill}>
+                <Text style={styles.streamPillText}>
+                  {transferId ? `Transfer: ${transferId.slice(0, 14)}...` : 'Connecting to Stream...'}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Controls Overlay */}
           {showControls && (

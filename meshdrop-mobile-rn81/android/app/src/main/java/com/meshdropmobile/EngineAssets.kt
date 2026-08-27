@@ -125,6 +125,6 @@ class MeshDropEngineAssetsPackage : ReactPackage {
       )
 
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
-      emptyList()
+      listOf(MeshDropVideoViewManager())
 }
 
