@@ -27,6 +27,7 @@ import { TransferApprovalDialog } from '@/components/TransferApprovalDialog'
 import { SyncInviteModal } from '@/components/SyncInviteModal'
 import { DropPreviewModal } from '@/components/DropPreviewModal'
 import { WhatsNewModal } from '@/components/WhatsNewModal'
+import { WatchPartyModal } from '@/components/WatchPartyModal'
 import { useDevices } from '@/hooks/useDevices'
 
 const pages: Record<string, React.FC> = {
@@ -44,7 +45,7 @@ const pages: Record<string, React.FC> = {
 export function MainLayout() {
   const { currentRoute } = useNavigation()
   const { isQRCodeModalOpen, toggleQRCodeModal } = useDevices()
-  const { openShareWith } = useShares()
+  const { openShareWith, watchParty, closeWatchParty } = useShares()
   const { toast } = useToast()
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0)
@@ -125,6 +126,17 @@ export function MainLayout() {
       <WhatsNewModal />
       <TransferApprovalDialog />
       <SyncInviteModal />
+      {watchParty && (
+        <WatchPartyModal
+          open={!!watchParty.open}
+          onClose={closeWatchParty}
+          transferId={watchParty.transferId}
+          filePath={watchParty.filePath}
+          roomCode={watchParty.roomCode}
+          roomTitle={watchParty.roomTitle}
+          isHost={watchParty.isHost}
+        />
+      )}
 
       {/* Drag-and-drop share overlay: pointer-events-none so the drop still
           lands on the window root above. */}

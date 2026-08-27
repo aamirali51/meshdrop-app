@@ -66,6 +66,8 @@ export declare const METHODS: {
   readonly DRIVE_SHARE_DECLINE: 'drive.shareDecline'
   readonly CHECK_FOR_UPDATES: 'system.checkForUpdates'
   readonly CLIPBOARD_SEND: 'clipboard.send'
+  readonly WATCH_STATE_BROADCAST: 'watch.stateBroadcast'
+  readonly STREAM_URL_GET: 'stream.getUrl'
 }
 
 export declare const EVENTS: {
@@ -112,6 +114,8 @@ export declare const EVENTS: {
   readonly UPDATED: 'updated'
   readonly SETTINGS_UPDATED: 'settings.updated'
   readonly SPEEDTEST_PROGRESS: 'speedtest.progress'
+  readonly LAN_DISCOVERY_KEY: 'lan.discoveryKey'
+  readonly WATCH_STATE_CHANGED: 'watch.stateChanged'
 }
 
 export declare function isProtocolCompatible(msg: unknown): boolean

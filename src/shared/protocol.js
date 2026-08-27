@@ -71,7 +71,9 @@ const METHODS = {
   DRIVE_SHARE_DECLINE: 'drive.shareDecline',
   CHECK_FOR_UPDATES: 'system.checkForUpdates',
   CLIPBOARD_SEND: 'clipboard.send',
-  LAN_DISCOVERY_PEER: 'lan.discoveryPeer'
+  LAN_DISCOVERY_PEER: 'lan.discoveryPeer',
+  WATCH_STATE_BROADCAST: 'watch.stateBroadcast',
+  STREAM_URL_GET: 'stream.getUrl'
 }
 
 const EVENTS = {
@@ -119,7 +121,8 @@ const EVENTS = {
   UPDATED: 'updated',
   SETTINGS_UPDATED: 'settings.updated',
   SPEEDTEST_PROGRESS: 'speedtest.progress',
-  LAN_DISCOVERY_KEY: 'lan.discoveryKey'
+  LAN_DISCOVERY_KEY: 'lan.discoveryKey',
+  WATCH_STATE_CHANGED: 'watch.stateChanged'
 }
 
 // A message is compatible when it is unversioned (legacy v1) or exactly matches

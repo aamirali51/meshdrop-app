@@ -13,7 +13,8 @@ import {
   FileUp,
   Link2,
   ShieldCheck,
-  FolderOpen
+  FolderOpen,
+  Film
 } from 'lucide-react'
 import { useTransfers } from '@/hooks/useTransfers'
 import { useDevices } from '@/hooks/useDevices'
@@ -24,6 +25,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ContextMenu } from '@/components/ContextMenu'
 import { ConfirmDialog } from '@/components/Modal'
+import { WatchPartyModal } from '@/components/WatchPartyModal'
 import type { TransferRecord, TransferStatus } from '@/types'
 
 const STATUS_LABEL: Record<TransferStatus, string> = {
@@ -62,7 +64,7 @@ export function Transfers() {
     sendFileToDevice
   } = useTransfers()
   const { devices } = useDevices()
-  const { toggleDropCodeModal } = useShares()
+  const { toggleDropCodeModal, openWatchParty } = useShares()
   const { toast } = useToast()
   const [targetId, setTargetId] = useState('')
   const [sending, setSending] = useState(false)
@@ -102,9 +104,34 @@ export function Transfers() {
     }
   }
 
+  const isVideoFile = (name?: string) => {
+    return /\.(mp4|mkv|webm|avi|mov|m4v|ts|m2ts|mts|flv|wmv)$/i.test(name || '')
+  }
+
   const actionButtons = (t: TransferRecord) => {
+    const isVideo = isVideoFile(t.filename)
+    if (t.status === 'pending_approval') {
+      return (
+        <div className='flex items-center gap-1.5'>
+          <Button
+            size='sm'
+            className='h-7 px-2 text-[10px] font-bold'
+            onClick={() => acceptIncomingTransfer(t.id)}
+          >
+            <Download className='mr-1 h-3 w-3' /> Accept
+          </Button>
+          <Button
+            size='sm'
+            variant='ghost'
+            className='h-7 px-2 text-[10px] font-bold text-destructive'
+            onClick={() => declineIncomingTransfer(t.id)}
+          >
+            <XCircle className='mr-1 h-3 w-3' /> Decline
+          </Button>
+        </div>
+      )
+    }
     if (t.status === 'waiting_peer') {
-      // A claimed DROP code whose host has not come online yet.
       return (
         <div className='flex items-center gap-1.5'>
           <Button
@@ -130,6 +157,25 @@ export function Transfers() {
     if (t.status === 'active') {
       return (
         <div className='flex items-center gap-1.5'>
+          {isVideo && (
+            <Button
+              size='sm'
+              variant='outline'
+              className='h-7 px-2 text-[10px] font-bold text-primary border-primary/40 bg-primary/10 hover:bg-primary/20'
+              title='Stream video playback now'
+              onClick={() => {
+                openWatchParty({
+                  transferId: t.id,
+                  filePath: t.filePath || t.destPath,
+                  roomTitle: t.filename,
+                  roomCode: t.claimCode,
+                  isHost: t.direction === 'send'
+                })
+              }}
+            >
+              <Film className='mr-1 h-3 w-3' /> Stream
+            </Button>
+          )}
           <Button
             size='sm'
             variant='outline'
@@ -209,6 +255,24 @@ export function Transfers() {
       const localPath = t.destPath || t.filePath
       return (
         <div className='flex items-center gap-1.5'>
+          {isVideo && (
+            <Button
+              size='sm'
+              variant='outline'
+              className='h-7 px-2 text-[10px] font-bold text-primary border-primary/40 bg-primary/10 hover:bg-primary/20'
+              title='Watch video'
+              onClick={() => {
+                setActiveWatchVideo({
+                  transferId: t.id,
+                  filePath: localPath,
+                  title: t.filename,
+                  roomCode: t.claimCode
+                })
+              }}
+            >
+              <Film className='mr-1 h-3 w-3' /> Watch
+            </Button>
+          )}
           {localPath && (
             <Button
               size='sm'

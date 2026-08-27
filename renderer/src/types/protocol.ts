@@ -1,13 +1,23 @@
 import * as shared from '@shared/protocol'
 
-export const METHODS = shared.METHODS
-export const EVENTS = shared.EVENTS
+const s = ((shared as any)?.default || shared) as typeof shared
 
-export const PROTOCOL_VERSION = shared.PROTOCOL_VERSION || '1.0'
-export const isProtocolCompatible = shared.isProtocolCompatible || (() => true)
+export const METHODS = {
+  ...(s.METHODS || {}),
+  WATCH_STATE_BROADCAST: s.METHODS?.WATCH_STATE_BROADCAST || 'watch.stateBroadcast',
+  STREAM_URL_GET: s.METHODS?.STREAM_URL_GET || 'stream.getUrl'
+} as typeof s.METHODS
 
-export type MethodName = (typeof METHODS)[keyof typeof METHODS]
-export type EventName = (typeof EVENTS)[keyof typeof EVENTS]
+export const EVENTS = {
+  ...(s.EVENTS || {}),
+  WATCH_STATE_CHANGED: s.EVENTS?.WATCH_STATE_CHANGED || 'watch.stateChanged'
+} as typeof s.EVENTS
+
+export const PROTOCOL_VERSION = s.PROTOCOL_VERSION || '1.0'
+export const isProtocolCompatible = s.isProtocolCompatible || (() => true)
+
+export type MethodName = (typeof METHODS)[keyof typeof METHODS] | string
+export type EventName = (typeof EVENTS)[keyof typeof EVENTS] | string
 
 export interface RequestMessage {
   type: 'request'

@@ -7,12 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/Modal'
 
 function normalizeCode(raw: string): string | null {
-  const clean = raw
+  const clean = (raw || '')
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
-  // Accept both the canonical "DROP-ABCD-EFGH" and a bare 8-char code.
-  const body = clean.startsWith('DROP') ? clean.slice(4) : clean
+  let body = clean.startsWith('DROP') ? clean.slice(4) : clean
+  if (body.startsWith('GRP')) {
+    body = body.slice(3)
+    if (body.length !== 8) return null
+    return `DROP-GRP-${body.slice(0, 4)}-${body.slice(4)}`
+  }
   if (body.length !== 8) return null
   return `DROP-${body.slice(0, 4)}-${body.slice(4)}`
 }

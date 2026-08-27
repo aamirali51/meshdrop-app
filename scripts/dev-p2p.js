@@ -35,11 +35,6 @@ async function launchInstance(name, storageDir) {
 
   const args = [
     electronCli,
-    // NOTE: do NOT pass --no-sandbox here — it fights with sandbox:true in
-    // BrowserWindow and causes the white-screen / webContents-destroyed bug
-    // on Electron 40 + Windows. The dialog workaround uses <input type="file">
-    // so native dialog sandbox issues are already bypassed.
-    '--disable-gpu',
     `--user-data-dir=${resolved}`,
     mainEntry,
     '--no-updates',

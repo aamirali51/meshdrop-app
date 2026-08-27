@@ -104,6 +104,7 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     engine.on('sync:invite:received', (d) => forward(EVENTS.SYNC_INVITE_RECEIVED, d))
     engine.on('sync:phase', (d) => forward(EVENTS.SYNC_PHASE, d))
     engine.on('claim:preview', (d) => forward(EVENTS.CLAIM_PREVIEW_RECEIVED, d))
+    engine.on('watch:state:updated', (d) => forward(EVENTS.WATCH_STATE_CHANGED, d))
     engine.on('notification:received', (n) => forward(EVENTS.NOTIFICATION_RECEIVED, n))
     engine.on('error', (err) => {
       if (err && err.code && err.code !== 'claim_rejected') {

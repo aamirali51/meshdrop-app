@@ -8,7 +8,7 @@
          replaces this meta tag with a strict CSP (see vite.config.ts). -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self' data: blob: ws://localhost:*; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none';"
+      content="default-src 'self' data: blob: ws://localhost:*; media-src 'self' http://127.0.0.1:* http://localhost:* data: blob:; connect-src 'self' http://127.0.0.1:* http://localhost:* ws://localhost:* ws://127.0.0.1:*; worker-src 'self' blob:; child-src 'self' blob:; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none';"
     />
     <title>MeshDrop</title>
   </head>

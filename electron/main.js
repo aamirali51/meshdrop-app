@@ -38,6 +38,10 @@ const protocol = name
 
 const appName = productName ?? name
 
+app.commandLine.appendSwitch('enable-gpu-rasterization')
+app.commandLine.appendSwitch('enable-zero-copy')
+app.commandLine.appendSwitch('ignore-gpu-blocklist')
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
 
 const cmd = command(
   appName,
@@ -439,7 +443,8 @@ async function createWindow() {
       // hidden windows' JS timers to ~1/min, so the 4s diagnostics poll (and
       // any other renderer timers) would stall while the window is hidden.
       backgroundThrottling: false,
-      devTools: !!process.env.PEAR_DEV_SERVER_URL
+      devTools: !!process.env.PEAR_DEV_SERVER_URL,
+      autoplayPolicy: 'no-user-gesture-required'
     }
   })
 
@@ -553,6 +558,10 @@ async function createWindow() {
 
   if (devServerUrl) {
     await win.loadURL(devServerUrl)
+    if (!isHiddenBoot) {
+      win.show()
+      win.focus()
+    }
     win.webContents.openDevTools()
   } else {
     // Build a real application menu (roles restore native shortcuts like

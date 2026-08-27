@@ -139,18 +139,21 @@ async function doCall(method: MethodName, params?: unknown): Promise<unknown> {
     return Promise.reject(new Error('MeshDrop P2P engine is only available in the desktop app'))
   }
 
-  // Timeouts account for relayed fallback connections: when direct UDP
-  // hole-punching is blocked, handshakes traverse a DHT relay and can take
-  // several seconds longer than a direct LAN/DHT connection.
+  // Timeouts account for large file staging and relayed fallback connections:
+  // when direct UDP hole-punching is blocked, handshakes traverse a DHT relay and
+  // can take several seconds longer than a direct LAN/DHT connection.
   const timeoutMs =
-    method.startsWith('transfers.start') || method.startsWith('transfers.resume')
-      ? 60000
+    method.startsWith('transfers.start') ||
+    method.startsWith('transfers.resume') ||
+    method.startsWith('files.createCode') ||
+    method.startsWith('files.claimCode')
+      ? 180000
       : method.endsWith('.list') ||
           method.endsWith('.status') ||
           method.endsWith('.get') ||
           method.endsWith('.getIdentity')
         ? 20000
-        : 30000
+        : 60000
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {

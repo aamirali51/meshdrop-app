@@ -9,7 +9,11 @@ import {
   ShieldCheck,
   FolderOpen,
   Folder,
-  QrCode
+  QrCode,
+  Radio,
+  Tv,
+  Film,
+  Sparkles
 } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useShares } from '@/hooks/useShares'
@@ -17,6 +21,7 @@ import { useTheme } from '@/hooks/useTheme'
 import { useToast } from '@/hooks/useToast'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/Modal'
+import { WatchPartyModal } from '@/components/WatchPartyModal'
 import { formatBytes } from '@/lib/format'
 import { buildShareLink, shareLinkMeta } from '@/lib/shareLinks'
 import type { PendingShare, PendingShareStatus } from '@/types'
@@ -99,11 +104,14 @@ export function DropCodeModal() {
     pendingShares,
     cancelShareCode,
     shareDraft,
-    clearShareDraft
+    clearShareDraft,
+    openWatchParty
   } = useShares()
   const { theme } = useTheme()
   const { toast } = useToast()
   const [source, setSource] = useState<PickedSource | null>(null)
+  const [shareMode, setShareMode] = useState<'standard' | 'watch_party'>('standard')
+  const [roomTitle, setRoomTitle] = useState('')
   const [preset, setPreset] = useState<ExpirationPreset>('30m')
   const [maxDownloads, setMaxDownloads] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -112,6 +120,7 @@ export function DropCodeModal() {
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [watchPartyOpen, setWatchPartyOpen] = useState(false)
   const [tick, setTick] = useState(0) // re-render driver for the countdown
 
   useEffect(() => {
@@ -254,12 +263,22 @@ export function DropCodeModal() {
     setLoading(true)
     setError('')
     try {
+      const isWatch = shareMode === 'watch_party'
       const params: {
         files?: PickedFile[]
         folderPath?: string
         expirationPreset: ExpirationPreset
         maxDownloads: number
-      } = { expirationPreset: preset, maxDownloads }
+        isGroup?: boolean
+        isWatchParty?: boolean
+        roomTitle?: string
+      } = {
+        expirationPreset: preset,
+        maxDownloads: isWatch ? 0 : maxDownloads,
+        isGroup: isWatch,
+        isWatchParty: isWatch,
+        roomTitle: isWatch ? (roomTitle.trim() || undefined) : undefined
+      }
       if (source.kind === 'files') params.files = source.files
       else params.folderPath = source.folderPath
       const result = (await createDropCode(params)) as DropShare
@@ -411,6 +430,24 @@ export function DropCodeModal() {
             End-to-end encrypted · Zero cloud relays · No pairing records required.
           </div>
 
+          {/* Launch Watch Party Player button if Watch Party mode or video file */}
+          {(share.isWatchParty || share.code.includes('GRP') || (source?.kind === 'files' && source.files.some(f => /\.(mp4|mkv|webm|avi|mov|m4v|ts|m2ts|mts|flv|wmv)$/i.test(f.filename)))) && (
+            <Button
+              onClick={() => {
+                openWatchParty({
+                  filePath: source?.kind === 'files' ? source.files[0]?.filePath : undefined,
+                  roomCode: share.code,
+                  roomTitle: share.roomTitle || share.filename,
+                  isHost: true
+                })
+              }}
+              className='w-full gap-2 bg-gradient-to-r from-primary via-accent to-primary font-bold text-white shadow-lg hover:brightness-110'
+            >
+              <Film className='h-4 w-4' />
+              Launch Watch Party Player
+            </Button>
+          )}
+
           <div className='flex w-full items-center gap-3 pt-1'>
             {shareStatus === 'waiting' || shareStatus === 'claimed' ? (
               <Button
@@ -433,6 +470,51 @@ export function DropCodeModal() {
       ) : (
         /* ── Setup: pick files/folder and choose limits ─────────────── */
         <div className='space-y-4'>
+          {/* Mode Switcher Tabs */}
+          <div className='grid grid-cols-2 gap-1.5 rounded-xl border border-border/60 bg-muted/20 p-1'>
+            <button
+              onClick={() => setShareMode('standard')}
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all ${
+                shareMode === 'standard'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Files className='h-3.5 w-3.5' />
+              Standard Drop
+            </button>
+            <button
+              onClick={() => setShareMode('watch_party')}
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all ${
+                shareMode === 'watch_party'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Film className='h-3.5 w-3.5' />
+              Watch Party / Swarm
+            </button>
+          </div>
+
+          {shareMode === 'watch_party' && (
+            <div className='space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3'>
+              <div className='flex items-center gap-1.5 text-xs font-bold text-primary'>
+                <Sparkles className='h-3.5 w-3.5' />
+                Multi-Peer Swarm & Watch Room
+              </div>
+              <p className='text-[11px] text-muted-foreground'>
+                Generates a multi-peer code (<span className='font-mono font-bold text-foreground'>DROP-GRP-...</span>) that allows multiple viewers to stream simultaneously with synchronized play/pause controls.
+              </p>
+              <input
+                type='text'
+                placeholder='Room / Movie Title (optional, e.g. Movie Night)'
+                value={roomTitle}
+                onChange={(e) => setRoomTitle(e.target.value)}
+                className='w-full rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none'
+              />
+            </div>
+          )}
+
           {pendingShares.filter((s) => s.status === 'waiting' || s.status === 'claimed').length >
             0 && (
             <div className='space-y-1.5'>
@@ -532,21 +614,25 @@ export function DropCodeModal() {
                 className='flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 bg-card/40 px-4 py-6 text-center transition-colors hover:border-primary/50 hover:bg-card/60'
               >
                 <Files className='h-8 w-8 text-muted-foreground/50' />
-                <span className='text-sm font-bold text-foreground'>Choose files to share</span>
+                <span className='text-sm font-bold text-foreground'>
+                  {shareMode === 'watch_party' ? 'Choose movie / video file' : 'Choose files to share'}
+                </span>
                 <span className='text-[11px] text-muted-foreground'>
-                  Select one or more files
+                  {shareMode === 'watch_party' ? 'Select video (MP4, MKV, WebM, etc.)' : 'Select one or more files'}
                 </span>
               </button>
-              <button
-                onClick={handleChooseFolder}
-                className='flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 bg-card/40 px-4 py-6 text-center transition-colors hover:border-primary/50 hover:bg-card/60'
-              >
-                <FolderOpen className='h-8 w-8 text-muted-foreground/50' />
-                <span className='text-sm font-bold text-foreground'>Share a folder</span>
-                <span className='text-[11px] text-muted-foreground'>
-                  Everything inside is included (up to 100 files)
-                </span>
-              </button>
+              {shareMode === 'standard' && (
+                <button
+                  onClick={handleChooseFolder}
+                  className='flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 bg-card/40 px-4 py-6 text-center transition-colors hover:border-primary/50 hover:bg-card/60'
+                >
+                  <FolderOpen className='h-8 w-8 text-muted-foreground/50' />
+                  <span className='text-sm font-bold text-foreground'>Share a folder</span>
+                  <span className='text-[11px] text-muted-foreground'>
+                    Everything inside is included (up to 100 files)
+                  </span>
+                </button>
+              )}
             </div>
           )}
 
@@ -571,26 +657,28 @@ export function DropCodeModal() {
             </div>
           </div>
 
-          <div className='space-y-2'>
-            <span className='block text-[10px] font-bold uppercase tracking-wider text-muted-foreground'>
-              Max Downloads
-            </span>
-            <div className='flex flex-wrap gap-1.5'>
-              {MAX_DOWNLOADS.map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => setMaxDownloads(d.value)}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
-                    maxDownloads === d.value
-                      ? 'bg-accent text-accent-foreground shadow-sm'
-                      : 'border border-border/60 bg-card/40 text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
+          {shareMode === 'standard' && (
+            <div className='space-y-2'>
+              <span className='block text-[10px] font-bold uppercase tracking-wider text-muted-foreground'>
+                Max Downloads
+              </span>
+              <div className='flex flex-wrap gap-1.5'>
+                {MAX_DOWNLOADS.map((d) => (
+                  <button
+                    key={d.value}
+                    onClick={() => setMaxDownloads(d.value)}
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
+                      maxDownloads === d.value
+                        ? 'bg-accent text-accent-foreground shadow-sm'
+                        : 'border border-border/60 bg-card/40 text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {error && <p className='text-xs font-medium text-destructive'>{error}</p>}
 
@@ -611,12 +699,24 @@ export function DropCodeModal() {
               ) : (
                 <>
                   <Link2 className='h-4 w-4' />
-                  Generate Code
+                  {shareMode === 'watch_party' ? 'Create Watch Room' : 'Generate Code'}
                 </>
               )}
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Embedded Watch Party Video Player */}
+      {share && (
+        <WatchPartyModal
+          open={watchPartyOpen}
+          onClose={() => setWatchPartyOpen(false)}
+          roomCode={share.code}
+          roomTitle={share.roomTitle || share.filename}
+          filePath={source?.kind === 'files' ? source.files[0]?.filePath : undefined}
+          isHost={true}
+        />
       )}
     </Modal>
   )

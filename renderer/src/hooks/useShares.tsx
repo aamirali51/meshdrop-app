@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
 import { useToast } from '@/hooks/useToast'
@@ -12,6 +12,21 @@ export interface ShareDraft {
   name?: string
 }
 
+export interface ActiveWatchParty {
+  open: boolean
+  transferId?: string
+  filePath?: string
+  roomCode?: string
+  roomTitle?: string
+  isHost?: boolean
+}
+
+function isVideoFile(filename?: string, fileType?: string) {
+  if (fileType && fileType.startsWith('video/')) return true
+  const ext = (filename || '').split('.').pop()?.toLowerCase()
+  return ['mp4', 'mkv', 'webm', 'mov', 'avi', 'ts', 'm4v', 'flv'].includes(ext || '')
+}
+
 interface SharesContextValue {
   pendingShares: PendingShare[]
   isDropCodeModalOpen: boolean
@@ -19,6 +34,7 @@ interface SharesContextValue {
   deepLinkCode: string
   shareDraft: ShareDraft | null
   claimPreview: ClaimPreview | null
+  watchParty: ActiveWatchParty | null
   toggleDropCodeModal: () => void
   toggleOneTimeReceiveModal: () => void
   clearDeepLinkCode: () => void
@@ -32,10 +48,15 @@ interface SharesContextValue {
     folderPath?: string
     expirationPreset: string
     maxDownloads: number
+    isGroup?: boolean
+    isWatchParty?: boolean
+    roomTitle?: string
   }) => Promise<unknown>
   claimFileWithCode: (code: string) => Promise<unknown>
   confirmClaimDownload: (params: { shareId: string; selectedIndices?: number[] }) => Promise<unknown>
   cancelClaimDownload: (params: { shareId: string; code?: string }) => Promise<unknown>
+  openWatchParty: (params: Omit<ActiveWatchParty, 'open'>) => void
+  closeWatchParty: () => void
 }
 
 const SharesContext = createContext<SharesContextValue | null>(null)
@@ -46,12 +67,22 @@ export function SharesProvider({ children }: { children: ReactNode }) {
   const [isDropCodeModalOpen, setIsDropCodeModalOpen] = useState(false)
   const [isOneTimeReceiveOpen, setIsOneTimeReceiveOpen] = useState(false)
   const [claimPreview, setClaimPreview] = useState<ClaimPreview | null>(null)
+  const [watchParty, setWatchParty] = useState<ActiveWatchParty | null>(null)
+  const lastClaimedCodeRef = useRef<string>('')
   // A DROP code arriving via deep link (meshdrop://drop/…) is stashed
   // here so OneTimeReceiveModal can pre-fill its input.
   const [deepLinkCode, setDeepLinkCode] = useState('')
   // Files/folder pre-selected elsewhere (drop zone, global drag-and-drop);
   // DropCodeModal consumes this when it opens.
   const [shareDraft, setShareDraft] = useState<ShareDraft | null>(null)
+
+  const openWatchParty = useCallback((params: Omit<ActiveWatchParty, 'open'>) => {
+    setWatchParty({ ...params, open: true })
+  }, [])
+
+  const closeWatchParty = useCallback(() => {
+    setWatchParty(null)
+  }, [])
 
   const refreshPendingShares = useCallback(() => {
     call(METHODS.FILES_LIST_PENDING)
@@ -78,6 +109,26 @@ export function SharesProvider({ children }: { children: ReactNode }) {
     const unsubClaimPreview = on(EVENTS.CLAIM_PREVIEW_RECEIVED, (preview: any) => {
       if (preview && preview.shareId) {
         setClaimPreview(preview)
+      }
+    })
+
+    const unsubTransferStarted = on(EVENTS.TRANSFER_STARTED, (t: any) => {
+      if (!t || !t.id) return
+      const isVideo = isVideoFile(t.filename, t.fileType)
+      const isClaimOrGroup =
+        t.isClaim ||
+        t.claimCode ||
+        t.isGroupDrop ||
+        (lastClaimedCodeRef.current &&
+          (lastClaimedCodeRef.current.includes('GRP') || isVideo))
+      if (isVideo && isClaimOrGroup && t.direction === 'receive') {
+        openWatchParty({
+          transferId: t.id,
+          roomTitle: t.filename,
+          roomCode: t.claimCode || lastClaimedCodeRef.current,
+          isHost: false
+        })
+        lastClaimedCodeRef.current = ''
       }
     })
 
@@ -147,16 +198,23 @@ export function SharesProvider({ children }: { children: ReactNode }) {
     folderPath?: string
     expirationPreset: string
     maxDownloads: number
+    isGroup?: boolean
+    isWatchParty?: boolean
+    roomTitle?: string
   }) => {
     return call(METHODS.FILES_CREATE_CODE, {
       files: params.files || undefined,
       folderPath: params.folderPath || undefined,
       expirationPreset: params.expirationPreset,
-      maxDownloads: params.maxDownloads
+      maxDownloads: params.maxDownloads,
+      isGroup: params.isGroup,
+      isWatchParty: params.isWatchParty,
+      roomTitle: params.roomTitle
     })
   }, [])
 
   const claimFileWithCode = useCallback((code: string) => {
+    lastClaimedCodeRef.current = code
     return call(METHODS.FILES_CLAIM_CODE, { code })
   }, [])
 
@@ -177,6 +235,7 @@ export function SharesProvider({ children }: { children: ReactNode }) {
         deepLinkCode,
         shareDraft,
         claimPreview,
+        watchParty,
         toggleDropCodeModal,
         toggleOneTimeReceiveModal,
         clearDeepLinkCode,
@@ -188,7 +247,9 @@ export function SharesProvider({ children }: { children: ReactNode }) {
         createDropCode,
         claimFileWithCode,
         confirmClaimDownload,
-        cancelClaimDownload
+        cancelClaimDownload,
+        openWatchParty,
+        closeWatchParty
       }}
     >
       {children}

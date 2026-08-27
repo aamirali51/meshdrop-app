@@ -139,6 +139,18 @@ export interface PendingShare {
   folderName?: string | null
   files?: PendingShareFile[]
   createdAt: number
+  isGroupDrop?: boolean
+  isWatchParty?: boolean
+  roomTitle?: string
+}
+
+export interface WatchState {
+  roomCode?: string
+  action: 'play' | 'pause' | 'seek'
+  positionSec: number
+  timestampMs?: number
+  buffering?: boolean
+  senderDevice?: { id?: string; name?: string } | null
 }
 
 export type TransferDirection = 'send' | 'receive'

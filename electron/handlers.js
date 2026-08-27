@@ -709,6 +709,33 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
     return { success: true, added }
   }
 
+  handlers[METHODS.WATCH_STATE_BROADCAST] = async (params) => {
+    if (!engine) return { success: false }
+    const res = engine.broadcastWatchState ? engine.broadcastWatchState(params) : { success: true }
+    emit(EVENTS.WATCH_STATE_CHANGED, {
+      ...params,
+      timestampMs: Date.now(),
+      senderDevice: engine.deviceIdentity ? { id: engine.deviceIdentity.id, name: engine.deviceIdentity.name } : null
+    })
+    return res || { success: true }
+  }
+
+  handlers[METHODS.STREAM_URL_GET] = async (params) => {
+    const { startWebDAVServer, setWebDAVEngine, getDriveStatus } = require('./webdav')
+    setWebDAVEngine(engine)
+    await startWebDAVServer().catch(() => {})
+    const status = getDriveStatus()
+    const port = status.port || 41983
+    if (params?.transferId) {
+      const pathParam = params?.filePath ? `&path=${encodeURIComponent(params.filePath)}` : ''
+      return { url: `http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}${pathParam}` }
+    }
+    if (params?.filePath) {
+      return { url: `http://127.0.0.1:${port}/stream/file?path=${encodeURIComponent(params.filePath)}` }
+    }
+    return { url: `http://127.0.0.1:${port}/p2p/` }
+  }
+
   return handlers
 }
 
