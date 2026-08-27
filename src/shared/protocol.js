@@ -73,10 +73,27 @@ const METHODS = {
   CLIPBOARD_SEND: 'clipboard.send',
   LAN_DISCOVERY_PEER: 'lan.discoveryPeer',
   WATCH_STATE_BROADCAST: 'watch.stateBroadcast',
+  WATCH_PARTY_CREATE: 'watch.createRoom',
+  WATCH_PARTY_JOIN: 'watch.joinRoom',
+  WATCH_PARTY_LEAVE: 'watch.leaveRoom',
+  WATCH_PARTY_GET_ROOM: 'watch.getRoom',
+  WATCH_PARTY_LIST_ROOMS: 'watch.listRooms',
+  WATCH_PARTY_REACTION: 'watch.reaction',
+  WATCH_PARTY_STATUS: 'watch.status',
   STREAM_URL_GET: 'stream.getUrl'
 }
 
 const EVENTS = {
+  WATCH_ROOM_CREATED: 'watch.room_created',
+  WATCH_ROOM_JOINED: 'watch.room_joined',
+  WATCH_ROOM_LEFT: 'watch.room_left',
+  WATCH_ROOM_CLOSED: 'watch.room_closed',
+  WATCH_PEER_JOINED: 'watch.peer_joined',
+  WATCH_PEER_LEFT: 'watch.peer_left',
+  WATCH_PEER_STATUS: 'watch.peer_status',
+  WATCH_STATE_SYNC: 'watch.state_sync',
+  WATCH_REACTION: 'watch.reaction',
+  WATCH_ROOMS_DISCOVERED: 'watch.rooms_discovered',
   DEVICE_ONLINE: 'device.online',
   DEVICE_OFFLINE: 'device.offline',
   DEVICE_DISCOVERED: 'device.discovered',

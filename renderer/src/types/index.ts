@@ -2,6 +2,7 @@ export type NavRoute =
   | '/dashboard'
   | '/devices'
   | '/sync'
+  | '/party'
   | '/transfers'
   | '/activity'
   | '/history'

@@ -17,7 +17,8 @@ import {
   QrCode,
   Settings,
   Waypoints,
-  RefreshCw
+  RefreshCw,
+  Tv
 } from 'lucide-react'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useDevices } from '@/hooks/useDevices'
@@ -94,6 +95,11 @@ export function Sidebar() {
       label: 'Sync Folders',
       route: '/sync',
       icon: <RefreshCw className='h-4 w-4' />
+    },
+    {
+      label: 'Mesh Party',
+      route: '/party',
+      icon: <Tv className='h-4 w-4' />
     },
     {
       label: 'Settings',

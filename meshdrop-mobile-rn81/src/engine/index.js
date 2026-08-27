@@ -190,7 +190,17 @@ async function boot() {
       'sync:phase',
       'claim:preview',
       'watch:state:updated',
-      'watch:peer:status'
+      'watch:peer:status',
+      'party:room:created',
+      'party:room:joined',
+      'party:room:left',
+      'party:room:closed',
+      'party:peer:joined',
+      'party:peer:left',
+      'party:peer:status',
+      'party:state:sync',
+      'party:reaction',
+      'party:rooms:discovered'
     ]
     for (const evt of EVENTS) {
       engine.on(evt, (data) => {
@@ -448,6 +458,29 @@ function call(method, params) {
     case 'watchStateBroadcast':
     case 'watch.broadcastState':
       return engine.broadcastWatchState ? engine.broadcastWatchState(params) : { success: true }
+    case 'createPartyRoom':
+    case 'watch.createRoom':
+      if (!engine.createPartyRoom) throw new Error('Party engine unavailable')
+      return engine.createPartyRoom(params)
+    case 'joinPartyRoom':
+    case 'watch.joinRoom':
+      if (!engine.joinPartyRoom) throw new Error('Party engine unavailable')
+      return engine.joinPartyRoom(params)
+    case 'leavePartyRoom':
+    case 'watch.leaveRoom':
+      return engine.leavePartyRoom ? engine.leavePartyRoom() : { success: true }
+    case 'getPartyRoom':
+    case 'watch.getRoom':
+      return engine.getPartyRoom ? engine.getPartyRoom() : null
+    case 'listPartyRooms':
+    case 'watch.listRooms':
+      return engine.listPartyRooms ? engine.listPartyRooms() : []
+    case 'sendPartyReaction':
+    case 'watch.reaction':
+      return engine.sendPartyReaction ? engine.sendPartyReaction(params?.emoji) : false
+    case 'broadcastPartyStatus':
+    case 'watch.status':
+      return engine.broadcastPartyStatus ? engine.broadcastPartyStatus(params) : false
     case 'setPlayheadByte':
       return engine.setPlayheadByte ? engine.setPlayheadByte(params?.transferId, params?.byteOffset) : false
     default:

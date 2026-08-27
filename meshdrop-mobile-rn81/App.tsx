@@ -30,6 +30,7 @@ import {
   Sparkles,
   Sun,
   Moon,
+  Tv,
 } from 'lucide-react-native'
 import { Devices } from './src/screens/Devices'
 import { Sync } from './src/screens/Sync'
@@ -39,6 +40,7 @@ import { Transfers } from './src/screens/Transfers'
 import { History } from './src/screens/History'
 import { Diagnostics } from './src/screens/Diagnostics'
 import { Settings } from './src/screens/Settings'
+import { WatchParty } from './src/screens/WatchParty'
 import { TransferApprovalDialog } from './src/components/TransferApprovalDialog'
 import { FloatingTransferPill } from './src/components/FloatingTransferPill'
 import { UpdateAvailableModal } from './src/components/UpdateAvailableModal'
@@ -62,6 +64,7 @@ import {
 type TabType =
   | 'devices'
   | 'share'
+  | 'party'
   | 'receive'
   | 'sync'
   | 'activity'
@@ -72,6 +75,7 @@ type TabType =
 const TABS: { key: TabType; label: string; icon: React.ElementType }[] = [
   { key: 'devices', label: 'Swarm', icon: Radio },
   { key: 'share', label: 'Beam', icon: Upload },
+  { key: 'party', label: 'Party', icon: Tv },
   { key: 'receive', label: 'Claim', icon: Download },
   { key: 'sync', label: 'Sync', icon: FolderSync },
   { key: 'activity', label: 'Live', icon: Activity },
@@ -434,6 +438,7 @@ function MainApp(): React.JSX.Element {
       <View style={[styles.body, { backgroundColor: theme.bg }]}>
         {currentTab === 'devices' && <Devices identity={identity} />}
         {currentTab === 'share' && <Share />}
+        {currentTab === 'party' && <WatchParty />}
         {currentTab === 'receive' && <Receive />}
         {currentTab === 'sync' && <Sync identity={identity} />}
         {currentTab === 'activity' && <Transfers />}

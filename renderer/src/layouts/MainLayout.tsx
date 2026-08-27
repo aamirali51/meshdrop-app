@@ -11,6 +11,7 @@ import { Activity } from '@/pages/Activity'
 import { History } from '@/pages/History'
 import { Diagnostics } from '@/pages/Diagnostics'
 import { Settings } from '@/pages/Settings'
+import { WatchParty } from '@/pages/WatchParty'
 import { About } from '@/pages/About'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Upload } from 'lucide-react'
@@ -34,6 +35,7 @@ const pages: Record<string, React.FC> = {
   '/dashboard': Dashboard,
   '/devices': Devices,
   '/sync': Sync,
+  '/party': WatchParty,
   '/transfers': Transfers,
   '/activity': Activity,
   '/history': History,

@@ -720,6 +720,41 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
     return res || { success: true }
   }
 
+  handlers[METHODS.WATCH_PARTY_CREATE] = async (params) => {
+    if (!engine || !engine.createPartyRoom) throw new Error('Engine watch party unavailable')
+    return engine.createPartyRoom(params)
+  }
+
+  handlers[METHODS.WATCH_PARTY_JOIN] = async (params) => {
+    if (!engine || !engine.joinPartyRoom) throw new Error('Engine watch party unavailable')
+    return engine.joinPartyRoom(params)
+  }
+
+  handlers[METHODS.WATCH_PARTY_LEAVE] = async () => {
+    if (!engine || !engine.leavePartyRoom) return { success: true }
+    return engine.leavePartyRoom()
+  }
+
+  handlers[METHODS.WATCH_PARTY_GET_ROOM] = async () => {
+    if (!engine || !engine.getPartyRoom) return null
+    return engine.getPartyRoom()
+  }
+
+  handlers[METHODS.WATCH_PARTY_LIST_ROOMS] = async () => {
+    if (!engine || !engine.listPartyRooms) return []
+    return engine.listPartyRooms()
+  }
+
+  handlers[METHODS.WATCH_PARTY_REACTION] = async (params) => {
+    if (!engine || !engine.sendPartyReaction) return false
+    return engine.sendPartyReaction(params?.emoji)
+  }
+
+  handlers[METHODS.WATCH_PARTY_STATUS] = async (params) => {
+    if (!engine || !engine.broadcastPartyStatus) return false
+    return engine.broadcastPartyStatus(params)
+  }
+
   handlers[METHODS.STREAM_URL_GET] = async (params) => {
     const { startWebDAVServer, setWebDAVEngine, getDriveStatus } = require('./webdav')
     setWebDAVEngine(engine)
