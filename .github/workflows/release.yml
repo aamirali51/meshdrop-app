@@ -276,6 +276,7 @@ jobs:
 
       - name: Deploy to AUR (meshdrop-bin)
         uses: KSX-GitHub/github-actions-deploy-aur@v3.0.1
+        continue-on-error: true
         if: env.AUR_SSH_PRIVATE_KEY != ''
         with:
           pkgname: meshdrop-bin
