@@ -15,6 +15,7 @@ import {
   type AppStateStatus,
   Animated,
   Alert,
+  useWindowDimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
@@ -105,6 +106,10 @@ function MainApp(): React.JSX.Element {
     filePath?: string
     isHost?: boolean
   }>({ visible: false })
+  const [isPartyActive, setIsPartyActive] = useState(false)
+  const { width, height } = useWindowDimensions()
+  const isLandscape = width > height
+  const hideAppChrome = (currentTab === 'party' && isPartyActive) || isLandscape
   // Avoid re-surfacing the update prompt on every background-resume.
   const updatePrompted = useRef(false)
 
@@ -333,112 +338,121 @@ function MainApp(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      <StatusBar barStyle={theme.statusBarStyle} backgroundColor={theme.statusBarBg} />
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: hideAppChrome ? '#000000' : theme.bg }]}
+      edges={hideAppChrome ? [] : ['top', 'left', 'right']}
+    >
+      <StatusBar
+        hidden={hideAppChrome}
+        barStyle={theme.statusBarStyle}
+        backgroundColor={hideAppChrome ? '#000000' : theme.statusBarBg}
+      />
 
-      {/* Top Sentinel HUD Header */}
-      <View style={[styles.header, { backgroundColor: theme.headerBg, borderBottomColor: theme.border }]}>
-        <View style={styles.brandRow}>
-          <View style={[styles.logoBadge, { backgroundColor: theme.primary, shadowColor: theme.primary }]}>
-            <Zap size={17} color="#FFFFFF" />
-          </View>
-          <View>
-            <View style={styles.brandTitleRow}>
-              <Text style={[styles.brand, { color: theme.text }]}>MeshDrop</Text>
-              <View style={[styles.versionPill, { backgroundColor: theme.primarySoft }]}>
-                <Text style={[styles.versionText, { color: theme.primary }]}>
-                  {appVersion ? `v${appVersion}` : ''}
-                </Text>
-              </View>
+      {/* Top Sentinel HUD Header (Hidden in active party or landscape) */}
+      {!hideAppChrome && (
+        <View style={[styles.header, { backgroundColor: theme.headerBg, borderBottomColor: theme.border }]}>
+          <View style={styles.brandRow}>
+            <View style={[styles.logoBadge, { backgroundColor: theme.primary, shadowColor: theme.primary }]}>
+              <Zap size={17} color="#FFFFFF" />
             </View>
-            <Text style={[styles.tagline, { color: theme.textSecondary }]} numberOfLines={1}>
-              {identity?.name ? `${identity.name} · Encrypted P2P` : 'Decentralized P2P Mesh'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setCurrentTab('diagnostics')}
-            style={[styles.statusPillBtn, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
-          >
-            <View style={styles.statusInner}>
-              <PulseIndicator
-                color={
-                  engineStatus === 'ready'
-                    ? theme.success
-                    : engineStatus === 'starting'
-                    ? theme.warning
-                    : theme.danger
-                }
-                size={7}
-              />
-              <Text
-                style={[
-                  styles.statusLabel,
-                  {
-                    color:
-                      engineStatus === 'ready'
-                        ? theme.success
-                        : engineStatus === 'starting'
-                        ? theme.warning
-                        : theme.danger,
-                  },
-                ]}
-              >
-                {engineStatus === 'ready'
-                  ? peerCount > 0
-                    ? `${peerCount} ${peerCount === 1 ? 'Peer' : 'Peers'}`
-                    : 'Online'
-                  : engineStatus === 'starting'
-                  ? 'Booting…'
-                  : 'Offline'}
+            <View>
+              <View style={styles.brandTitleRow}>
+                <Text style={[styles.brand, { color: theme.text }]}>MeshDrop</Text>
+                <View style={[styles.versionPill, { backgroundColor: theme.primarySoft }]}>
+                  <Text style={[styles.versionText, { color: theme.primary }]}>
+                    {appVersion ? `v${appVersion}` : ''}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.tagline, { color: theme.textSecondary }]} numberOfLines={1}>
+                {identity?.name ? `${identity.name} · Encrypted P2P` : 'Decentralized P2P Mesh'}
               </Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={toggleTheme}
-            style={[styles.headerIconBtn, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
-          >
-            {isDark ? (
-              <Sun size={16} color={theme.warning} />
-            ) : (
-              <Moon size={16} color={theme.primary} />
-            )}
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setCurrentTab('diagnostics')}
+              style={[styles.statusPillBtn, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
+            >
+              <View style={styles.statusInner}>
+                <PulseIndicator
+                  color={
+                    engineStatus === 'ready'
+                      ? theme.success
+                      : engineStatus === 'starting'
+                      ? theme.warning
+                      : theme.danger
+                  }
+                  size={7}
+                />
+                <Text
+                  style={[
+                    styles.statusLabel,
+                    {
+                      color:
+                        engineStatus === 'ready'
+                          ? theme.success
+                          : engineStatus === 'starting'
+                          ? theme.warning
+                          : theme.danger,
+                    },
+                  ]}
+                >
+                  {engineStatus === 'ready'
+                    ? peerCount > 0
+                      ? `${peerCount} ${peerCount === 1 ? 'Peer' : 'Peers'}`
+                      : 'Online'
+                    : engineStatus === 'starting'
+                    ? 'Booting…'
+                    : 'Offline'}
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setCurrentTab('settings')}
-            style={[
-              styles.headerIconBtn,
-              { backgroundColor: theme.bgElevated, borderColor: theme.border },
-              currentTab === 'settings' && { borderColor: theme.primary, backgroundColor: theme.primarySoft },
-            ]}
-          >
-            <SettingsIcon
-              size={17}
-              color={currentTab === 'settings' ? theme.primary : theme.textSecondary}
-            />
-          </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={toggleTheme}
+              style={[styles.headerIconBtn, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
+            >
+              {isDark ? (
+                <Sun size={16} color={theme.warning} />
+              ) : (
+                <Moon size={16} color={theme.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setCurrentTab('settings')}
+              style={[
+                styles.headerIconBtn,
+                { backgroundColor: theme.bgElevated, borderColor: theme.border },
+                currentTab === 'settings' && { borderColor: theme.primary, backgroundColor: theme.primarySoft },
+              ]}
+            >
+              <SettingsIcon
+                size={17}
+                color={currentTab === 'settings' ? theme.primary : theme.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Error Banner */}
-      {engineStatus === 'error' && !!errorMessage && (
+      {!hideAppChrome && engineStatus === 'error' && !!errorMessage && (
         <View style={[styles.errorBanner, { backgroundColor: theme.dangerBg, borderColor: theme.dangerBorder }]}>
           <Text style={[styles.errorBannerText, { color: theme.danger }]}>⚠️ {errorMessage}</Text>
         </View>
       )}
 
       {/* Screen Body */}
-      <View style={[styles.body, { backgroundColor: theme.bg }]}>
+      <View style={[styles.body, { backgroundColor: hideAppChrome ? '#000000' : theme.bg }]}>
         {currentTab === 'devices' && <Devices identity={identity} />}
         {currentTab === 'share' && <Share />}
-        {currentTab === 'party' && <WatchParty />}
+        {currentTab === 'party' && <WatchParty onActiveRoomChange={setIsPartyActive} />}
         {currentTab === 'receive' && <Receive />}
         {currentTab === 'sync' && <Sync identity={identity} />}
         {currentTab === 'activity' && <Transfers />}
@@ -455,7 +469,7 @@ function MainApp(): React.JSX.Element {
         onClose={() => setPendingApproval(null)}
       />
 
-      <FloatingTransferPill onExpand={() => setCurrentTab('activity')} />
+      {!hideAppChrome && <FloatingTransferPill onExpand={() => setCurrentTab('activity')} />}
 
       <UpdateAvailableModal />
 
@@ -481,47 +495,49 @@ function MainApp(): React.JSX.Element {
       />
 
       {/* Floating Luminous Bottom Navigation Dock */}
-      <View style={styles.dockContainer}>
-        <View
-          style={[
-            styles.dockBar,
-            {
-              backgroundColor: theme.dockBg,
-              borderColor: theme.border,
-              shadowColor: theme.shadowLg?.shadowColor || '#000',
-            },
-          ]}
-        >
-          {TABS.map((tab) => {
-            const isActive = currentTab === tab.key
-            const IconComponent = tab.icon
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                activeOpacity={0.75}
-                onPress={() => setCurrentTab(tab.key)}
-                style={[styles.dockItem, isActive && { backgroundColor: theme.primarySoft }]}
-              >
-                <View style={styles.dockIconBox}>
-                  <IconComponent
-                    size={16}
-                    color={isActive ? theme.primary : theme.muted}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.dockLabel,
-                    { color: theme.muted },
-                    isActive && { color: theme.primary, fontWeight: '900' },
-                  ]}
+      {!hideAppChrome && (
+        <View style={styles.dockContainer}>
+          <View
+            style={[
+              styles.dockBar,
+              {
+                backgroundColor: theme.dockBg,
+                borderColor: theme.border,
+                shadowColor: theme.shadowLg?.shadowColor || '#000',
+              },
+            ]}
+          >
+            {TABS.map((tab) => {
+              const isActive = currentTab === tab.key
+              const IconComponent = tab.icon
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  activeOpacity={0.75}
+                  onPress={() => setCurrentTab(tab.key)}
+                  style={[styles.dockItem, isActive && { backgroundColor: theme.primarySoft }]}
                 >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            )
-          })}
+                  <View style={styles.dockIconBox}>
+                    <IconComponent
+                      size={16}
+                      color={isActive ? theme.primary : theme.muted}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.dockLabel,
+                      { color: theme.muted },
+                      isActive && { color: theme.primary, fontWeight: '900' },
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
         </View>
-      </View>
+      )}
     </SafeAreaView>
   )
 }

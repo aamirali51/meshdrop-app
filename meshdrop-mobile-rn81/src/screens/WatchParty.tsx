@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  Dimensions,
-  requireNativeComponent,
+  useWindowDimensions,
+  GestureResponderEvent,
 } from 'react-native'
 import {
   Tv,
@@ -26,20 +26,14 @@ import {
   Copy,
   Check,
   Sparkles,
-  ArrowRight,
   LogOut,
-  Upload,
-  Layers,
-  Heart,
-  Smile,
-  Flame,
 } from 'lucide-react-native'
 import RNFS from 'react-native-fs'
 import { call, on } from '../bridge'
 import { copyToClipboard } from '../clipboard'
 import { pickFiles } from '../filePicker'
 import { useTheme, fonts } from '../theme'
-import { Card, Btn, Pill, SectionHeader } from '../components'
+import { Card, Btn } from '../components'
 import { NativeVideoView } from '../components/NativeVideoView'
 
 const REACTIONS = ['🍿', '🔥', '👏', '❤️', '😂']
@@ -52,14 +46,14 @@ interface DiscoveredRoom {
   timestamp: number
 }
 
-interface RoomParticipant {
-  id: string
-  name: string
-  buffering?: boolean
+interface WatchPartyProps {
+  onActiveRoomChange?: (active: boolean) => void
 }
 
-export function WatchParty() {
+export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
   const { theme } = useTheme()
+  const { width, height } = useWindowDimensions()
+  const isLandscape = width > height
 
   // Room State
   const [activeRoom, setActiveRoom] = useState<any | null>(null)
@@ -83,6 +77,9 @@ export function WatchParty() {
 
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSyncRef = useRef<number>(0)
+  const scrubberLayoutRef = useRef<{ width: number; pageX: number }>({ width: 1, pageX: 0 })
+
+  const isImmersive = isLandscape || isFullscreen
 
   const formatTime = (secs: number) => {
     if (!Number.isFinite(secs) || isNaN(secs) || secs < 0) return '00:00'
@@ -91,7 +88,41 @@ export function WatchParty() {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
-  // Load initial state
+  // Notify parent on room change
+  useEffect(() => {
+    onActiveRoomChange?.(Boolean(activeRoom))
+  }, [activeRoom, onActiveRoomChange])
+
+  // Controls Auto-Hide Management
+  const resetControlsTimer = useCallback(() => {
+    setShowControls(true)
+    if (controlsTimer.current) clearTimeout(controlsTimer.current)
+    if (isPlaying) {
+      controlsTimer.current = setTimeout(() => {
+        setShowControls(false)
+      }, 3500)
+    }
+  }, [isPlaying])
+
+  const toggleControls = () => {
+    if (showControls) {
+      if (controlsTimer.current) clearTimeout(controlsTimer.current)
+      setShowControls(false)
+    } else {
+      resetControlsTimer()
+    }
+  }
+
+  useEffect(() => {
+    if (isPlaying) {
+      resetControlsTimer()
+    } else {
+      if (controlsTimer.current) clearTimeout(controlsTimer.current)
+      setShowControls(true)
+    }
+  }, [isPlaying, resetControlsTimer])
+
+  // Load initial state & subscriptions
   useEffect(() => {
     call('getPartyRoom').then((room: any) => {
       if (room) setActiveRoom(room)
@@ -151,6 +182,7 @@ export function WatchParty() {
 
     return () => {
       unsubs.forEach((u) => u?.())
+      if (controlsTimer.current) clearTimeout(controlsTimer.current)
     }
   }, [])
 
@@ -254,7 +286,7 @@ export function WatchParty() {
 
   const handleCopyCode = async () => {
     if (!activeRoom?.roomCode) return
-    const ok = await copyToClipboard(activeRoom.roomCode)
+    await copyToClipboard(activeRoom.roomCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
     Alert.alert('Room Code Copied', `Room ${activeRoom.roomCode} copied to clipboard!`)
@@ -266,52 +298,58 @@ export function WatchParty() {
     call('sendPartyReaction', { emoji }).catch(() => {})
   }
 
-  const resetControlsTimer = () => {
-    setShowControls(true)
-    if (controlsTimer.current) clearTimeout(controlsTimer.current)
-    if (isPlaying) {
-      controlsTimer.current = setTimeout(() => setShowControls(false), 4000)
-    }
+  const handleScrubberTouch = (e: GestureResponderEvent) => {
+    resetControlsTimer()
+    if (duration <= 0) return
+    const { locationX } = e.nativeEvent
+    const w = scrubberLayoutRef.current.width || 1
+    const ratio = Math.max(0, Math.min(1, locationX / w))
+    const target = ratio * duration
+    setCurrentTime(target)
+    setSeekTarget(target)
+    broadcastPlayback('seek', target)
   }
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.hairline }]}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.iconBadge, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
-            <Tv size={18} color={theme.primary} />
+      {/* Non-Immersive Header (Shown only in Lobby or Portrait Active Room) */}
+      {!isImmersive && (
+        <View style={[styles.header, { borderBottomColor: theme.hairline }]}>
+          <View style={styles.headerLeft}>
+            <View style={[styles.iconBadge, { backgroundColor: theme.primarySoft, borderColor: theme.primary + '35' }]}>
+              <Tv size={18} color={theme.primary} />
+            </View>
+            <View>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>Mesh Party</Text>
+              <Text style={[styles.headerSub, { color: theme.muted }]}>
+                {activeRoom ? activeRoom.title : 'Live Synchronized Swarm Theater'}
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>Mesh Party</Text>
-            <Text style={[styles.headerSub, { color: theme.muted }]}>
-              {activeRoom ? activeRoom.title : 'Live Synchronized Swarm Theater'}
-            </Text>
-          </View>
+
+          {activeRoom && (
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={[styles.codePill, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
+                onPress={handleCopyCode}
+              >
+                <Radio size={12} color={theme.primary} />
+                <Text style={[styles.codePillText, { color: theme.text }]}>{activeRoom.roomCode}</Text>
+                {copied ? <Check size={12} color={theme.success} /> : <Copy size={12} color={theme.muted} />}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.leaveBtn, { backgroundColor: theme.dangerBg }]}
+                onPress={handleLeaveRoom}
+              >
+                <LogOut size={14} color={theme.danger} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-
-        {activeRoom && (
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={[styles.codePill, { backgroundColor: theme.bgElevated, borderColor: theme.border }]}
-              onPress={handleCopyCode}
-            >
-              <Radio size={12} color={theme.primary} />
-              <Text style={[styles.codePillText, { color: theme.text }]}>{activeRoom.roomCode}</Text>
-              {copied ? <Check size={12} color={theme.success} /> : <Copy size={12} color={theme.muted} />}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.leaveBtn, { backgroundColor: theme.dangerBg }]}
-              onPress={handleLeaveRoom}
-            >
-              <LogOut size={14} color={theme.danger} />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+      )}
 
       {!activeRoom ? (
         /* Lobby Mode */
@@ -451,12 +489,12 @@ export function WatchParty() {
         </ScrollView>
       ) : (
         /* Active Theater Mode */
-        <View style={styles.theaterContainer}>
-          {/* Video Surface Area */}
+        <View style={[styles.theaterContainer, isImmersive && styles.immersiveTheaterContainer]}>
+          {/* Main Video Viewport */}
           <TouchableOpacity
             activeOpacity={1}
-            style={[styles.videoViewport, isFullscreen && styles.fullscreenViewport]}
-            onPress={resetControlsTimer}
+            style={[styles.videoViewport, isImmersive && styles.fullscreenViewport]}
+            onPress={toggleControls}
           >
             {videoSrc ? (
               <NativeVideoView
@@ -492,21 +530,41 @@ export function WatchParty() {
               </View>
             )}
 
-            {/* Floating Reaction Bubble */}
+            {/* Floating Reaction Bubble (Always visible when triggered) */}
             {floatingReaction && (
               <View style={styles.floatingReactionBubble}>
                 <Text style={styles.floatingReactionText}>{floatingReaction}</Text>
               </View>
             )}
 
-            {/* Controls Overlay */}
+            {/* Secondary Controls Overlay (Fades out when playing) */}
             {showControls && (
               <View style={styles.controlsOverlay}>
-                {/* Center Controls */}
+                {/* Immersive Top Bar */}
+                {isImmersive && (
+                  <View style={styles.immersiveTopBar}>
+                    <View style={styles.immersiveTitleBox}>
+                      <Text style={styles.immersiveTitleText} numberOfLines={1}>
+                        {activeRoom.title}
+                      </Text>
+                      <TouchableOpacity style={styles.immersiveCodePill} onPress={handleCopyCode}>
+                        <Text style={styles.immersiveCodeText}>{activeRoom.roomCode}</Text>
+                        {copied ? <Check size={12} color="#10B981" /> : <Copy size={12} color="#94A3B8" />}
+                      </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity style={styles.immersiveCloseBtn} onPress={handleLeaveRoom}>
+                      <LogOut size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Center Playback HUD */}
                 <View style={styles.centerRow}>
                   <TouchableOpacity
                     style={styles.seekBtn}
-                    onPress={() => {
+                    onPress={(e) => {
+                      e.stopPropagation()
                       resetControlsTimer()
                       const next = Math.max(0, currentTime - 10)
                       setCurrentTime(next)
@@ -514,13 +572,14 @@ export function WatchParty() {
                       broadcastPlayback('seek', next)
                     }}
                   >
-                    <RotateCcw size={22} color="#FFFFFF" />
+                    <RotateCcw size={26} color="#FFFFFF" />
                     <Text style={styles.seekBtnText}>10s</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.playBtn, { backgroundColor: theme.primary }]}
-                    onPress={() => {
+                    onPress={(e) => {
+                      e.stopPropagation()
                       resetControlsTimer()
                       const next = !isPlaying
                       setIsPlaying(next)
@@ -528,15 +587,16 @@ export function WatchParty() {
                     }}
                   >
                     {isPlaying ? (
-                      <Pause size={28} color="#000000" />
+                      <Pause size={30} color="#000000" />
                     ) : (
-                      <Play size={28} color="#000000" style={{ marginLeft: 3 }} />
+                      <Play size={30} color="#000000" style={{ marginLeft: 3 }} />
                     )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={styles.seekBtn}
-                    onPress={() => {
+                    onPress={(e) => {
+                      e.stopPropagation()
                       resetControlsTimer()
                       const next = Math.min(duration, currentTime + 10)
                       setCurrentTime(next)
@@ -544,29 +604,70 @@ export function WatchParty() {
                       broadcastPlayback('seek', next)
                     }}
                   >
-                    <RotateCw size={22} color="#FFFFFF" />
+                    <RotateCw size={26} color="#FFFFFF" />
                     <Text style={styles.seekBtnText}>10s</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* Bottom Bar */}
+                {/* Bottom Bar Controls & Quick Emoji Reactions */}
                 <View style={styles.bottomControlsBar}>
-                  <View style={styles.scrubberBg}>
-                    <View style={[styles.scrubberFill, { width: `${progressPercent}%`, backgroundColor: theme.primary }]} />
-                  </View>
+                  {/* Interactive Scrubber Bar */}
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    style={styles.scrubberTouchArea}
+                    onLayout={(e) => {
+                      scrubberLayoutRef.current.width = e.nativeEvent.layout.width
+                    }}
+                    onPress={handleScrubberTouch}
+                  >
+                    <View style={styles.scrubberBg}>
+                      <View style={[styles.scrubberFill, { width: `${progressPercent}%`, backgroundColor: theme.primary }]} />
+                      <View style={[styles.scrubberThumb, { left: `${progressPercent}%`, backgroundColor: theme.primary }]} />
+                    </View>
+                  </TouchableOpacity>
 
                   <View style={styles.bottomMetaRow}>
                     <Text style={styles.timeLabel}>
                       {formatTime(currentTime)} / {formatTime(duration)}
                     </Text>
 
+                    {/* Quick Reactions embedded in HUD */}
+                    <View style={styles.immersiveReactionsRow}>
+                      {REACTIONS.map((emoji) => (
+                        <TouchableOpacity
+                          key={emoji}
+                          style={styles.immersiveReactionBtn}
+                          onPress={(e) => {
+                            e.stopPropagation()
+                            resetControlsTimer()
+                            handleReaction(emoji)
+                          }}
+                        >
+                          <Text style={styles.reactionText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
                     <View style={styles.bottomActionIcons}>
-                      <TouchableOpacity onPress={() => setIsMuted((p) => !p)} style={styles.iconPad}>
-                        {isMuted ? <VolumeX size={18} color="#94A3B8" /> : <Volume2 size={18} color="#FFFFFF" />}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation()
+                          resetControlsTimer()
+                          setIsMuted((p) => !p)
+                        }}
+                        style={styles.iconPad}
+                      >
+                        {isMuted ? <VolumeX size={20} color="#94A3B8" /> : <Volume2 size={20} color="#FFFFFF" />}
                       </TouchableOpacity>
 
-                      <TouchableOpacity onPress={() => setIsFullscreen((p) => !p)} style={styles.iconPad}>
-                        {isFullscreen ? <Minimize2 size={18} color="#FFFFFF" /> : <Maximize2 size={18} color="#FFFFFF" />}
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation()
+                          setIsFullscreen((p) => !p)
+                        }}
+                        style={styles.iconPad}
+                      >
+                        {isImmersive ? <Minimize2 size={20} color="#FFFFFF" /> : <Maximize2 size={20} color="#FFFFFF" />}
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -575,8 +676,8 @@ export function WatchParty() {
             )}
           </TouchableOpacity>
 
-          {/* Quick Reaction & Audience Bar */}
-          {!isFullscreen && (
+          {/* Portrait Audience & Roster Card (Only when in non-immersive portrait) */}
+          {!isImmersive && (
             <View style={[styles.audienceCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
               <View style={styles.reactionsRow}>
                 {REACTIONS.map((emoji) => (
@@ -770,6 +871,15 @@ const styles = StyleSheet.create({
   theaterContainer: {
     flex: 1,
   },
+  immersiveTheaterContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+    backgroundColor: '#000000',
+  },
   videoViewport: {
     flex: 1,
     backgroundColor: '#000000',
@@ -795,56 +905,121 @@ const styles = StyleSheet.create({
   },
   floatingReactionBubble: {
     position: 'absolute',
-    bottom: 80,
+    top: '30%',
     alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    zIndex: 1000,
   },
   floatingReactionText: {
-    fontSize: 36,
+    fontSize: 44,
   },
   controlsOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    zIndex: 900,
+  },
+  immersiveTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+  },
+  immersiveTitleBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 16,
+  },
+  immersiveTitleText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  immersiveCodePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  immersiveCodeText: {
+    color: '#E2E8F0',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: fonts?.mono || 'monospace',
+  },
+  immersiveCloseBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+    padding: 8,
+    borderRadius: 20,
   },
   centerRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 32,
+    gap: 40,
   },
   playBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   seekBtn: {
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
+    padding: 8,
   },
   seekBtnText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   bottomControlsBar: {
-    gap: 8,
+    gap: 10,
+    paddingBottom: 4,
+  },
+  scrubberTouchArea: {
+    paddingVertical: 8,
   },
   scrubberBg: {
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
+    height: 5,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 3,
+    position: 'relative',
+    justifyContent: 'center',
   },
   scrubberFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
+  },
+  scrubberThumb: {
+    position: 'absolute',
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    marginLeft: -6.5,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   bottomMetaRow: {
     flexDirection: 'row',
@@ -852,14 +1027,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   timeLabel: {
-    fontSize: 11,
-    color: '#CBD5E1',
+    fontSize: 12,
+    color: '#E2E8F0',
     fontFamily: fonts?.mono || 'monospace',
+    fontWeight: '600',
+  },
+  immersiveReactionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  immersiveReactionBtn: {
+    padding: 2,
   },
   bottomActionIcons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   iconPad: {
     padding: 4,
@@ -879,7 +1067,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   reactionText: {
-    fontSize: 18,
+    fontSize: 20,
   },
   rosterRow: {
     flexDirection: 'row',
