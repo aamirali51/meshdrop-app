@@ -115,22 +115,15 @@ function ensureFetched(platform, src) {
 }
 
 function extractZip(archive, destDir) {
-  // Cross-platform zip extraction. Windows has Expand-Archive; Linux/macOS
-  // runners have `unzip` (or the `tar` that ships with bsdtar can read zips).
-  // Try unzip first (works everywhere a zip tool is installed), then fall back
-  // to PowerShell on Windows.
+  // Use PowerShell Expand-Archive (available on every Windows box) to unpack
+  // to a temp dir, then move the two binaries out.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'meshdrop-ffmpeg-'))
-  const unzip = spawnSync('unzip', ['-q', archive, '-d', tmp], { encoding: 'utf8' })
-  if (unzip.status === 0) return { tmp, walk: (cb) => walkDir(tmp, cb) }
-  if (process.platform === 'win32') {
-    const ps = spawnSync('powershell', [
-      '-NoProfile', '-NonInteractive', '-Command',
-      `Expand-Archive -LiteralPath '${archive}' -DestinationPath '${tmp}' -Force`
-    ], { encoding: 'utf8' })
-    if (ps.status === 0) return { tmp, walk: (cb) => walkDir(tmp, cb) }
-  }
-  fs.rmSync(tmp, { recursive: true, force: true })
-  throw new Error('zip extraction failed (no unzip, no Expand-Archive)')
+  const r = spawnSync('powershell', [
+    '-NoProfile', '-NonInteractive', '-Command',
+    `Expand-Archive -LiteralPath '${archive}' -DestinationPath '${tmp}' -Force`
+  ], { encoding: 'utf8' })
+  if (r.status !== 0) throw new Error('Expand-Archive failed: ' + r.stderr)
+  return { tmp, walk: (cb) => walkDir(tmp, cb) }
 }
 
 function extractTar(archive, destDir) {
@@ -202,10 +195,8 @@ async function installPlatform(platform) {
 }
 
 async function main() {
-  // Default to the CURRENT platform only. Running "all platforms" on one OS
-  // would try to extract a win32 zip on a Linux runner (no Expand-Archive).
   const requested = process.argv.slice(2)
-  const platforms = requested.length ? requested : [process.platform]
+  const platforms = requested.length ? requested : Object.keys(SOURCES)
   let ok = true
   for (const p of platforms) {
     try {

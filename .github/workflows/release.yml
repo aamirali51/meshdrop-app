@@ -73,6 +73,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Bundled LGPL ffmpeg/ffprobe for watch-party remux (stream-copy + AAC).
+      # Committed under vendor/ffmpeg/<platform>; this is a self-heal so a
+      # stale/absent vendor dir never silently ships a build without remux.
+      - name: Fetch bundled ffmpeg
+        run: node scripts/fetch-ffmpeg.js ${{ runner.os == 'Windows' && 'win32' || runner.os == 'macOS' && 'darwin' || 'linux' }}
+
       - name: Build & publish
         run: npm run build:release
         env:
