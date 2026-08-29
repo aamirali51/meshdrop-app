@@ -70,7 +70,6 @@ export function WatchPartyModal({
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isSeeking, setIsSeeking] = useState(false)
-  const [playbackError, setPlaybackError] = useState<string>('')
 
   // Resolve local or staging video file path
   useEffect(() => {
@@ -169,34 +168,20 @@ export function WatchPartyModal({
       if (!state) return
       if (!syncWithHost && !isHost) return
 
-      // New-joiner snapshot: apply immediately when roomMeta is present.
-      if (state.roomMeta) {
-        setIsPlaying(state.action === 'play')
-        if (typeof state.positionSec === 'number') {
-          setCurrentTime(state.positionSec)
-          setSeekTarget(state.positionSec)
-        }
-        return
-      }
-
-      // Expected-position sync: account for playback advance since send.
-      const now = Date.now()
-      const sentAt = Number(state.timestampMs) || 0
-      const elapsedSec = sentAt > 0 ? (now - sentAt) / 1000 : 0
-      const expectedPos = Number(state.positionSec) + (state.action === 'play' ? elapsedSec : 0)
-      if (!Number.isFinite(expectedPos)) return
-
       if (state.action === 'play') {
         setIsPlaying(true)
-        setCurrentTime(expectedPos)
-        setSeekTarget(expectedPos)
+        if (typeof state.positionSec === 'number') {
+          setCurrentTime(state.positionSec)
+        }
       } else if (state.action === 'pause') {
         setIsPlaying(false)
-        setCurrentTime(expectedPos)
-        setSeekTarget(expectedPos)
+        if (typeof state.positionSec === 'number') {
+          setCurrentTime(state.positionSec)
+        }
       } else if (state.action === 'seek') {
-        setCurrentTime(expectedPos)
-        setSeekTarget(expectedPos)
+        if (typeof state.positionSec === 'number') {
+          setCurrentTime(state.positionSec)
+        }
       }
     })
 
@@ -284,7 +269,7 @@ export function WatchPartyModal({
           onPress={resetControlsTimer}
         >
           {/* Native Video Player */}
-          {videoSrc && !playbackError ? (
+          {videoSrc ? (
             <NativeVideoView
               style={StyleSheet.absoluteFillObject}
               src={videoSrc}
@@ -306,18 +291,8 @@ export function WatchPartyModal({
               }}
               onError={(e: any) => {
                 console.warn('[WatchParty] Video playback error:', e.nativeEvent?.error)
-                setPlaybackError(
-                  'This device cannot decode this video file. Ask the host to share a compatible format (MP4/H.264), or try on a device that supports it.'
-                )
               }}
             />
-          ) : playbackError ? (
-            <View style={styles.videoSurface}>
-              <Film size={56} color="#f59e0b" />
-              <Text style={[styles.streamTitle, { marginTop: 12 }]} numberOfLines={3}>
-                {playbackError}
-              </Text>
-            </View>
           ) : (
             <View style={styles.videoSurface}>
               <Film size={56} color="#475569" />

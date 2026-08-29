@@ -48,7 +48,7 @@ Then open:
 2. **Build and deployment → Source: GitHub Actions**.
 3. The included `.github/workflows/deploy-pages.yml` deploys `web/` to Pages on
    every push to `main` that touches `web/**`.
-4. The site is live at `https://<user>.github.io/meshdrop-app/`. The path form
+4. The site is live at `https://<user>.github.io/MeshDesk/`. The path form
    `/d/CODE` works via `404.html`.
 
 ### Option B — Cloudflare Pages (free, global CDN)
@@ -79,7 +79,7 @@ The desktop app generates web links from `renderer/src/lib/shareLinks.ts` —
 that's the single source of truth. Copied links look like:
 
 ```
-https://aamirali51.github.io/meshdrop-app/d/DROP-XXXX-XXXX?n=Movie.mp4&s=248000000
+https://aamirali51.github.io/MeshDesk/d/DROP-XXXX-XXXX?n=Movie.mp4&s=248000000
 ```
 
 When the custom domain goes live, change one constant there:

@@ -790,32 +790,19 @@ function handleDeepLink(url) {
     win.show()
     win.focus()
   }
-  // Three supported shapes:
-  //   meshdrop://?code=DROP-ABCD-EFGH       (legacy query form)
-  //   meshdrop://drop/DROP-ABCD-EFGH        (link form copied from the UI)
-  //   meshdrop://party/PARTY-XXXX-XXXX      (watch party room join)
+  // Two supported shapes:
+  //   meshdrop://?code=DROP-ABCD-EFGH   (legacy query form)
+  //   meshdrop://drop/DROP-ABCD-EFGH    (link form copied from the UI)
   let code = null
-  let kind = 'drop'
   try {
     const u = new URL(url)
     code = u.searchParams.get('code')
-    if (code) {
-      kind = 'drop'
-    } else {
+    if (!code) {
       const m = /^\/drop\/([A-Z0-9-]+)/i.exec(u.pathname)
-      if (m) {
-        code = m[1]
-        kind = 'drop'
-      } else {
-        const p = /^\/party\/([A-Z0-9-]+)/i.exec(u.pathname)
-        if (p) {
-          code = p[1]
-          kind = 'party'
-        }
-      }
+      if (m) code = m[1]
     }
   } catch {}
-  if (win) win.webContents.send('app:deep-link', { url, code, kind })
+  if (win) win.webContents.send('app:deep-link', { url, code })
 }
 
 app.setAsDefaultProtocolClient(protocol)

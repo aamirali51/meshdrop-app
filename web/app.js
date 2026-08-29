@@ -13,8 +13,8 @@
  * static files themselves.
  */
 
-const REPO = 'https://github.com/aamirali51/meshdrop-releases'
-const VERSION = '1.0.46' // bump on each release
+const REPO = 'https://github.com/aamirali51/MeshDesk'
+const VERSION = '1.0.1' // bump on each release
 const RELEASES = REPO + '/releases'
 
 // Direct asset URLs for the current release. Update VERSION above when you cut a release.

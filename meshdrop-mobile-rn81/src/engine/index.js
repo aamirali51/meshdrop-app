@@ -195,13 +195,11 @@ async function boot() {
       'party:room:joined',
       'party:room:left',
       'party:room:closed',
-      'party:host:changed',
       'party:peer:joined',
       'party:peer:left',
       'party:peer:status',
       'party:state:sync',
       'party:reaction',
-      'party:chat',
       'party:rooms:discovered'
     ]
     for (const evt of EVENTS) {
@@ -260,38 +258,6 @@ async function boot() {
   }
 }
 
-// ─── History helpers (mirror the desktop handlers: the engine persists
-// transfer history in the `history` Hyperbee, keyed by hist-<transferId> with
-// a `timestamp` field) ───────────────────────────────────────────────────────
-
-async function listHistory(eng) {
-  const bee = await eng.getBee('history')
-  const results = []
-  for await (const node of bee.createReadStream()) {
-    if (typeof node.key === 'string' && node.key.startsWith('__')) continue
-    results.push(node.value)
-  }
-  results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-  return results
-}
-
-async function clearHistory(eng) {
-  const bee = await eng.getBee('history')
-  const keys = []
-  for await (const node of bee.createReadStream()) {
-    if (typeof node.key === 'string' && node.key.startsWith('__')) continue
-    keys.push(node.key)
-  }
-  for (const k of keys) await bee.del(k)
-  return { success: true, count: keys.length }
-}
-
-async function deleteHistoryItem(eng, id) {
-  const bee = await eng.getBee('history')
-  await bee.del('hist-' + id)
-  return { success: true }
-}
-
 // ─── RPC Dispatch ──────────────────────────────────────────────────────────
 
 function call(method, params) {
@@ -310,10 +276,6 @@ function call(method, params) {
       return engine.setAutoTrustLAN(!!params?.enabled)
     case 'setPreferOwnRelay':
       return engine.setPreferOwnRelay(!!params?.enabled)
-    case 'setRelayMode':
-      return engine.setRelayMode ? engine.setRelayMode(params?.mode) : { success: false }
-    case 'setCustomRelayUrl':
-      return engine.setCustomRelayUrl ? engine.setCustomRelayUrl(params?.url) : { success: false }
     case 'setLANDiscovery':
       // LAN discovery cannot run inside the Bare worklet (no raw UDP
       // sockets), so this is intentionally a persisted-only non-op.
@@ -389,11 +351,6 @@ function call(method, params) {
     case 'claimFile':
     case 'files.claimCode':
       return engine.claimDropCode(params?.code, { interactive: true })
-    case 'acceptClaimPreview':
-      // The claim preview accept is the same action as confirmClaimDownload —
-      // the engine's claimer flow already opened the cores and queued the
-      // transfers at claim time; confirm starts the download.
-      return engine.confirmClaimDownload({ shareId: params?.shareId, fileIndices: params?.fileIndices })
     case 'confirmClaimDownload':
       return engine.confirmClaimDownload(params)
     case 'cancelClaimDownload':
@@ -410,12 +367,6 @@ function call(method, params) {
       return { success: true }
     case 'listTransfers':
       return engine.listTransfers()
-    case 'getTransferHistory':
-      return listHistory(engine)
-    case 'clearTransferHistory':
-      return clearHistory(engine)
-    case 'deleteHistoryItem':
-      return deleteHistoryItem(engine, params?.id)
     case 'getStorageStats':
       return engine.getStorageStats()
     case 'clearTransferLog':
@@ -527,9 +478,6 @@ function call(method, params) {
     case 'sendPartyReaction':
     case 'watch.reaction':
       return engine.sendPartyReaction ? engine.sendPartyReaction(params?.emoji) : false
-    case 'sendPartyChat':
-    case 'watch.sendChat':
-      return engine.sendPartyChat ? engine.sendPartyChat(params?.text) : false
     case 'broadcastPartyStatus':
     case 'watch.status':
       return engine.broadcastPartyStatus ? engine.broadcastPartyStatus(params) : false

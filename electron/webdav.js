@@ -6,13 +6,6 @@ const os = require('os')
 const { exec } = require('child_process')
 const util = require('util')
 const execAsync = util.promisify(exec)
-const {
-  fileMetaFrom,
-  decide,
-  probeFile,
-  normalizeCapabilities
-} = require('@mesh/core').watchCapabilities
-const remux = require('./remux')
 
 const DEFAULT_PORT = 41983
 const DEFAULT_DRIVE_LETTER = 'Z'
@@ -99,41 +92,6 @@ function resolveLocalPath(urlPath) {
   return path.join(syncRoot, safeRel)
 }
 
-// True when `p` is strictly inside `root` (no path traversal escape). Both are
-// resolved first so symlink-free containment is checked on the real path.
-function isUnderRoot(p, root) {
-  const rel = path.relative(path.resolve(root), path.resolve(p))
-  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
-}
-
-// The stream routes only ever serve files the app itself owns: downloads,
-// staging, sync roots, or paths the engine handed us. Any other absolute path
-// (e.g. a raw /stream/file?path=C:\Windows\...) is refused.
-let allowedStreamRoots = null
-async function streamRoots() {
-  if (allowedStreamRoots) return allowedStreamRoots
-  const roots = [getSyncRootDir()]
-  const downloadsDir =
-    (boundEngine && boundEngine.getDownloadDirectory
-      ? await boundEngine.getDownloadDirectory().catch(() => null)
-      : null) ||
-    boundEngine?.downloadsDir ||
-    path.join(os.homedir(), 'Downloads')
-  roots.push(downloadsDir, path.join(downloadsDir, '.p2p-staging'))
-  allowedStreamRoots = roots
-  return roots
-}
-
-function clearStreamRootsCache() {
-  allowedStreamRoots = null
-}
-
-function isAllowedStreamPath(localPath) {
-  const resolved = path.resolve(localPath)
-  const roots = allowedStreamRoots || []
-  return roots.some((root) => isUnderRoot(resolved, root))
-}
-
 async function handlePropfind(req, res, targetUrlPath) {
   res.writeHead(207, {
     'Content-Type': 'application/xml; charset="utf-8"',
@@ -213,139 +171,6 @@ function getMimeType(filePath) {
   return MIME_TYPES[ext] || 'application/octet-stream'
 }
 
-// ─── Capability-negotiated streaming (watch party) ──────────────────────────
-
-// The host decides what a viewer gets. `caps` is the viewer's declared
-// capabilities (already normalized); `filePath` is the resolved source.
-// Returns { mode: 'direct' } | { mode: 'remux' } | { mode: 'refuse', reason }.
-async function decideFor(caps, filePath) {
-  const meta = fileMetaFrom({ filename: path.basename(filePath) })
-  if (!remux.resolveFfmpeg().available) {
-    return decide(caps, meta, { remuxAvailable: false })
-  }
-  // We have ffprobe: get the real codecs (best effort — filename-only fallback
-  // on probe failure).
-  const probe = await remux.probeMedia(filePath).catch(() => null)
-  if (probe) {
-    meta.videoCodec = probe.videoCodec
-    meta.audioCodec = probe.audioCodec
-  }
-  return decide(caps, meta, { remuxAvailable: true })
-}
-
-function writeJsonError(res, status, payload) {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
-  res.end(JSON.stringify(payload))
-}
-
-// /stream/remux?id=<transferId|watch-<code>>&caps=<encodedJson>[&path=<encoded>]
-// Serves a container/audio rebuild (video stream copied) for a viewer that
-// cannot direct-play the source. Nothing is written to disk; the remux bytes
-// stream straight from the ffmpeg child. On refuse the viewer gets a 403 with
-// a reason instead of a black screen.
-async function handleRemuxRequest(req, res, targetUrlPath) {
-  let u
-  try {
-    u = new URL(targetUrlPath, 'http://127.0.0.1')
-  } catch {
-    return writeJsonError(res, 400, { error: 'bad request' })
-  }
-
-  let caps = null
-  try {
-    caps = normalizeCapabilities(JSON.parse(u.searchParams.get('caps') || '{}'))
-  } catch {
-    caps = normalizeCapabilities({})
-  }
-
-  const resolved = await resolveStreamSource(u)
-  if (!resolved.localPath || !fs.existsSync(resolved.localPath)) {
-    return writeJsonError(res, 404, { error: 'File Not Found' })
-  }
-
-  const verdict = await decideFor(caps, resolved.localPath)
-  if (verdict.mode === 'refuse') {
-    return writeJsonError(res, 403, { error: 'refused', reason: verdict.reason })
-  }
-  if (verdict.mode !== 'remux') {
-    // Direct play is fine — hand the caller the plain file URL instead.
-    const q = u.searchParams
-    const direct = new URL('/stream/transfer', 'http://127.0.0.1')
-    if (q.get('id')) direct.searchParams.set('id', q.get('id'))
-    if (q.get('path')) direct.searchParams.set('path', q.get('path'))
-    return writeJsonError(res, 302, { redirect: direct.pathname + direct.search })
-  }
-
-  let session
-  const token = `remux-${req.socket?.remotePort || Math.random()}`
-  try {
-    session = remux.startRemux(resolved.localPath, { token })
-  } catch (err) {
-    return writeJsonError(res, 500, { error: 'remux unavailable', reason: err.message })
-  }
-
-  // A client that disconnects mid-remux must kill the ffmpeg child — an
-  // orphan holds a file handle on the library drive.
-  const cleanup = () => remux.killRemux(token)
-  req.on('close', cleanup)
-  res.on('close', cleanup)
-
-  res.writeHead(200, {
-    'Content-Type': 'video/mp4',
-    'Transfer-Encoding': 'chunked',
-    'Cache-Control': 'no-cache',
-    'Access-Control-Allow-Origin': '*'
-  })
-  session.stream.on('error', () => {
-    if (!res.writableEnded) res.end()
-  })
-  session.stream.pipe(res)
-}
-
-// Resolve a stream source from a URL's query params. Returns { localPath,
-// transferId, source } where source is 'file' | 'transfer' | 'webdav'. The
-// transfer route reuses the existing transfers-bee + staging-dir resolution.
-async function resolveStreamSource(u) {
-  const query = u.searchParams
-  const transferId = query.get('id')
-  const filePathParam = query.get('path')
-
-  if (filePathParam && fs.existsSync(filePathParam)) {
-    return { localPath: filePathParam, transferId: null, source: 'file' }
-  }
-
-  if (transferId && boundEngine) {
-    // 1. transfers bee: stagingPath, destPath, filePath
-    const bee = await boundEngine.getBee('transfers').catch(() => null)
-    if (bee) {
-      const entry = await bee.get(transferId).catch(() => null)
-      if (entry?.value?.stagingPath && fs.existsSync(entry.value.stagingPath)) {
-        return { localPath: entry.value.stagingPath, transferId, source: 'transfer' }
-      }
-      if (entry?.value?.destPath && fs.existsSync(entry.value.destPath)) {
-        return { localPath: entry.value.destPath, transferId, source: 'transfer' }
-      }
-      if (entry?.value?.filePath && fs.existsSync(entry.value.filePath)) {
-        return { localPath: entry.value.filePath, transferId, source: 'transfer' }
-      }
-    }
-
-    // 2. staging .part file in downloadsDir
-    const downloadsDir =
-      (boundEngine.getDownloadDirectory ? await boundEngine.getDownloadDirectory() : null) ||
-      boundEngine.downloadsDir ||
-      path.join(os.homedir(), 'Downloads')
-    const stagingDir = path.join(downloadsDir, '.p2p-staging', transferId)
-    if (fs.existsSync(stagingDir)) {
-      const files = await fsp.readdir(stagingDir).catch(() => [])
-      const part = files.find((f) => f.endsWith('.part'))
-      if (part) return { localPath: path.join(stagingDir, part), transferId, source: 'transfer' }
-    }
-  }
-
-  return { localPath: null, transferId: null, source: 'webdav' }
-}
-
 async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
   let localPath = null
   let transferId = null
@@ -361,45 +186,44 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
     // Route: /stream/transfer?id=<transferId>&path=<encodedPath>
     try {
       const u = new URL(targetUrlPath, 'http://127.0.0.1')
-      const resolved = await resolveStreamSource(u)
-      localPath = resolved.localPath
-      transferId = resolved.transferId
+      transferId = u.searchParams.get('id')
+      const fallbackPath = u.searchParams.get('path')
+      if (fallbackPath && fs.existsSync(fallbackPath)) {
+        localPath = fallbackPath
+      }
+      if (!localPath && transferId && boundEngine) {
+        // 1. Check transfers bee for stagingPath, destPath, filePath
+        const bee = await boundEngine.getBee('transfers').catch(() => null)
+        if (bee) {
+          const entry = await bee.get(transferId).catch(() => null)
+          if (entry?.value?.stagingPath && fs.existsSync(entry.value.stagingPath)) {
+            localPath = entry.value.stagingPath
+          } else if (entry?.value?.destPath && fs.existsSync(entry.value.destPath)) {
+            localPath = entry.value.destPath
+          } else if (entry?.value?.filePath && fs.existsSync(entry.value.filePath)) {
+            localPath = entry.value.filePath
+          }
+        }
+
+        // 2. Check if staging .part file exists in baseDir or downloadsDir
+        if (!localPath) {
+          const downloadsDir =
+            (boundEngine.getDownloadDirectory ? await boundEngine.getDownloadDirectory() : null) ||
+            boundEngine.downloadsDir ||
+            path.join(os.homedir(), 'Downloads')
+          const stagingDir = path.join(downloadsDir, '.p2p-staging', transferId)
+          if (fs.existsSync(stagingDir)) {
+            const files = await fsp.readdir(stagingDir).catch(() => [])
+            const part = files.find((f) => f.endsWith('.part'))
+            if (part) localPath = path.join(stagingDir, part)
+          }
+        }
+      }
     } catch {}
-  } else if (targetUrlPath.startsWith('/stream/remux')) {
-    await handleRemuxRequest(req, res, targetUrlPath)
-    return
   }
 
   if (!localPath) {
     localPath = resolveLocalPath(targetUrlPath)
-  }
-
-  // Capability-negotiated direct path: when the caller declares what it can
-  // play, the host decides before serving a single byte. A viewer that needs a
-  // remux is pointed at /stream/remux; one that cannot play the file at all
-  // gets the reason instead of a silent black screen.
-  if (targetUrlPath.includes('caps=')) {
-    let caps = null
-    try {
-      const u = new URL(targetUrlPath, 'http://127.0.0.1')
-      caps = normalizeCapabilities(JSON.parse(u.searchParams.get('caps') || '{}'))
-    } catch {
-      caps = normalizeCapabilities({})
-    }
-    const verdict = await decideFor(caps, localPath)
-    if (verdict.mode === 'refuse') {
-      res.writeHead(403, {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      })
-      res.end(JSON.stringify({ error: 'refused', reason: verdict.reason }))
-      return
-    }
-    if (verdict.mode === 'remux') {
-      // Serve the remuxed bytes directly from this same request.
-      await handleRemuxRequest(req, res, targetUrlPath)
-      return
-    }
   }
 
   if (!fs.existsSync(localPath)) {
@@ -795,8 +619,7 @@ function getDriveStatus() {
     driveLetter: currentDriveLetter,
     webdavUrl: `http://127.0.0.1:${activePort}/p2p/`,
     port: activePort,
-    permissions,
-    remuxAvailable: remux.resolveFfmpeg().available
+    permissions
   }
 }
 
@@ -809,8 +632,5 @@ module.exports = {
   updateDrivePermissions,
   updateCatalogData,
   setFileCreatedCallback,
-  setWebDAVEngine,
-  decideFor,
-  clearStreamRootsCache,
-  resolveStreamSource
+  setWebDAVEngine
 }

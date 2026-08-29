@@ -18,10 +18,8 @@ import {
 import { Modal } from '@/components/Modal'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/useToast'
-import { useWatchSync } from '@/hooks/useWatchSync'
 import { METHODS, EVENTS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
-import { computeDeviceCapabilities } from '@/lib/deviceCapabilities'
 import type { WatchState } from '@/types'
 import mpegts from 'mpegts.js'
 import Hls from 'hls.js'
@@ -51,7 +49,6 @@ export function WatchPartyModal({
   const playerRef = useRef<any>(null)
 
   const [streamUrl, setStreamUrl] = useState<string>('')
-  const [streamError, setStreamError] = useState<string>('')
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -64,32 +61,23 @@ export function WatchPartyModal({
   const [showControls, setShowControls] = useState(true)
   const hideControlsTimer = useRef<NodeJS.Timeout | null>(null)
 
-  // Fetch local loopback Range stream URL. The host negotiates per-device:
-  // we declare what this browser can actually play so it can direct-play,
-  // remux, or refuse with a reason instead of a silent black screen.
+  // Fetch local loopback Range stream URL
   useEffect(() => {
     if (!open) {
       setStreamUrl('')
-      setStreamError('')
       setIsPlaying(false)
       return
     }
 
     let active = true
     const method = METHODS.STREAM_URL_GET || 'stream.getUrl'
-    const capabilities = computeDeviceCapabilities()
-    call(method, { transferId, filePath, capabilities })
+    call(method, { transferId, filePath })
       .then((res: any) => {
-        if (!active) return
-        if (res?.refused) {
-          setStreamError(res.refused)
-          setStreamUrl('')
-        } else if (res?.url) {
+        if (active && res?.url) {
           setStreamUrl(res.url)
-          setStreamError('')
         }
       })
-      .catch((err: any) => {
+      .catch((err) => {
         console.warn('[WatchParty] Failed to get stream url:', err)
         toast.error('Stream Error', 'Could not initialize local stream server.')
       })
@@ -191,38 +179,6 @@ export function WatchPartyModal({
   const seekDebounceTimer = useRef<NodeJS.Timeout | null>(null)
   const lastTimeUpdate = useRef<number>(0)
 
-  // Three-tier drift correction (clock offset + playbackRate + hard snap).
-  const applySync = useWatchSync({
-    videoRef,
-    isHost,
-    enabled: syncWithHost,
-    onResync: () => {}
-  })
-
-  // Listen for incoming Watch state sync signals from Host (viewers only)
-  useEffect(() => {
-    if (!open || isHost) return
-    const eventName = EVENTS.WATCH_STATE_SYNC || 'watch.state_sync'
-    const unsub = on(eventName, (state: any) => {
-      if (!state || !syncWithHost) return
-      // New-joiner snapshot: apply immediately when roomMeta is present.
-      if (state.roomMeta) {
-        const vid = videoRef.current
-        if (vid && typeof state.positionSec === 'number') {
-          vid.currentTime = state.positionSec
-        }
-        setIsPlaying(state.action === 'play')
-        setCurrentTime(state.positionSec || 0)
-        return
-      }
-      applySync(state)
-    })
-
-    return () => {
-      unsub?.()
-    }
-  }, [open, isHost, syncWithHost, applySync])
-
   // Broadcast state changes when Host interacts
   const broadcastSync = useCallback(
     (action: 'play' | 'pause' | 'seek', positionSec: number) => {
@@ -236,6 +192,39 @@ export function WatchPartyModal({
     },
     [isHost, syncWithHost, roomCode]
   )
+
+  // Listen for incoming Watch state sync signals from Host (viewers only)
+  useEffect(() => {
+    if (!open || isHost) return
+    const eventName = EVENTS.WATCH_STATE_CHANGED || 'watch.stateChanged'
+    const unsub = on(eventName, (state: WatchState) => {
+      if (!state || !syncWithHost) return
+
+      const vid = videoRef.current
+      if (!vid) return
+
+      if (state.action === 'play') {
+        if (vid.paused) vid.play().catch(() => {})
+        setIsPlaying(true)
+      } else if (state.action === 'pause') {
+        if (!vid.paused) vid.pause()
+        setIsPlaying(false)
+      }
+
+      if (typeof state.positionSec === 'number') {
+        // Sync timestamp if drift is greater than 1.5 seconds
+        const drift = Math.abs(vid.currentTime - state.positionSec)
+        if (drift > 1.5) {
+          vid.currentTime = state.positionSec
+          setCurrentTime(state.positionSec)
+        }
+      }
+    })
+
+    return () => {
+      unsub?.()
+    }
+  }, [open, isHost, syncWithHost])
 
   // Throttled video time update handler to prevent high-frequency React re-renders
   const handleTimeUpdate = () => {
@@ -431,22 +420,11 @@ export function WatchPartyModal({
               onError={(e) => {
                 const err = e.currentTarget.error
                 console.warn('[WatchParty] Video decode error:', err?.code, err?.message)
-                if (err?.code === 4) {
-                  setStreamError(
-                    'This device could not decode the video. The host may need to convert it.'
-                  )
-                }
               }}
               onClick={togglePlay}
               className='h-full w-full object-contain cursor-pointer'
               playsInline
             />
-          ) : streamError ? (
-            <div className='flex flex-col items-center gap-3 px-6 text-center text-muted-foreground'>
-              <Film className='h-10 w-10 text-amber-500/80' />
-              <span className='text-sm font-medium text-foreground'>Video not playable on this device</span>
-              <span className='text-xs leading-relaxed'>{streamError}</span>
-            </div>
           ) : (
             <div className='flex flex-col items-center gap-2 text-muted-foreground'>
               <Film className='h-10 w-10 animate-pulse text-primary/60' />

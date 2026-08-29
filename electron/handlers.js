@@ -693,6 +693,10 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
     return { success: true, count: sentCount }
   }
 
+  handlers[METHODS.CHECK_FOR_UPDATES] = async () => {
+    return { status: 'up_to_date', message: 'Application is already up to date.' }
+  }
+
   handlers[METHODS.LAN_DISCOVERY_PEER] = async (params) => {
     // LAN discovery now runs inside the engine; accept legacy announcements
     // for compatibility with old mains that forwarded them.
@@ -751,70 +755,20 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
     return engine.broadcastPartyStatus(params)
   }
 
-  handlers[METHODS.WATCH_PARTY_CHAT] = async (params) => {
-    if (!engine || !engine.sendPartyChat) return false
-    return engine.sendPartyChat(params?.text)
-  }
-
   handlers[METHODS.STREAM_URL_GET] = async (params) => {
-    const { startWebDAVServer, setWebDAVEngine, getDriveStatus, decideFor, resolveStreamSource } = require('./webdav')
+    const { startWebDAVServer, setWebDAVEngine, getDriveStatus } = require('./webdav')
     setWebDAVEngine(engine)
     await startWebDAVServer().catch(() => {})
     const status = getDriveStatus()
     const port = status.port || 41983
-    // The viewer's declared capabilities (codecs/containers/protocols it can
-    // actually play). When present, the host negotiates at stream time:
-    // direct-play if it can, remux if only the container is wrong, refuse with
-    // a reason otherwise. The legacy no-caps URL is unchanged.
-    const capsParam = params?.capabilities
-      ? `&caps=${encodeURIComponent(JSON.stringify(params.capabilities))}`
-      : ''
-
-    // Resolve the source path now so we can return a `refused` verdict to the
-    // renderer instead of handing it a URL that 403s into a black screen.
-    let sourcePath = null
-    if (params?.transferId || params?.filePath) {
-      try {
-        const u = new URL('/stream/transfer', 'http://127.0.0.1')
-        if (params.transferId) u.searchParams.set('id', params.transferId)
-        if (params.filePath) u.searchParams.set('path', params.filePath)
-        const resolved = await resolveStreamSource(u)
-        sourcePath = resolved.localPath
-      } catch {}
-    }
-
-    let refused = null
-    if (params?.capabilities && sourcePath) {
-      try {
-        const verdict = await decideFor(params.capabilities, sourcePath)
-        if (verdict.mode === 'refuse') refused = verdict.reason || 'This device cannot play this video.'
-        else if (verdict.mode === 'remux') {
-          // Remux is served at the same URL — the host's webdav layer picks the
-          // remux path when it sees caps=.
-        }
-      } catch {}
-    }
-
-    const base = { refused }
     if (params?.transferId) {
       const pathParam = params?.filePath ? `&path=${encodeURIComponent(params.filePath)}` : ''
-      return { ...base, url: `http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}${pathParam}${capsParam}` }
+      return { url: `http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}${pathParam}` }
     }
     if (params?.filePath) {
-      return { ...base, url: `http://127.0.0.1:${port}/stream/file?path=${encodeURIComponent(params.filePath)}${capsParam}` }
+      return { url: `http://127.0.0.1:${port}/stream/file?path=${encodeURIComponent(params.filePath)}` }
     }
-    return { ...base, url: `http://127.0.0.1:${port}/p2p/` }
-  }
-
-  handlers[METHODS.WATCH_GET_CAPABILITIES] = async () => {
-    const { getDriveStatus } = require('./webdav')
-    const { resolveFfmpeg } = require('./remux')
-    const ff = resolveFfmpeg()
-    return {
-      remuxAvailable: ff.available,
-      ffmpegSource: ff.source || null,
-      remuxDisabled: ff.disabled || false
-    }
+    return { url: `http://127.0.0.1:${port}/p2p/` }
   }
 
   return handlers

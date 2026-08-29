@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { METHODS, EVENTS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
 import { useToast } from '@/hooks/useToast'
-import { useNavigation } from '@/hooks/useNavigation'
 import type { PendingShare, ClaimPreview } from '@/types'
 
 // A pre-filled share composer: files picked in a system dialog, or files
@@ -36,12 +35,10 @@ interface SharesContextValue {
   shareDraft: ShareDraft | null
   claimPreview: ClaimPreview | null
   watchParty: ActiveWatchParty | null
-  partyJoinCode: string
   toggleDropCodeModal: () => void
   toggleOneTimeReceiveModal: () => void
   clearDeepLinkCode: () => void
   clearClaimPreview: () => void
-  clearPartyJoinCode: () => void
   openShareWith: (draft: ShareDraft) => void
   clearShareDraft: () => void
   cancelShareCode: (id: string) => Promise<unknown>
@@ -66,15 +63,11 @@ const SharesContext = createContext<SharesContextValue | null>(null)
 
 export function SharesProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast()
-  const { navigate } = useNavigation()
   const [pendingShares, setPendingShares] = useState<PendingShare[]>([])
   const [isDropCodeModalOpen, setIsDropCodeModalOpen] = useState(false)
   const [isOneTimeReceiveOpen, setIsOneTimeReceiveOpen] = useState(false)
   const [claimPreview, setClaimPreview] = useState<ClaimPreview | null>(null)
   const [watchParty, setWatchParty] = useState<ActiveWatchParty | null>(null)
-  // A PARTY code arriving via deep link (meshdrop://party/…): the WatchParty
-  // page consumes it to auto-join when it mounts.
-  const [partyJoinCode, setPartyJoinCode] = useState('')
   const lastClaimedCodeRef = useRef<string>('')
   // A DROP code arriving via deep link (meshdrop://drop/…) is stashed
   // here so OneTimeReceiveModal can pre-fill its input.
@@ -144,11 +137,7 @@ export function SharesProvider({ children }: { children: ReactNode }) {
     const unsubDeepLink = window.bridge?.onDeepLink?.((data) => {
       const code = data.code?.trim().toUpperCase() || ''
       if (!code) return
-      if (data.kind === 'party' || code.startsWith('PARTY')) {
-        // A watch-party link: go to the Party page and auto-join the room.
-        setPartyJoinCode(code)
-        navigate('/party')
-      } else if (code.startsWith('DROP')) {
+      if (code.startsWith('DROP')) {
         // A WeTransfer-style link: open the receive modal pre-filled with the
         // code. The claim itself is user-confirmed in the modal.
         setDeepLinkCode(code)
@@ -190,10 +179,6 @@ export function SharesProvider({ children }: { children: ReactNode }) {
 
   const clearDeepLinkCode = useCallback(() => {
     setDeepLinkCode('')
-  }, [])
-
-  const clearPartyJoinCode = useCallback(() => {
-    setPartyJoinCode('')
   }, [])
 
   const clearClaimPreview = useCallback(() => {
@@ -251,12 +236,10 @@ export function SharesProvider({ children }: { children: ReactNode }) {
         shareDraft,
         claimPreview,
         watchParty,
-        partyJoinCode,
         toggleDropCodeModal,
         toggleOneTimeReceiveModal,
         clearDeepLinkCode,
         clearClaimPreview,
-        clearPartyJoinCode,
         openShareWith,
         clearShareDraft,
         cancelShareCode,

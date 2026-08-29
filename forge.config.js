@@ -13,15 +13,6 @@ let packagerConfig = {
   protocols: [{ name: appName, schemes: [pkg.name] }],
   derefSymlinks: true,
   prune: true,
-  // Bundled ffmpeg/ffprobe for watch-party remux (stream-copy, no transcode).
-  // Shipped outside the asar so the remux seam can spawn them directly. The
-  // vendor dir is optional at build time — without the binaries the app runs
-  // fine, it just can't remux (direct-play or refuse).
-  extraResource: [
-    ...(fs.existsSync(path.join(__dirname, 'vendor', 'ffmpeg'))
-      ? [path.join(__dirname, 'vendor', 'ffmpeg')]
-      : [])
-  ],
   ignore: [
     /^[/\\]data([/\\]|$)/,
     /^[/\\]\.p2p-test-profile([/\\]|$)/,

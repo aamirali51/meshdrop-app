@@ -109,13 +109,11 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     engine.on('party:room:joined', (d) => forward(EVENTS.WATCH_ROOM_JOINED, d))
     engine.on('party:room:left', (d) => forward(EVENTS.WATCH_ROOM_LEFT, d))
     engine.on('party:room:closed', (d) => forward(EVENTS.WATCH_ROOM_CLOSED, d))
-    engine.on('party:host:changed', (d) => forward(EVENTS.WATCH_HOST_CHANGED, d))
     engine.on('party:peer:joined', (d) => forward(EVENTS.WATCH_PEER_JOINED, d))
     engine.on('party:peer:left', (d) => forward(EVENTS.WATCH_PEER_LEFT, d))
     engine.on('party:peer:status', (d) => forward(EVENTS.WATCH_PEER_STATUS, d))
     engine.on('party:state:sync', (d) => forward(EVENTS.WATCH_STATE_SYNC, d))
     engine.on('party:reaction', (d) => forward(EVENTS.WATCH_REACTION, d))
-    engine.on('party:chat', (d) => forward(EVENTS.WATCH_CHAT, d))
     engine.on('party:rooms:discovered', (d) => forward(EVENTS.WATCH_ROOMS_DISCOVERED, d))
     engine.on('notification:received', (n) => forward(EVENTS.NOTIFICATION_RECEIVED, n))
     engine.on('error', (err) => {
