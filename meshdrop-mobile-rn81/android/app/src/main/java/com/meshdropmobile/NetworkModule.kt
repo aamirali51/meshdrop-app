@@ -24,14 +24,20 @@ class NetworkModule(private val reactContext: ReactApplicationContext) :
 
   override fun getName(): String = "MeshDropNetwork"
 
-  private var lastSig: String? = null
+  private val signatureTracker = NetworkSignatureTracker()
   private var registered = false
+
+  private data class NetworkState(val type: String, val signature: String, val isOnline: Boolean)
 
   @ReactMethod
   fun startListening() {
     if (registered) return
     val cm = reactContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
+    // registerNetworkCallback immediately reports the current network. Seed it
+    // as this process's baseline so that callback is not misclassified as a
+    // transport transition and used to rebuild the just-started swarm.
+    signatureTracker.seed(readNetworkState(cm).signature)
     cm.registerNetworkCallback(request, callback)
     registered = true
   }
@@ -57,32 +63,36 @@ class NetworkModule(private val reactContext: ReactApplicationContext) :
   private fun emitChange() {
     try {
       val cm = reactContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-      val active = cm.activeNetwork
-      val caps = active?.let { cm.getNetworkCapabilities(it) }
-      val type =
-          when {
-            caps == null -> "none"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
-            else -> "other"
-          }
-      // Distinguish "no connectivity at all" from "switched transports": a full
-      // loss with no replacement network must not trigger a swarm rebuild onto
-      // a dead interface — the engine only rebuilds when connectivity returns.
-      // The online flag is part of the signature so loss→recovery always emits.
-      val isOnline = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-      val sig = "$type:${active?.toString() ?: "none"}:$isOnline"
-      if (sig == lastSig) return
-      lastSig = sig
+      val state = readNetworkState(cm)
+      if (!signatureTracker.shouldEmit(state.signature)) return
       val params = Arguments.createMap()
-      params.putString("type", type)
-      params.putBoolean("online", isOnline)
+      params.putString("type", state.type)
+      params.putBoolean("online", state.isOnline)
       reactContext
           .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
           .emit("MeshDropNetworkChanged", params)
     } catch (e: Exception) {
       // Never crash the bridge over a connectivity probe.
     }
+  }
+
+  private fun readNetworkState(cm: ConnectivityManager): NetworkState {
+    val active = cm.activeNetwork
+    val caps = active?.let { cm.getNetworkCapabilities(it) }
+    val type =
+        when {
+          caps == null -> "none"
+          caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+          caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+          caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+          else -> "other"
+        }
+    // Distinguish "no connectivity at all" from "switched transports": a full
+    // loss with no replacement network must not trigger a swarm rebuild onto
+    // a dead interface — the engine only rebuilds when connectivity returns.
+    // The online flag is part of the signature so loss→recovery always emits.
+    val isOnline = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    val signature = "$type:${active?.toString() ?: "none"}:$isOnline"
+    return NetworkState(type, signature, isOnline)
   }
 }
