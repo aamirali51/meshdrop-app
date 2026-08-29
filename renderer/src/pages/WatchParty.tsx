@@ -28,7 +28,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/hooks/useToast'
 import { useDevices } from '@/hooks/useDevices'
+import { call, on } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
+import { EVENTS, METHODS } from '@/types/protocol'
 
 interface RoomParticipant {
   id: string
@@ -79,43 +81,43 @@ export function WatchParty() {
 
   // Fetch initial state & discover rooms
   useEffect(() => {
-    window.bridge?.send?.('watch.getRoom').then((room: any) => {
+    call(METHODS.WATCH_PARTY_GET_ROOM).then((room: any) => {
       if (room) setActiveRoom(room)
     }).catch(() => {})
 
-    window.bridge?.send?.('watch.listRooms').then((rooms: any) => {
+    call(METHODS.WATCH_PARTY_LIST_ROOMS).then((rooms: any) => {
       if (Array.isArray(rooms)) setDiscoveredRooms(rooms)
     }).catch(() => {})
 
     const unsubs = [
-      window.bridge?.on?.('watch.rooms_discovered', (rooms: DiscoveredRoom[]) => {
+      on(EVENTS.WATCH_ROOMS_DISCOVERED, (rooms: any) => {
         if (Array.isArray(rooms)) setDiscoveredRooms(rooms)
       }),
-      window.bridge?.on?.('watch.room_created', (room: any) => {
+      on(EVENTS.WATCH_ROOM_CREATED, (room: any) => {
         setActiveRoom(room)
       }),
-      window.bridge?.on?.('watch.room_joined', (room: any) => {
+      on(EVENTS.WATCH_ROOM_JOINED, (room: any) => {
         setActiveRoom(room)
       }),
-      window.bridge?.on?.('watch.room_left', () => {
+      on(EVENTS.WATCH_ROOM_LEFT, () => {
         setActiveRoom(null)
         setStreamUrl('')
       }),
-      window.bridge?.on?.('watch.room_closed', () => {
+      on(EVENTS.WATCH_ROOM_CLOSED, () => {
         setActiveRoom(null)
         setStreamUrl('')
         toast.info('Party Ended', 'The host has closed the Watch Party room.')
       }),
-      window.bridge?.on?.('watch.state_sync', (state: any) => {
+      on(EVENTS.WATCH_STATE_SYNC, (state: any) => {
         if (!state) return
         handleRemotePlaybackState(state)
       }),
-      window.bridge?.on?.('watch.reaction', (reaction: any) => {
+      on(EVENTS.WATCH_REACTION, (reaction: any) => {
         if (reaction?.emoji) {
           triggerReactionAnimation(reaction.emoji)
         }
       }),
-      window.bridge?.on?.('watch.peer_joined', (data: any) => {
+      on(EVENTS.WATCH_PEER_JOINED, (data: any) => {
         toast.success('Peer Joined', `${data.peer?.name || 'A peer'} joined the party.`)
       }),
     ]
@@ -133,14 +135,14 @@ export function WatchParty() {
     }
 
     if (activeRoom.filePath) {
-      window.bridge?.send?.('stream.getUrl', { filePath: activeRoom.filePath })
+      call(METHODS.STREAM_URL_GET, { filePath: activeRoom.filePath })
         .then((res: any) => {
           if (res?.url) setStreamUrl(res.url)
         })
         .catch(() => {})
     } else if (activeRoom.roomCode) {
       const shareId = `watch-${activeRoom.roomCode.toLowerCase()}`
-      window.bridge?.send?.('stream.getUrl', { transferId: shareId })
+      call(METHODS.STREAM_URL_GET, { transferId: shareId })
         .then((res: any) => {
           if (res?.url) setStreamUrl(res.url)
         })
@@ -178,7 +180,7 @@ export function WatchParty() {
     if (now - lastSyncBroadcastRef.current < 200 && action !== 'seek') return
     lastSyncBroadcastRef.current = now
 
-    window.bridge?.send?.('watch.stateBroadcast', {
+    call(METHODS.WATCH_STATE_BROADCAST, {
       roomCode: activeRoom?.roomCode,
       action,
       positionSec: posSec
@@ -196,13 +198,13 @@ export function WatchParty() {
 
   const handleSendReaction = (emoji: string) => {
     triggerReactionAnimation(emoji)
-    window.bridge?.send?.('watch.reaction', { emoji }).catch(() => {})
+    call(METHODS.WATCH_PARTY_REACTION, { emoji }).catch(() => {})
   }
 
   // File Picker
   const handlePickFile = async () => {
     try {
-      const res = await window.bridge?.send?.('files.pickFile')
+      const res = await window.bridge.openFileDialog()
       if (res && res.filePath) {
         setSelectedFile({
           path: res.filePath,
@@ -213,7 +215,9 @@ export function WatchParty() {
           setRoomTitleInput(res.filename?.replace(/\.[^/.]+$/, '') || 'Watch Party')
         }
       }
-    } catch {}
+    } catch (err: any) {
+      toast.error('File Selection Failed', err?.message || 'Could not open the video file chooser.')
+    }
   }
 
   // Host Create Room
@@ -224,11 +228,11 @@ export function WatchParty() {
     }
     setLoading(true)
     try {
-      const room = await window.bridge?.send?.('watch.createRoom', {
+      const room = (await call(METHODS.WATCH_PARTY_CREATE, {
         title: roomTitleInput || selectedFile.name,
         filePath: selectedFile.path,
         controlsMode
-      })
+      })) as any
       setActiveRoom(room)
       toast.success('Room Created', `Watch Party ${room.roomCode} is live!`)
     } catch (err: any) {
@@ -247,7 +251,7 @@ export function WatchParty() {
     }
     setLoading(true)
     try {
-      const room = await window.bridge?.send?.('watch.joinRoom', { roomCode: code })
+      const room = (await call(METHODS.WATCH_PARTY_JOIN, { roomCode: code })) as any
       setActiveRoom(room)
       toast.success('Joined Room', `Connected to party ${code}`)
     } catch (err: any) {
@@ -259,7 +263,7 @@ export function WatchParty() {
 
   // Leave Room
   const handleLeaveRoom = async () => {
-    await window.bridge?.send?.('watch.leaveRoom').catch(() => {})
+    await call(METHODS.WATCH_PARTY_LEAVE).catch(() => {})
     setActiveRoom(null)
     setStreamUrl('')
     setSelectedFile(null)
@@ -345,7 +349,7 @@ export function WatchParty() {
               Select a video from your computer to stream progressively to connected mesh peers with synchronized playback.
             </p>
 
-            {/* Drag & Drop / File Picker */}
+            {/* File Picker */}
             <div
               onClick={handlePickFile}
               className={cn(
@@ -365,7 +369,7 @@ export function WatchParty() {
                 </div>
               ) : (
                 <div className='text-center'>
-                  <p className='text-sm font-medium text-foreground'>Click or drag video file here</p>
+                  <p className='text-sm font-medium text-foreground'>Click to select a video file</p>
                   <p className='text-xs text-muted-foreground mt-0.5'>Supports MP4, MKV, WebM, TS, MOV</p>
                 </div>
               )}
