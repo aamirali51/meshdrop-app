@@ -39,6 +39,17 @@ files:
   - build/**/*
   - package.json
 
+# Bundled LGPL ffmpeg/ffprobe for watch-party remux (stream-copy + AAC). Copied
+# outside the asar to <resources>/ffmpeg/<platform>/ where electron/remux.js
+# resolves them (process.resourcesPath). Populated by scripts/fetch-ffmpeg.js
+# (pinned releases, SHA-256 verified); CI fetches before every release build.
+# Without them the app still works — negotiation degrades to direct/refuse.
+extraResources:
+  - from: vendor/ffmpeg
+    to: ffmpeg
+    filter:
+      - '**/*'
+
 # The P2P engine (@mesh/core) uses native/prebuilt modules (sodium-native,
 # udx-native) that cannot load from inside asar, so node_modules stays
 # unpacked on disk.
