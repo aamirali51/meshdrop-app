@@ -10,12 +10,8 @@ export interface DeviceCapabilities {
   protocols: string[]
 }
 
-// The native module declares `get(promise: Promise)` as a React Promise
-// (TurboModule interop), so the JS side must call it with NO arguments and
-// await the returned promise — passing a trailing callback is never invoked
-// (same pattern as MeshDropUpdater; see src/updater.ts).
 const native = NativeModules.MeshDropCapabilities as
-  | { get?: () => Promise<DeviceCapabilities> }
+  | { get?: (cb: (caps: DeviceCapabilities) => void) => void }
   | undefined
 
 let cached: DeviceCapabilities | null = null
@@ -28,21 +24,15 @@ export function getDeviceCapabilities(): Promise<DeviceCapabilities> {
     cached = { videoCodecs: [], audioCodecs: [], containers: [], protocols: [] }
     return Promise.resolve(cached)
   }
-  return native
-    .get()
-    .then((caps) => {
+  return new Promise((resolve) => {
+    native.get!((caps) => {
       cached = {
         videoCodecs: Array.isArray(caps?.videoCodecs) ? caps.videoCodecs : [],
         audioCodecs: Array.isArray(caps?.audioCodecs) ? caps.audioCodecs : [],
         containers: Array.isArray(caps?.containers) ? caps.containers : [],
         protocols: Array.isArray(caps?.protocols) ? caps.protocols : []
       }
-      return cached
+      resolve(cached)
     })
-    .catch(() => {
-      // A failed probe must not block party creation — declare nothing so the
-      // host refuses with a clear reason rather than the party failing to start.
-      cached = { videoCodecs: [], audioCodecs: [], containers: [], protocols: [] }
-      return cached
-    })
+  })
 }
