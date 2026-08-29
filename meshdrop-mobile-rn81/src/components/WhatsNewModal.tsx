@@ -16,7 +16,7 @@ import RNFS from 'react-native-fs'
 import { SimpleModal, Btn } from '../components'
 import { useTheme, fonts } from '../theme'
 
-const CURRENT_VERSION = '1.0.39'
+const CURRENT_VERSION = '1.0.53'
 const VERSION_FILE_PATH = `${RNFS.DocumentDirectoryPath}/.meshdrop_version`
 
 const FEATURES = [

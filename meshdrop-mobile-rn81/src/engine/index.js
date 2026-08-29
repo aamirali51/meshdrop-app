@@ -276,6 +276,14 @@ function call(method, params) {
       return engine.setAutoTrustLAN(!!params?.enabled)
     case 'setPreferOwnRelay':
       return engine.setPreferOwnRelay(!!params?.enabled)
+    case 'setRelayMode':
+      return typeof engine.setRelayMode === 'function'
+        ? engine.setRelayMode(params?.mode)
+        : { success: false, supported: false }
+    case 'setCustomRelayUrl':
+      return typeof engine.setCustomRelayUrl === 'function'
+        ? engine.setCustomRelayUrl(params?.url)
+        : { success: false, supported: false }
     case 'setLANDiscovery':
       // LAN discovery cannot run inside the Bare worklet (no raw UDP
       // sockets), so this is intentionally a persisted-only non-op.
@@ -353,6 +361,11 @@ function call(method, params) {
       return engine.claimDropCode(params?.code, { interactive: true })
     case 'confirmClaimDownload':
       return engine.confirmClaimDownload(params)
+    case 'acceptClaimPreview':
+      // The claim preview's Accept button resolves to confirming the download
+      // (same path as desktop FILES_CONFIRM_CLAIM). `shareId` is the claim's
+      // share id; confirmClaimDownload resolves it into a real transfer.
+      return engine.confirmClaimDownload({ shareId: params?.shareId })
     case 'cancelClaimDownload':
       return engine.cancelClaimDownload(params)
     case 'deletePendingShare':
@@ -371,6 +384,38 @@ function call(method, params) {
       return engine.getStorageStats()
     case 'clearTransferLog':
       return engine.clearTransferLog()
+    case 'getTransferHistory':
+    case 'history.list': {
+      // Read the persisted transfer history bee (same shape the desktop
+      // history.list handler returns: newest first).
+      const bee = await engine.getBee('history').catch(() => null)
+      if (!bee) return []
+      const results = []
+      for await (const node of bee.createReadStream()) {
+        results.push(node.value)
+      }
+      results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      return results
+    }
+    case 'clearTransferHistory':
+    case 'history.clear': {
+      const bee = await engine.getBee('history').catch(() => null)
+      if (!bee) return { success: false, count: 0 }
+      const keys = []
+      for await (const node of bee.createReadStream()) {
+        keys.push(node.key)
+      }
+      for (const k of keys) {
+        await bee.del(k)
+      }
+      return { success: true, count: keys.length }
+    }
+    case 'deleteHistoryItem': {
+      const bee = await engine.getBee('history').catch(() => null)
+      if (!bee) return { success: false }
+      await bee.del(String(params?.id))
+      return { success: true }
+    }
     case 'compactStorage':
       return engine.compactStorage()
     case 'acceptTransfer':
