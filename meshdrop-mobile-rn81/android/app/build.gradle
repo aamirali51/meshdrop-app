@@ -148,6 +148,8 @@ dependencies {
     // FileProvider for sharing downloaded APKs with the system installer.
     implementation("androidx.core:core-ktx:1.13.1")
 
+    testImplementation("junit:junit:4.13.2")
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

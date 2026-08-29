@@ -19,6 +19,11 @@ import { Worklet } from 'react-native-bare-kit'
 import { NativeModules, NativeEventEmitter, type NativeModule } from 'react-native'
 import RNFS from 'react-native-fs'
 import b4a from 'b4a'
+import {
+  INITIAL_NETWORK_REFRESH_STATE,
+  recordEngineReady,
+  recordNetworkChange,
+} from './networkRefreshPolicy'
 
 type Resolve = (value: any) => void
 type Reject = (err: Error) => void
@@ -34,15 +39,7 @@ let engineReady = false
 // process restore) would stay stuck on 'Booting…' forever. Replayed in on().
 let lastEngineMsg: any = null
 let networkTimer: ReturnType<typeof setTimeout> | null = null
-// A network change that arrived while the engine was still booting. The boot
-// binds to the network current at boot time, so an early switch matters only
-// if it is the last one before ready — replay it then instead of dropping it.
-let pendingNetworkChange = false
-// The native layer reports online=false when connectivity fully drops (no
-// replacement network). While offline, refreshes are pointless — the swarm
-// rebuilds onto a dead interface. We remember the loss so the next
-// online=true event always rebuilds exactly once.
-let isOffline = false
+let networkRefreshState = INITIAL_NETWORK_REFRESH_STATE
 
 function emit(event: string, data: any) {
   const set = listeners.get(event)
@@ -63,12 +60,9 @@ function handle(msg: any) {
     lastEngineMsg = msg
     if (msg.status === 'ready') {
       engineReady = true
-      // Replay a network change that arrived during the boot window now that
-      // the engine can rebuild the swarm on the current network.
-      if (pendingNetworkChange) {
-        pendingNetworkChange = false
-        scheduleNetworkRefresh()
-      }
+      const decision = recordEngineReady(networkRefreshState)
+      networkRefreshState = decision.state
+      if (decision.action === 'refresh') scheduleNetworkRefresh()
     } else if (msg.status === 'stopped' || msg.status === 'error') {
       engineReady = false
       // The worklet died (unhandled rejection in Bare is fatal, or the engine
@@ -229,33 +223,24 @@ export function watchNetworkChanges(): void {
     startListening?: () => void
   }
   if (!mod?.startListening) return
-  mod.startListening()
   const emitter = new NativeEventEmitter(mod as unknown as NativeModule)
   emitter.addListener('MeshDropNetworkChanged', (params: { type?: string; online?: boolean }) => {
-    if (!engineReady) {
-      // Engine still booting — defer instead of dropping; the replay happens
-      // in handle() when the engine reports ready.
-      pendingNetworkChange = true
-      return
-    }
     const online = params?.online !== false
-    if (!online) {
-      // Full connectivity loss. Cancel any pending rebuild — refreshing onto
-      // a dead network just churns. Remember the loss so the recovery event
-      // (online=true) always rebuilds exactly once below.
+    const decision = recordNetworkChange(networkRefreshState, online, engineReady)
+    networkRefreshState = decision.state
+
+    if (decision.action === 'cancel') {
       if (networkTimer) {
         clearTimeout(networkTimer)
         networkTimer = null
       }
-      isOffline = true
-      return
+    } else if (decision.action === 'refresh') {
+      scheduleNetworkRefresh()
     }
-    const wasOffline = isOffline
-    isOffline = false
-    // Recovered from a loss, or switched transports while online — both need a
-    // rebuild on the current interface.
-    if (wasOffline || online) scheduleNetworkRefresh()
   })
+  // Subscribe before native observation starts so the first real transition
+  // cannot race ahead of the JS listener.
+  mod.startListening()
 }
 
 // Debounced rebuild trigger; a single switch fires several callbacks
