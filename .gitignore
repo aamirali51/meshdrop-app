@@ -63,6 +63,7 @@ skills-lock.json
 *.md
 !README.md
 !CONTRIBUTING.md
+!CONTRIBUTORS.md
 !TRADEMARK_POLICY.md
 !web/README.md
 
