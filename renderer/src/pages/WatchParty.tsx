@@ -17,17 +17,19 @@ import {
   Sparkles,
   ArrowRight,
   LogOut,
-  Upload,
-  Shield,
-  Clock,
-  Heart,
-  Smile,
-  Flame,
-  Zap,
+  Send,
+  MessageSquare,
+  ShieldAlert,
+  Crown,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/hooks/useToast'
 import { useDevices } from '@/hooks/useDevices'
+import { useShares } from '@/hooks/useShares'
+import { useWatchSync } from '@/hooks/useWatchSync'
+import { METHODS, EVENTS } from '@/types/protocol'
+import { call, on } from '@/lib/ipc'
+import { computeDeviceCapabilities } from '@/lib/deviceCapabilities'
 import { cn } from '@/lib/utils'
 
 interface RoomParticipant {
@@ -44,7 +46,18 @@ interface DiscoveredRoom {
   title: string
   hostName: string
   hostPeerId: string
+  filename?: string
+  fileSize?: number
   timestamp: number
+}
+
+interface ChatMessage {
+  id: string
+  sender: string
+  senderId?: string
+  text: string
+  timestamp: number
+  isSelf?: boolean
 }
 
 const REACTIONS = ['🍿', '🔥', '👏', '❤️', '😂', '🎉']
@@ -52,6 +65,7 @@ const REACTIONS = ['🍿', '🔥', '👏', '❤️', '😂', '🎉']
 export function WatchParty() {
   const { toast } = useToast()
   const { identity } = useDevices()
+  const { partyJoinCode, clearPartyJoinCode } = useShares()
 
   // Room & Player State
   const [activeRoom, setActiveRoom] = useState<any | null>(null)
@@ -64,6 +78,7 @@ export function WatchParty() {
 
   // Playback State
   const [streamUrl, setStreamUrl] = useState<string>('')
+  const [streamError, setStreamError] = useState<string>('')
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -72,50 +87,152 @@ export function WatchParty() {
   const [showControls, setShowControls] = useState(true)
   const [copiedCode, setCopiedCode] = useState(false)
   const [floatingReactions, setFloatingReactions] = useState<{ id: number; emoji: string; x: number }[]>([])
+  const [checksumWarning, setChecksumWarning] = useState<string | null>(null)
+
+  // Chat State
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatOpen, setChatOpen] = useState(true)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSyncBroadcastRef = useRef<number>(0)
+  const chatScrollRef = useRef<HTMLDivElement | null>(null)
+  const appliedSnapshotRef = useRef<string>('')
+
+  const applySync = useWatchSync({
+    videoRef,
+    isHost: Boolean(activeRoom?.isHost),
+    onResync: () => {}
+  })
+
+  const sendChatMessage = useCallback(() => {
+    const text = chatInput.trim()
+    if (!text) return
+    call(METHODS.WATCH_PARTY_CHAT, { text }).catch(() => {})
+    setChatMessages((prev) => [
+      ...prev,
+      { id: `${Date.now()}-self`, sender: identity?.name || 'You', senderId: identity?.id, text, timestamp: Date.now(), isSelf: true }
+    ])
+    setChatInput('')
+  }, [chatInput, identity])
 
   // Fetch initial state & discover rooms
   useEffect(() => {
-    window.bridge?.send?.('watch.getRoom').then((room: any) => {
+    call(METHODS.WATCH_PARTY_GET_ROOM).then((room: any) => {
       if (room) setActiveRoom(room)
     }).catch(() => {})
 
-    window.bridge?.send?.('watch.listRooms').then((rooms: any) => {
+    call(METHODS.WATCH_PARTY_LIST_ROOMS).then((rooms: any) => {
       if (Array.isArray(rooms)) setDiscoveredRooms(rooms)
     }).catch(() => {})
 
     const unsubs = [
-      window.bridge?.on?.('watch.rooms_discovered', (rooms: DiscoveredRoom[]) => {
+      on(EVENTS.WATCH_ROOMS_DISCOVERED, (rooms: any) => {
         if (Array.isArray(rooms)) setDiscoveredRooms(rooms)
       }),
-      window.bridge?.on?.('watch.room_created', (room: any) => {
+      on(EVENTS.WATCH_ROOM_CREATED, (room: any) => {
         setActiveRoom(room)
+        // Pre-seed chat history from the room snapshot if the engine carried it.
+        if (Array.isArray(room?.chatHistory)) {
+          setChatMessages(room.chatHistory.map((m: any, i: number) => ({
+            id: `${room.roomCode}-${i}-${m.timestamp || 0}`,
+            sender: m.sender?.name || 'Peer',
+            senderId: m.sender?.id,
+            text: m.text,
+            timestamp: m.timestamp || Date.now(),
+            isSelf: m.sender?.id === identity?.id
+          })))
+        }
       }),
-      window.bridge?.on?.('watch.room_joined', (room: any) => {
+      on(EVENTS.WATCH_ROOM_JOINED, (room: any) => {
         setActiveRoom(room)
+        // New-joiner snapshot: apply the host's position immediately.
+        if (room?.lastPlayback && room.lastPlayback.positionSec != null) {
+          setCurrentTime(room.lastPlayback.positionSec)
+          if (videoRef.current) videoRef.current.currentTime = room.lastPlayback.positionSec
+          setIsPlaying(room.lastPlayback.action === 'play')
+          appliedSnapshotRef.current = room.roomCode || ''
+        }
+        if (Array.isArray(room?.chatHistory)) {
+          setChatMessages(room.chatHistory.map((m: any, i: number) => ({
+            id: `${room.roomCode}-${i}-${m.timestamp || 0}`,
+            sender: m.sender?.name || 'Peer',
+            senderId: m.sender?.id,
+            text: m.text,
+            timestamp: m.timestamp || Date.now(),
+            isSelf: m.sender?.id === identity?.id
+          })))
+        }
+        if (room?.fileChecksum && room.fileChecksum !== identity?.id) {
+          // The engine knows the host's checksum; the local copy may differ —
+          // surface a warning instead of silently desyncing.
+          setChecksumWarning('This party is playing a file. If the video looks wrong, make sure you have the same file as the host.')
+        }
       }),
-      window.bridge?.on?.('watch.room_left', () => {
+      on(EVENTS.WATCH_ROOM_LEFT, () => {
         setActiveRoom(null)
         setStreamUrl('')
+        setChatMessages([])
+        setChecksumWarning(null)
       }),
-      window.bridge?.on?.('watch.room_closed', () => {
+      on(EVENTS.WATCH_ROOM_CLOSED, (data: any) => {
         setActiveRoom(null)
         setStreamUrl('')
-        toast.info('Party Ended', 'The host has closed the Watch Party room.')
+        setChatMessages([])
+        setChecksumWarning(null)
+        if (data?.handedOff) {
+          toast.info('Party Continued', 'The host left, but the party continues with a new host.')
+        } else {
+          toast.info('Party Ended', 'The host has closed the Watch Party room.')
+        }
       }),
-      window.bridge?.on?.('watch.state_sync', (state: any) => {
+      on(EVENTS.WATCH_HOST_CHANGED, (room: any) => {
+        setActiveRoom(room)
+        setIsPlaying(Boolean(room?.lastPlayback && room.lastPlayback.action === 'play'))
+        toast.success('You are the Host', 'The previous host left — you are now hosting the party.')
+      }),
+      on(EVENTS.WATCH_STATE_SYNC, (state: any) => {
         if (!state) return
-        handleRemotePlaybackState(state)
+        // Apply new-joiner snapshot immediately when roomMeta is present.
+        if (state.roomMeta) {
+          setActiveRoom((prev: any) => {
+            const next = { ...(prev || {}), ...state.roomMeta }
+            return next
+          })
+          if (state.positionSec != null) {
+            setCurrentTime(state.positionSec)
+            if (videoRef.current) videoRef.current.currentTime = state.positionSec
+            setIsPlaying(state.action === 'play')
+            appliedSnapshotRef.current = state.roomCode || ''
+          }
+          return
+        }
+        applySync(state)
       }),
-      window.bridge?.on?.('watch.reaction', (reaction: any) => {
+      on(EVENTS.WATCH_REACTION, (reaction: any) => {
         if (reaction?.emoji) {
           triggerReactionAnimation(reaction.emoji)
         }
       }),
-      window.bridge?.on?.('watch.peer_joined', (data: any) => {
+      on(EVENTS.WATCH_CHAT, (msg: any) => {
+        if (!msg?.text) return
+        setChatMessages((prev) => {
+          if (prev.some((m) => m.timestamp === msg.timestamp && m.senderId === msg.sender?.id)) return prev
+          return [
+            ...prev,
+            {
+              id: `${msg.sender?.id || 'p'}-${msg.timestamp}`,
+              sender: msg.sender?.name || 'Peer',
+              senderId: msg.sender?.id,
+              text: msg.text,
+              timestamp: msg.timestamp || Date.now(),
+              isSelf: msg.sender?.id === identity?.id
+            }
+          ]
+        })
+      }),
+      on(EVENTS.WATCH_PEER_JOINED, (data: any) => {
         toast.success('Peer Joined', `${data.peer?.name || 'A peer'} joined the party.`)
       }),
     ]
@@ -123,62 +240,68 @@ export function WatchParty() {
     return () => {
       unsubs.forEach((u) => u?.())
     }
-  }, [])
+  }, [applySync, identity?.id, identity?.name, toast])
 
-  // Resolve WebDAV Stream URL whenever activeRoom changes
+  // Auto-join when a party deep link arrives.
+  useEffect(() => {
+    if (partyJoinCode && !activeRoom) {
+      handleJoinRoom(partyJoinCode)
+      clearPartyJoinCode()
+    }
+  }, [partyJoinCode, activeRoom]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll chat to the bottom on new messages.
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+    }
+  }, [chatMessages])
+
+  // Resolve WebDAV Stream URL whenever activeRoom changes. The host negotiates
+  // per-device: we declare what this browser can play so it can direct-play,
+  // remux, or refuse with a reason instead of a black screen.
   useEffect(() => {
     if (!activeRoom) {
       setStreamUrl('')
+      setStreamError('')
       return
     }
 
+    const capabilities = computeDeviceCapabilities()
     if (activeRoom.filePath) {
-      window.bridge?.send?.('stream.getUrl', { filePath: activeRoom.filePath })
+      call(METHODS.STREAM_URL_GET, { filePath: activeRoom.filePath, capabilities })
         .then((res: any) => {
-          if (res?.url) setStreamUrl(res.url)
+          if (res?.refused) {
+            setStreamUrl('')
+            setStreamError(res.refused)
+          } else if (res?.url) {
+            setStreamUrl(res.url)
+            setStreamError('')
+          }
         })
         .catch(() => {})
     } else if (activeRoom.roomCode) {
       const shareId = `watch-${activeRoom.roomCode.toLowerCase()}`
-      window.bridge?.send?.('stream.getUrl', { transferId: shareId })
+      call(METHODS.STREAM_URL_GET, { transferId: shareId, capabilities })
         .then((res: any) => {
-          if (res?.url) setStreamUrl(res.url)
+          if (res?.refused) {
+            setStreamUrl('')
+            setStreamError(res.refused)
+          } else if (res?.url) {
+            setStreamUrl(res.url)
+            setStreamError('')
+          }
         })
         .catch(() => {})
     }
   }, [activeRoom])
-
-  // Remote Sync Handler
-  const handleRemotePlaybackState = useCallback((state: any) => {
-    const video = videoRef.current
-    if (!video) return
-
-    if (state.action === 'play') {
-      if (typeof state.positionSec === 'number' && Math.abs(video.currentTime - state.positionSec) > 1.5) {
-        video.currentTime = state.positionSec
-      }
-      video.play().catch(() => {})
-      setIsPlaying(true)
-    } else if (state.action === 'pause') {
-      if (typeof state.positionSec === 'number' && Math.abs(video.currentTime - state.positionSec) > 1.5) {
-        video.currentTime = state.positionSec
-      }
-      video.pause()
-      setIsPlaying(false)
-    } else if (state.action === 'seek') {
-      if (typeof state.positionSec === 'number') {
-        video.currentTime = state.positionSec
-        setCurrentTime(state.positionSec)
-      }
-    }
-  }, [])
 
   const broadcastSync = (action: 'play' | 'pause' | 'seek', posSec: number) => {
     const now = Date.now()
     if (now - lastSyncBroadcastRef.current < 200 && action !== 'seek') return
     lastSyncBroadcastRef.current = now
 
-    window.bridge?.send?.('watch.stateBroadcast', {
+    call(METHODS.WATCH_STATE_BROADCAST, {
       roomCode: activeRoom?.roomCode,
       action,
       positionSec: posSec
@@ -196,13 +319,13 @@ export function WatchParty() {
 
   const handleSendReaction = (emoji: string) => {
     triggerReactionAnimation(emoji)
-    window.bridge?.send?.('watch.reaction', { emoji }).catch(() => {})
+    call(METHODS.WATCH_PARTY_REACTION, { emoji }).catch(() => {})
   }
 
   // File Picker
   const handlePickFile = async () => {
     try {
-      const res = await window.bridge?.send?.('files.pickFile')
+      const res = await window.bridge?.openFileDialog?.()
       if (res && res.filePath) {
         setSelectedFile({
           path: res.filePath,
@@ -224,13 +347,13 @@ export function WatchParty() {
     }
     setLoading(true)
     try {
-      const room = await window.bridge?.send?.('watch.createRoom', {
+      const room = await call(METHODS.WATCH_PARTY_CREATE, {
         title: roomTitleInput || selectedFile.name,
         filePath: selectedFile.path,
         controlsMode
       })
       setActiveRoom(room)
-      toast.success('Room Created', `Watch Party ${room.roomCode} is live!`)
+      toast.success('Room Created', `Watch Party ${(room as any)?.roomCode} is live!`)
     } catch (err: any) {
       toast.error('Creation Failed', err?.message || 'Could not create room')
     } finally {
@@ -247,7 +370,7 @@ export function WatchParty() {
     }
     setLoading(true)
     try {
-      const room = await window.bridge?.send?.('watch.joinRoom', { roomCode: code })
+      const room = await call(METHODS.WATCH_PARTY_JOIN, { roomCode: code })
       setActiveRoom(room)
       toast.success('Joined Room', `Connected to party ${code}`)
     } catch (err: any) {
@@ -259,10 +382,12 @@ export function WatchParty() {
 
   // Leave Room
   const handleLeaveRoom = async () => {
-    await window.bridge?.send?.('watch.leaveRoom').catch(() => {})
+    await call(METHODS.WATCH_PARTY_LEAVE).catch(() => {})
     setActiveRoom(null)
     setStreamUrl('')
     setSelectedFile(null)
+    setChatMessages([])
+    setChecksumWarning(null)
   }
 
   const handleCopyCode = () => {
@@ -495,6 +620,15 @@ export function WatchParty() {
                 className='w-full h-full object-contain'
                 autoPlay
                 playsInline
+                onError={(e) => {
+                  const err = e.currentTarget.error
+                  console.warn('[WatchParty] Video decode error:', err?.code, err?.message)
+                  if (err?.code === 4) {
+                    setStreamError(
+                      'This device could not decode the video. The host may need to convert it.'
+                    )
+                  }
+                }}
                 onTimeUpdate={() => {
                   if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
                 }}
@@ -514,6 +648,12 @@ export function WatchParty() {
                   }
                 }}
               />
+            ) : streamError ? (
+              <div className='flex flex-col items-center justify-center gap-3 p-8 text-center'>
+                <Tv className='h-12 w-12 text-amber-500/80' />
+                <p className='text-sm font-semibold text-foreground'>Video not playable on this device</p>
+                <p className='text-xs text-muted-foreground max-w-sm'>{streamError}</p>
+              </div>
             ) : (
               <div className='flex flex-col items-center justify-center gap-3 p-8 text-center'>
                 <Tv className='h-12 w-12 text-primary animate-pulse' />
@@ -667,6 +807,22 @@ export function WatchParty() {
               </div>
             </div>
 
+            {/* File checksum warning */}
+            {checksumWarning && (
+              <div className='flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/25 px-3 py-2 text-xs text-amber-300'>
+                <ShieldAlert className='h-4 w-4 shrink-0 mt-0.5' />
+                <span>{checksumWarning}</span>
+              </div>
+            )}
+
+            {/* Host badge when promoted */}
+            {activeRoom.isHost && (
+              <div className='flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/25 px-3 py-2 text-xs font-semibold text-primary'>
+                <Crown className='h-4 w-4' />
+                You are hosting this party — controls are yours.
+              </div>
+            )}
+
             {/* Reactions Bar */}
             <div className='flex flex-col gap-2'>
               <label className='text-xs font-semibold text-muted-foreground'>Quick Reactions</label>
@@ -722,6 +878,71 @@ export function WatchParty() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Chat Panel */}
+            <div className='flex flex-col gap-2 border-t border-border/40 pt-3'>
+              <div className='flex items-center justify-between'>
+                <button
+                  onClick={() => setChatOpen((v) => !v)}
+                  className='flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors'
+                >
+                  <MessageSquare className='h-3.5 w-3.5' />
+                  Party Chat
+                  {chatMessages.length > 0 && (
+                    <span className='text-primary font-mono'>{chatMessages.length}</span>
+                  )}
+                </button>
+              </div>
+
+              {chatOpen && (
+                <>
+                  <div
+                    ref={chatScrollRef}
+                    className='flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1'
+                  >
+                    {chatMessages.length === 0 && (
+                      <p className='text-[11px] text-muted-foreground/70 py-2 text-center'>
+                        Say hi to the party 🍿
+                      </p>
+                    )}
+                    {chatMessages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={cn(
+                          'flex flex-col gap-0.5 rounded-lg px-2.5 py-1.5 text-xs',
+                          m.isSelf ? 'bg-primary/10 border border-primary/20' : 'bg-background/50 border border-border/30'
+                        )}
+                      >
+                        <span className='text-[10px] font-semibold text-muted-foreground'>
+                          {m.isSelf ? 'You' : m.sender}
+                        </span>
+                        <span className='text-foreground/90 break-words'>{m.text}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className='flex items-center gap-1.5'>
+                    <input
+                      type='text'
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') sendChatMessage()
+                      }}
+                      placeholder='Message the party…'
+                      className='flex-1 rounded-lg bg-background border border-border/60 px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary'
+                    />
+                    <button
+                      onClick={sendChatMessage}
+                      disabled={!chatInput.trim()}
+                      className='flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40 transition-colors'
+                    >
+                      <Send className='h-3.5 w-3.5' />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

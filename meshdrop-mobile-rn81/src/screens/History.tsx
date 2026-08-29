@@ -88,7 +88,7 @@ export function History() {
   useEffect(() => {
     refresh()
 
-    const unsubComplete = on('transfer:complete', () => {
+    const unsubComplete = on('transfer:completed', () => {
       refresh()
     })
 

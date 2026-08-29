@@ -83,7 +83,7 @@ interface Bridge {
   writeClipboard: (data: { text: string }) => Promise<void>
   onClipboardChanged: (callback: (data: { type: string; content: string }) => void) => () => void
   onTrayHidden?: (callback: () => void) => () => void
-  onDeepLink: (callback: (data: { url: string; code?: string | null }) => void) => () => void
+  onDeepLink: (callback: (data: { url: string; code?: string | null; kind?: 'drop' | 'party' }) => void) => () => void
   onQuickSend?: (
     callback: (data: {
       peerId?: string | null

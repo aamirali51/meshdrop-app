@@ -69,7 +69,6 @@ const METHODS = {
   DRIVE_SHARE_INVITE: 'drive.shareInvite',
   DRIVE_SHARE_ACCEPT: 'drive.shareAccept',
   DRIVE_SHARE_DECLINE: 'drive.shareDecline',
-  CHECK_FOR_UPDATES: 'system.checkForUpdates',
   CLIPBOARD_SEND: 'clipboard.send',
   LAN_DISCOVERY_PEER: 'lan.discoveryPeer',
   WATCH_STATE_BROADCAST: 'watch.stateBroadcast',
@@ -80,6 +79,8 @@ const METHODS = {
   WATCH_PARTY_LIST_ROOMS: 'watch.listRooms',
   WATCH_PARTY_REACTION: 'watch.reaction',
   WATCH_PARTY_STATUS: 'watch.status',
+  WATCH_PARTY_CHAT: 'watch.sendChat',
+  WATCH_GET_CAPABILITIES: 'watch.getCapabilities',
   STREAM_URL_GET: 'stream.getUrl'
 }
 
@@ -88,11 +89,13 @@ const EVENTS = {
   WATCH_ROOM_JOINED: 'watch.room_joined',
   WATCH_ROOM_LEFT: 'watch.room_left',
   WATCH_ROOM_CLOSED: 'watch.room_closed',
+  WATCH_HOST_CHANGED: 'watch.host_changed',
   WATCH_PEER_JOINED: 'watch.peer_joined',
   WATCH_PEER_LEFT: 'watch.peer_left',
   WATCH_PEER_STATUS: 'watch.peer_status',
   WATCH_STATE_SYNC: 'watch.state_sync',
   WATCH_REACTION: 'watch.reaction',
+  WATCH_CHAT: 'watch.chat',
   WATCH_ROOMS_DISCOVERED: 'watch.rooms_discovered',
   DEVICE_ONLINE: 'device.online',
   DEVICE_OFFLINE: 'device.offline',

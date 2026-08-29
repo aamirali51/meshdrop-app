@@ -72,3 +72,11 @@ graphify-out/
 # Release artifacts — generated locally, published to meshdrop-releases
 meshdrop-mobile-rn81/MeshDrop-*.apk
 meshdrop-mobile-rn81/latest.json
+
+# Bundled ffmpeg/ffprobe for watch-party remux (LGPL). ~535 MB total across
+# three platforms — too large to commit. `scripts/fetch-ffmpeg.js` downloads
+# and checksum-verifies them; CI runs it before every release build. Without
+# them the app still works, it just can't remux (direct-play or refuse).
+vendor/ffmpeg/*
+!vendor/ffmpeg/README.md
+vendor/.ffmpeg-cache/

@@ -87,11 +87,11 @@ export function Devices({ identity }: { identity?: any }) {
   useEffect(() => {
     refresh()
 
-    const unsubPeers = on('peers', () => {
+    const unsubPeers = on('peer:connected', () => {
       refresh()
     })
 
-    const unsubStatus = on('status', () => {
+    const unsubStatus = on('peer:disconnected', () => {
       refresh()
     })
 

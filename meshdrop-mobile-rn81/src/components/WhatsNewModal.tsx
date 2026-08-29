@@ -16,7 +16,11 @@ import RNFS from 'react-native-fs'
 import { SimpleModal, Btn } from '../components'
 import { useTheme, fonts } from '../theme'
 
-const CURRENT_VERSION = '1.0.39'
+// Version shown as the "What's New" target. When the app is running, the
+// installed version (from version.properties via the native module) is passed
+// in as `installedVersion` and used as the gate; this constant is only the
+// fallback when the native version read fails.
+const CURRENT_VERSION = '1.0.46'
 const VERSION_FILE_PATH = `${RNFS.DocumentDirectoryPath}/.meshdrop_version`
 
 const FEATURES = [
@@ -37,15 +41,18 @@ const FEATURES = [
   },
 ]
 
-export function WhatsNewModal() {
+export function WhatsNewModal({ installedVersion }: { installedVersion?: string | null }) {
   const { theme } = useTheme()
   const [visible, setVisible] = useState(false)
+  // Use the real installed version when available, so the gate never goes
+  // stale against version.properties bumps.
+  const version = (installedVersion && installedVersion.trim()) || CURRENT_VERSION
 
   useEffect(() => {
     let isMounted = true
     RNFS.readFile(VERSION_FILE_PATH, 'utf8')
       .then((savedVersion) => {
-        if (isMounted && savedVersion.trim() !== CURRENT_VERSION) {
+        if (isMounted && savedVersion.trim() !== version) {
           setVisible(true)
         }
       })
@@ -58,10 +65,10 @@ export function WhatsNewModal() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [version])
 
   const handleDismiss = () => {
-    RNFS.writeFile(VERSION_FILE_PATH, CURRENT_VERSION, 'utf8').catch(() => {})
+    RNFS.writeFile(VERSION_FILE_PATH, version, 'utf8').catch(() => {})
     setVisible(false)
   }
 
@@ -69,7 +76,7 @@ export function WhatsNewModal() {
     <SimpleModal
       visible={visible}
       title="What's New in MeshDrop"
-      subtitle={`Version ${CURRENT_VERSION} Update`}
+      subtitle={`Version ${version} Update`}
       onClose={handleDismiss}
     >
       <View style={styles.container}>

@@ -473,7 +473,7 @@ function MainApp(): React.JSX.Element {
 
       <UpdateAvailableModal />
 
-      <WhatsNewModal />
+      <WhatsNewModal installedVersion={appVersion} />
 
       <ShareTargetModal
         visible={Boolean(incomingShare)}

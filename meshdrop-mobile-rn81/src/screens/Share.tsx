@@ -85,10 +85,20 @@ export function Share() {
 
   useEffect(() => {
     refreshShares()
-    const unsub = on('shares:updated', () => {
+    const unsub = on('drop:created', () => {
       refreshShares()
     })
-    return () => unsub()
+    const unsubClaimed = on('drop:claimed', () => {
+      refreshShares()
+    })
+    const unsubExpired = on('drop:expired', () => {
+      refreshShares()
+    })
+    return () => {
+      unsub()
+      unsubClaimed()
+      unsubExpired()
+    }
   }, [refreshShares])
 
   const handlePickFiles = async () => {
