@@ -160,6 +160,13 @@ function handleRelayHttpResult(msg) {
   resolve(msg.ok ? parsed : null)
 }
 
+// The transport object handed to MeshEngine (-> RelayClient): POST stores
+// relay frames in KV, GET polls the topic's message list.
+const relayHttp = {
+  post: (url, bodyObj) => relayCall('POST', url, bodyObj),
+  get: (url) => relayCall('GET', url)
+}
+
 // ─── Engine boot ───────────────────────────────────────────────────────────
 
 async function boot() {
