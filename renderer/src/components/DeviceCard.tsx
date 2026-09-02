@@ -168,6 +168,14 @@ export function DeviceCard({
               Encrypted
             </span>
           )}
+          {!device.isTrusted && (
+            <span
+              className='rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-500'
+              title='Not paired — direct file sends need a paired device. Share or enter a code to pair.'
+            >
+              Not Paired
+            </span>
+          )}
           {device.isOnline && (
             <span
               className={cn(

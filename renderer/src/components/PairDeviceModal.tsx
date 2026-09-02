@@ -341,7 +341,7 @@ export function PairDeviceModal({ isOpen, onClose, defaultTab = 'myCode' }: Pair
       open={isOpen}
       onOpenChange={(o) => !o && onClose()}
       title='Pair a Device'
-      description='Pair devices or claim one-time file codes'
+      description='Share a code with anyone. Pair the devices you own.'
     >
       <div className='flex gap-1 rounded-xl bg-muted p-1'>
         <button

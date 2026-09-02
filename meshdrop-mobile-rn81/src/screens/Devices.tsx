@@ -311,11 +311,11 @@ export function Devices({ identity }: { identity?: any }) {
       {/* Devices List / Empty Radar Pulse State */}
       {filteredDevices.length === 0 ? (
         <RadarPulseEmptyState
-          title={query ? 'No matching peers found' : 'Scanning Hyperswarm Network…'}
+          title={query ? 'No matching peers found' : 'No paired devices yet'}
           subtitle={
             query
               ? 'Try modifying your search filter.'
-              : 'Devices running MeshDrop on your Wi-Fi or DHT will automatically appear here.'
+              : 'Share a code with anyone. Pair the devices you own — paired devices connect directly for file sends and sync.'
           }
           actionLabel="Enter Pairing Code"
           onAction={() => setShowPairModal(true)}
@@ -338,8 +338,8 @@ export function Devices({ identity }: { identity?: any }) {
       {/* QR Code Presentation Modal */}
       <QRCodeModal
         visible={showQRModal}
-        title="Node QR Matrix"
-        subtitle="Scan this matrix with MeshDrop mobile or desktop camera to pair instantly"
+        title="Pairing Code"
+        subtitle="Scan this with your other MeshDrop device to pair instantly"
         value={myCode}
         onClose={() => setShowQRModal(false)}
       />
@@ -357,8 +357,8 @@ export function Devices({ identity }: { identity?: any }) {
       {/* Manual Pairing Input Modal */}
       <SimpleModal
         visible={showPairModal}
-        title="Pair Remote Node"
-        subtitle="Enter the 16-character alphanumeric code displayed on your other device"
+        title="Pair a Device"
+        subtitle="Enter the code shown on your other device. Share a code with anyone — pair the devices you own."
         onClose={() => {
           setShowPairModal(false)
           setPairCodeInput('')
@@ -387,7 +387,7 @@ export function Devices({ identity }: { identity?: any }) {
               style={styles.flex1}
             />
             <Btn
-              label="Establish Mesh"
+              label="Pair"
               icon={ShieldCheck}
               variant="primary"
               onPress={handlePair}

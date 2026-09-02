@@ -399,9 +399,9 @@ export function PairingCodeCard({
           <KeyRound size={18} color={theme.primary} />
         </View>
         <View style={styles.flex1}>
-          <Text style={[styles.codeHeroTitle, { color: theme.text }]}>Node Pairing Code</Text>
+          <Text style={[styles.codeHeroTitle, { color: theme.text }]}>Pairing Code</Text>
           <Text style={[styles.codeHeroSub, { color: theme.textSecondary }]}>
-            Share with another device to establish trusted P2P sync
+            Share a code with anyone. Pair the devices you own.
           </Text>
         </View>
         {onRefresh && (

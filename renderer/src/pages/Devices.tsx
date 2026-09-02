@@ -287,7 +287,7 @@ export function Devices() {
           </p>
           <p className='mx-auto max-w-sm text-xs text-muted-foreground'>
             {devices.length === 0
-              ? "To add your first device: open MeshDrop on your other device and enter the code shown at the top of this page (or scan its QR code). When it connects, it appears here — then you can send files and sync folders directly."
+              ? 'Share a code with anyone. Pair the devices you own: open MeshDrop on your other device and enter the code shown here (or scan its QR code). Paired devices can send files and sync folders directly.'
               : 'Try adjusting your search query or filter category.'}
           </p>
           {devices.length === 0 && (
