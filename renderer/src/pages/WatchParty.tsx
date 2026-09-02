@@ -140,13 +140,39 @@ export function WatchParty() {
           if (res?.url) setStreamUrl(res.url)
         })
         .catch(() => {})
-    } else if (activeRoom.roomCode) {
-      const shareId = `watch-${activeRoom.roomCode.toLowerCase()}`
+      return
+    }
+
+    if (!activeRoom.roomCode) return
+
+    // Guest: media for the room's deterministic id may still be transferring.
+    // The engine only reports a URL once the source is actually resolvable,
+    // and a version bump forces the player to reload when media arrives.
+    const shareId = `watch-${activeRoom.roomCode.toLowerCase()}`
+    let version = 0
+    const resolve = () => {
       call(METHODS.STREAM_URL_GET, { transferId: shareId })
         .then((res: any) => {
-          if (res?.url) setStreamUrl(res.url)
+          if (res?.url) {
+            setStreamUrl(version > 0 ? `${res.url}&vw=${version}` : res.url)
+          }
         })
         .catch(() => {})
+    }
+    resolve()
+    const unsubs = [
+      on(EVENTS.WATCH_MEDIA_READY, (media: any) => {
+        if (media?.shareId && media.shareId !== shareId) return
+        version += 1
+        resolve()
+      }),
+      on(EVENTS.WATCH_MEDIA_ERROR, (media: any) => {
+        if (media?.shareId && media.shareId !== shareId) return
+        toast.error('Media Error', 'The party media could not be transferred.')
+      }),
+    ]
+    return () => {
+      unsubs.forEach((u) => u?.())
     }
   }, [activeRoom])
 

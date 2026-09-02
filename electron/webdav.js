@@ -162,6 +162,41 @@ const MIME_TYPES = {
 
 let boundEngine = null
 
+// Resolve a transfer id to a locally readable media path (staging .part while
+// downloading, final file once complete, or a sender's own file path).
+// Returns null when nothing is (yet) resolvable — callers must not hand the
+// player a URL that can only 404.
+async function resolveTransferStreamPath(engine, transferId) {
+  if (!engine || !transferId) return null
+  try {
+    const bee = await engine.getBee('transfers').catch(() => null)
+    if (bee) {
+      const entry = await bee.get(transferId).catch(() => null)
+      if (entry?.value?.stagingPath && fs.existsSync(entry.value.stagingPath)) {
+        return entry.value.stagingPath
+      }
+      if (entry?.value?.destPath && fs.existsSync(entry.value.destPath)) {
+        return entry.value.destPath
+      }
+      if (entry?.value?.filePath && fs.existsSync(entry.value.filePath)) {
+        return entry.value.filePath
+      }
+    }
+
+    const downloadsDir =
+      (engine.getDownloadDirectory ? await engine.getDownloadDirectory() : null) ||
+      engine.downloadsDir ||
+      path.join(os.homedir(), 'Downloads')
+    const stagingDir = path.join(downloadsDir, '.p2p-staging', transferId)
+    if (fs.existsSync(stagingDir)) {
+      const files = await fsp.readdir(stagingDir).catch(() => [])
+      const part = files.find((f) => f.endsWith('.part'))
+      if (part) return path.join(stagingDir, part)
+    }
+  } catch {}
+  return null
+}
+
 function setWebDAVEngine(eng) {
   boundEngine = eng
 }
@@ -192,32 +227,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
         localPath = fallbackPath
       }
       if (!localPath && transferId && boundEngine) {
-        // 1. Check transfers bee for stagingPath, destPath, filePath
-        const bee = await boundEngine.getBee('transfers').catch(() => null)
-        if (bee) {
-          const entry = await bee.get(transferId).catch(() => null)
-          if (entry?.value?.stagingPath && fs.existsSync(entry.value.stagingPath)) {
-            localPath = entry.value.stagingPath
-          } else if (entry?.value?.destPath && fs.existsSync(entry.value.destPath)) {
-            localPath = entry.value.destPath
-          } else if (entry?.value?.filePath && fs.existsSync(entry.value.filePath)) {
-            localPath = entry.value.filePath
-          }
-        }
-
-        // 2. Check if staging .part file exists in baseDir or downloadsDir
-        if (!localPath) {
-          const downloadsDir =
-            (boundEngine.getDownloadDirectory ? await boundEngine.getDownloadDirectory() : null) ||
-            boundEngine.downloadsDir ||
-            path.join(os.homedir(), 'Downloads')
-          const stagingDir = path.join(downloadsDir, '.p2p-staging', transferId)
-          if (fs.existsSync(stagingDir)) {
-            const files = await fsp.readdir(stagingDir).catch(() => [])
-            const part = files.find((f) => f.endsWith('.part'))
-            if (part) localPath = path.join(stagingDir, part)
-          }
-        }
+        localPath = await resolveTransferStreamPath(boundEngine, transferId)
       }
     } catch {}
   }
@@ -632,5 +642,6 @@ module.exports = {
   updateDrivePermissions,
   updateCatalogData,
   setFileCreatedCallback,
-  setWebDAVEngine
+  setWebDAVEngine,
+  resolveTransferStreamPath
 }

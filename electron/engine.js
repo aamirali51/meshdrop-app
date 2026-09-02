@@ -115,6 +115,9 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     engine.on('party:state:sync', (d) => forward(EVENTS.WATCH_STATE_SYNC, d))
     engine.on('party:reaction', (d) => forward(EVENTS.WATCH_REACTION, d))
     engine.on('party:rooms:discovered', (d) => forward(EVENTS.WATCH_ROOMS_DISCOVERED, d))
+    engine.on('party:media:offer', (d) => forward(EVENTS.WATCH_MEDIA_OFFER, d))
+    engine.on('party:media:ready', (d) => forward(EVENTS.WATCH_MEDIA_READY, d))
+    engine.on('party:media:error', (d) => forward(EVENTS.WATCH_MEDIA_ERROR, d))
     engine.on('notification:received', (n) => forward(EVENTS.NOTIFICATION_RECEIVED, n))
     engine.on('error', (err) => {
       if (err && err.code && err.code !== 'claim_rejected') {

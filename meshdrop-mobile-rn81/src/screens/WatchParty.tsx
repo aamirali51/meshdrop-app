@@ -178,6 +178,25 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
           setTimeout(() => setFloatingReaction(null), 2500)
         }
       }),
+      on('party:media:offer', () => {
+        resolvePartyMediaRef.current?.(false)
+      }),
+      on('party:media:ready', () => {
+        resolvePartyMediaRef.current?.(true)
+      }),
+      on('party:media:error', () => {
+        Alert.alert('Media Error', 'The party media could not be transferred.')
+      }),
+      on('transfer:progress', (t: any) => {
+        if (t?.id && shareIdRef.current && t.id === shareIdRef.current) {
+          resolvePartyMediaRef.current?.(false)
+        }
+      }),
+      on('transfer:completed', (t: any) => {
+        if (t?.id && shareIdRef.current && t.id === shareIdRef.current) {
+          resolvePartyMediaRef.current?.(true)
+        }
+      }),
     ]
 
     return () => {
@@ -186,10 +205,43 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
     }
   }, [])
 
+  // Party media resolution: the engine transfers party media under the room's
+  // deterministic shareId into Download/.p2p-staging/<shareId>/<name>.part
+  // (renamed to its final path on completion). React to transfer events rather
+  // than scanning the staging directory a single time.
+  const shareIdRef = useRef<string | null>(null)
+  const lastMediaScanRef = useRef<number>(0)
+
+  const resolvePartyMedia = useCallback(async (force: boolean) => {
+    const shareId = shareIdRef.current
+    if (!shareId) return
+    const now = Date.now()
+    if (!force && now - lastMediaScanRef.current < 1500) return
+    lastMediaScanRef.current = now
+
+    const stagingDir = `/storage/emulated/0/Download/.p2p-staging/${shareId}`
+    try {
+      if (await RNFS.exists(stagingDir)) {
+        const files = await RNFS.readDir(stagingDir)
+        const part = files.find((f) => f.name.endsWith('.part'))
+        if (part) {
+          setVideoSrc(part.path)
+          return
+        }
+      }
+      const list = await call('listTransfers').catch(() => [])
+      const match = Array.isArray(list) ? list.find((t: any) => t.id === shareId) : null
+      if (match?.destPath) setVideoSrc(match.destPath)
+    } catch {}
+  }, [])
+  const resolvePartyMediaRef = useRef<((force: boolean) => Promise<void>) | null>(null)
+  resolvePartyMediaRef.current = resolvePartyMedia
+
   // Resolve video path for active room
   useEffect(() => {
     if (!activeRoom) {
       setVideoSrc('')
+      shareIdRef.current = null
       return
     }
 
@@ -198,17 +250,10 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
       return
     }
 
-    // Look for stream .part file or completed download
-    const shareId = `watch-${activeRoom.roomCode.toLowerCase()}`
-    const stagingDir = `/storage/emulated/0/Download/.p2p-staging/${shareId}`
-    RNFS.exists(stagingDir).then((exists) => {
-      if (exists) {
-        RNFS.readDir(stagingDir).then((files) => {
-          const part = files.find((f) => f.name.endsWith('.part'))
-          if (part) setVideoSrc(part.path)
-        }).catch(() => {})
-      }
-    }).catch(() => {})
+    if (activeRoom.roomCode) {
+      shareIdRef.current = `watch-${activeRoom.roomCode.toLowerCase()}`
+    }
+    resolvePartyMediaRef.current?.(true)
   }, [activeRoom])
 
   const broadcastPlayback = (action: 'play' | 'pause' | 'seek', posSec: number) => {

@@ -200,7 +200,10 @@ async function boot() {
       'party:peer:status',
       'party:state:sync',
       'party:reaction',
-      'party:rooms:discovered'
+      'party:rooms:discovered',
+      'party:media:offer',
+      'party:media:ready',
+      'party:media:error'
     ]
     for (const evt of EVENTS) {
       engine.on(evt, (data) => {

@@ -756,14 +756,22 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
   }
 
   handlers[METHODS.STREAM_URL_GET] = async (params) => {
-    const { startWebDAVServer, setWebDAVEngine, getDriveStatus } = require('./webdav')
+    const { startWebDAVServer, setWebDAVEngine, getDriveStatus, resolveTransferStreamPath } = require('./webdav')
     setWebDAVEngine(engine)
     await startWebDAVServer().catch(() => {})
     const status = getDriveStatus()
     const port = status.port || 41983
     if (params?.transferId) {
-      const pathParam = params?.filePath ? `&path=${encodeURIComponent(params.filePath)}` : ''
-      return { url: `http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}${pathParam}` }
+      // With an explicit filePath the player is expected to have the file
+      // locally (host side / claim playback) — keep the URL unconditional.
+      if (params?.filePath) {
+        return { url: `http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}&path=${encodeURIComponent(params.filePath)}` }
+      }
+      // Otherwise (e.g. watch party guest) only hand out a URL when something
+      // is actually resolvable — never a guaranteed 404.
+      const resolvable = await resolveTransferStreamPath(engine, params.transferId)
+      if (!resolvable) return { url: null }
+      return { url: `http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}` }
     }
     if (params?.filePath) {
       return { url: `http://127.0.0.1:${port}/stream/file?path=${encodeURIComponent(params.filePath)}` }
