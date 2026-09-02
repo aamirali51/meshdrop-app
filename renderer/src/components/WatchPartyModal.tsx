@@ -197,7 +197,8 @@ export function WatchPartyModal({
   useEffect(() => {
     if (!open || isHost) return
     const eventName = EVENTS.WATCH_STATE_CHANGED || 'watch.stateChanged'
-    const unsub = on(eventName, (state: WatchState) => {
+    const unsub = on(eventName, (data: unknown) => {
+      const state = data as WatchState | null
       if (!state || !syncWithHost) return
 
       const vid = videoRef.current

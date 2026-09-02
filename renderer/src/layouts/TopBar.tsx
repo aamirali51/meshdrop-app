@@ -29,6 +29,7 @@ export function TopBar() {
     '/dashboard': 'Share',
     '/devices': 'My Devices',
     '/sync': 'Sync Folders',
+    '/party': 'Watch Party',
     '/transfers': 'Transfers',
     '/activity': 'Activity',
     '/history': 'History',

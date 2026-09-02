@@ -53,7 +53,7 @@ interface Bridge {
   portableInstall: (options?: PortableInstallOptions) => Promise<PortableInstallResult>
   portablePickFolder: () => Promise<string | null>
   getUpdateChannel: () => Promise<string>
-  setUpdateChannel: (channel: 'stable' | 'beta' | 'nightly') => Promise<string>
+  setUpdateChannel: (channel: 'stable' | 'beta' | 'nightly' | 'dev') => Promise<string>
   onUpdateStatus: (callback: (data: UpdateStatusData) => void) => () => void
   onUpdateDownloaded: (
     callback: (data: { version?: string; message?: string }) => void

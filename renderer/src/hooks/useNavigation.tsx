@@ -13,7 +13,9 @@ const ROUTE_ORDER: NavRoute[] = [
   '/about'
 ]
 
-export const ROUTE_SHORTCUTS: Record<NavRoute, number> = {
+// Not every route carries a number shortcut (e.g. /party is palette-only);
+// the Ctrl+N handler resolves through ROUTE_ORDER, which stays authoritative.
+export const ROUTE_SHORTCUTS: Partial<Record<NavRoute, number>> = {
   '/dashboard': 1,
   '/devices': 2,
   '/sync': 3,

@@ -36,6 +36,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 
+type UpdateChannel = 'stable' | 'beta' | 'nightly' | 'dev'
+
 interface AppSettings {
   theme: 'dark' | 'light'
   deviceName: string
@@ -125,7 +127,7 @@ export function Settings() {
   const [showDevModal, setShowDevModal] = useState(false)
   const [devPassword, setDevPassword] = useState('')
 
-  const handleChannelChange = (newChannel: string) => {
+  const handleChannelChange = (newChannel: UpdateChannel) => {
     if (newChannel === 'dev') {
       setShowDevModal(true)
       return
@@ -751,7 +753,7 @@ export function Settings() {
                   </div>
                   <select
                     value={settings.releaseChannel}
-                    onChange={(e) => handleChannelChange(e.target.value)}
+                    onChange={(e) => handleChannelChange(e.target.value as UpdateChannel)}
                     className='rounded-xl border border-border/60 bg-background px-3 py-1.5 font-bold text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
                   >
                     <option value='stable'>Stable Release (Official)</option>

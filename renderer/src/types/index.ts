@@ -42,6 +42,8 @@ export interface Device {
   deviceType: DeviceType
   /** Live flag: this peer's active connection is tunneled through a DHT relay. */
   relayed?: boolean
+  /** How this peer is currently reached: 'lan' | 'relay' | other (e.g. dht). */
+  transferMethod?: string
   cpuUsage?: number
   ramUsage?: number
 }

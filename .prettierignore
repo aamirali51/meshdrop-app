@@ -1,1 +1,11 @@
 out
+dist
+
+# Generated mobile engine bundle (built by scripts/build-engine.js)
+meshdrop-mobile-rn81/src/engine/mesh-engine.bundle.js
+meshdrop-mobile-rn81/android/app/src/main/assets/engine
+
+# Native/gradle build artifacts
+meshdrop-mobile-rn81/android/app/.cxx
+meshdrop-mobile-rn81/android/app/build
+meshdrop-mobile-rn81/android/build

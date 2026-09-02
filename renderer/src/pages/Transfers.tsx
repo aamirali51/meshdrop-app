@@ -59,6 +59,8 @@ export function Transfers() {
     resumeTransfer,
     cancelTransfer,
     retryTransfer,
+    acceptTransfer,
+    declineTransfer,
     clearTransfers,
     deleteTransfer,
     sendFileToDevice
@@ -116,7 +118,7 @@ export function Transfers() {
           <Button
             size='sm'
             className='h-7 px-2 text-[10px] font-bold'
-            onClick={() => acceptIncomingTransfer(t.id)}
+            onClick={() => acceptTransfer(t.id)}
           >
             <Download className='mr-1 h-3 w-3' /> Accept
           </Button>
@@ -124,7 +126,7 @@ export function Transfers() {
             size='sm'
             variant='ghost'
             className='h-7 px-2 text-[10px] font-bold text-destructive'
-            onClick={() => declineIncomingTransfer(t.id)}
+            onClick={() => declineTransfer(t.id)}
           >
             <XCircle className='mr-1 h-3 w-3' /> Decline
           </Button>
@@ -262,11 +264,12 @@ export function Transfers() {
               className='h-7 px-2 text-[10px] font-bold text-primary border-primary/40 bg-primary/10 hover:bg-primary/20'
               title='Watch video'
               onClick={() => {
-                setActiveWatchVideo({
+                openWatchParty({
                   transferId: t.id,
                   filePath: localPath,
-                  title: t.filename,
-                  roomCode: t.claimCode
+                  roomTitle: t.filename,
+                  roomCode: t.claimCode,
+                  isHost: t.direction === 'send'
                 })
               }}
             >
