@@ -14,6 +14,7 @@ export declare const METHODS: {
   readonly DEVICES_TRUST: 'devices.trust'
   readonly DEVICES_GET_IDENTITY: 'devices.getIdentity'
   readonly DEVICES_SPEED_TEST: 'devices.speedTest'
+  readonly PAIRING_INTENT: 'devices.pairingIntent'
   readonly PRESENCE_SET: 'presence.set'
   readonly PRESENCE_GET: 'presence.get'
   readonly DIAGNOSTICS_GET: 'diagnostics.get'

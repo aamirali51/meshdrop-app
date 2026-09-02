@@ -17,6 +17,7 @@ const METHODS = {
   DEVICES_TRUST: 'devices.trust',
   DEVICES_GET_IDENTITY: 'devices.getIdentity',
   DEVICES_SPEED_TEST: 'devices.speedTest',
+  PAIRING_INTENT: 'devices.pairingIntent',
   PRESENCE_SET: 'presence.set',
   PRESENCE_GET: 'presence.get',
   DIAGNOSTICS_GET: 'diagnostics.get',

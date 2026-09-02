@@ -291,6 +291,13 @@ function call(method, params) {
       // LAN discovery cannot run inside the Bare worklet (no raw UDP
       // sockets), so this is intentionally a persisted-only non-op.
       return { supported: false, lanDiscovery: false }
+    case 'pairingIntent':
+      // Pairing screen open: bring the relay fallback up immediately so a
+      // remote device on a challenged network can reach us (lazy 'auto').
+      if (engine && typeof engine.setPairingIntent === 'function') {
+        engine.setPairingIntent(params?.active !== false)
+      }
+      return true
     case 'listDevices':
       return engine.listDevices()
     case 'removeDevice':

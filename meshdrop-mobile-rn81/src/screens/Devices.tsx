@@ -73,6 +73,15 @@ export function Devices({ identity }: { identity?: any }) {
   // Details Modal
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
 
+  // Pairing intent: a pairing screen open (manual entry, scanner) means this
+  // device wants to be reachable for pairing — the engine brings the relay
+  // fallback up immediately in lazy 'auto' mode. Sticky on close.
+  useEffect(() => {
+    const pairing = showPairModal || showScanner
+    if (!pairing) return
+    call('pairingIntent', { active: true }).catch(() => {})
+  }, [showPairModal, showScanner])
+
   const refresh = useCallback(() => {
     call('listDevices')
       .then((res: any) => {

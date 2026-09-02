@@ -180,6 +180,13 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     return { ...(engine.deviceIdentity || {}), pairingCode: identity.pairingCode }
   }
 
+  handlers[METHODS.PAIRING_INTENT] = async (params) => {
+    if (engine && typeof engine.setPairingIntent === 'function') {
+      engine.setPairingIntent(params?.active !== false)
+    }
+    return true
+  }
+
   handlers[METHODS.DEVICES_GET_CODE] = async () => {
     const identity = engine.getIdentity()
     return {
