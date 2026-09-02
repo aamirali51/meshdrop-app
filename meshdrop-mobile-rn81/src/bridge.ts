@@ -46,8 +46,50 @@ function emit(event: string, data: any) {
   if (set) set.forEach((h) => h(data))
 }
 
+// Relay HTTP proxy: the Bare worklet has no fetch/WebSocket, so the engine's
+// relay client sends its HTTP requests here and the RN side (which has real
+// fetch) performs them against the relay worker.
+
+async function handleRelayHttp(msg: {
+  reqId: number
+  method?: string
+  url?: string
+  body?: string
+}): Promise<void> {
+  if (!worklet || !msg.url) return
+  let ok = false
+  let text: string | null = null
+  try {
+    const controller = new AbortController()
+    const abort = setTimeout(() => controller.abort(), 10000)
+    const method = msg.method === 'POST' ? 'POST' : 'GET'
+    const res = await fetch(msg.url, {
+      method,
+      headers: msg.body ? { 'Content-Type': 'application/json' } : undefined,
+      body: msg.body ? (msg.body as any) : undefined,
+      signal: controller.signal,
+    })
+    clearTimeout(abort)
+    ok = res.ok
+    text = await res.text()
+  } catch (err) {
+    console.warn('[bridge] relay HTTP proxy failed:', String((err as Error)?.message || err))
+  }
+  try {
+    const payload =
+      JSON.stringify({ type: 'relayHttpResult', reqId: msg.reqId, ok, text }) + '\n'
+    worklet.IPC.write(b4a.from(payload))
+  } catch {}
+}
+
 function handle(msg: any) {
   if (!msg || typeof msg !== 'object') return
+  if (msg.type === 'relayHttp') {
+    // Fire-and-forget from the worklet's perspective (it times out on its
+    // own); run the proxy without blocking the IPC pump.
+    handleRelayHttp(msg).catch(() => {})
+    return
+  }
   if (msg.type === 'response') {
     const p = pending.get(String(msg.id))
     if (!p) return

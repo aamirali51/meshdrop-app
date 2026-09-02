@@ -118,6 +118,48 @@ let engine = null
 let storageDir = null
 let downloadsDir = null
 
+// ─── Relay HTTP bridge ─────────────────────────────────────────────────────
+// The Bare worklet has no global fetch/WebSocket, so the engine's relay
+// client proxies its HTTP through the RN side (which has real fetch):
+//   worklet -> RN:  { type: 'relayHttp', reqId, method, url, body }
+//   RN -> worklet:  { type: 'relayHttpResult', reqId, ok, text }
+const relayPending = new Map()
+let relaySeq = 1
+
+function relayCall(method, url, bodyObj) {
+  return new Promise((resolve) => {
+    const reqId = relaySeq++
+    relayPending.set(reqId, resolve)
+    send({
+      type: 'relayHttp',
+      reqId,
+      method,
+      url,
+      body: bodyObj === undefined ? undefined : JSON.stringify(bodyObj)
+    })
+    // Never hang the relay client on a dead bridge.
+    setTimeout(() => {
+      if (relayPending.has(reqId)) {
+        relayPending.delete(reqId)
+        resolve(null)
+      }
+    }, 10000)
+  })
+}
+
+function handleRelayHttpResult(msg) {
+  const resolve = relayPending.get(msg.reqId)
+  if (!resolve) return
+  relayPending.delete(msg.reqId)
+  let parsed = null
+  try {
+    parsed = msg.text ? JSON.parse(msg.text) : null
+  } catch {
+    parsed = null
+  }
+  resolve(msg.ok ? parsed : null)
+}
+
 // ─── Engine boot ───────────────────────────────────────────────────────────
 
 async function boot() {
@@ -151,7 +193,8 @@ async function boot() {
       deviceName: 'MeshDrop Mobile',
       autoAcceptOffers: false,
       autoTrustLAN: true,
-      lanDiscovery: true
+      lanDiscovery: true,
+      relayHttp
     })
     console.log('[MDLOG] MeshEngine created OK')
 
@@ -559,6 +602,12 @@ if (IPC) {
         try {
           msg = JSON.parse(trimmed)
         } catch {
+          continue
+        }
+        // Relay HTTP proxy results (RN -> worklet) resolve the engine's
+        // pending relay requests; they are not RPC calls.
+        if (msg && msg.type === 'relayHttpResult') {
+          handleRelayHttpResult(msg)
           continue
         }
         if (!msg || msg.id === undefined) continue
