@@ -142,7 +142,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 24: the bare-module-lexer prebuild (pulled by bare-pack for the
+          # engine bundle) requires node_api_is_sharedarraybuffer, which Node 20
+          # lacks ("symbol lookup error"). Desktop jobs can stay on 20 — they
+          # never run bare-pack.
+          node-version: 24
           cache: npm
 
       - name: Setup JDK
