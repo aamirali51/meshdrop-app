@@ -294,30 +294,25 @@ function safeParseIPC(raw) {
   }
 }
 
-async function respond(win, msg, result, error) {
-  const response = createResponse(msg.id, result, error)
-  if (!win.isDestroyed()) {
-    win.webContents.send('pear:worker:ipc:' + WORKER_SPECIFIER, Buffer.from(response))
-  }
-}
-
 // The renderer's request router (renderer/src/lib/ipc.ts) sends protocol
-// requests over writeWorkerIPC; main now executes them against the engine.
+// requests over writeWorkerIPC (an ipcRenderer.invoke). The handle's return
+// value IS the reply: Electron resolves the renderer's invoke promise with it,
+// so a request can never be "reply was never sent" or hang waiting on a side
+// channel. The push channel ('pear:worker:ipc:...') is reserved for engine
+// EVENTS only — never for request responses.
 ipcMain.handle('pear:worker:writeIPC:' + WORKER_SPECIFIER, async (evt, data) => {
-  const win = BrowserWindow.fromWebContents(evt.sender)
   const msg = safeParseIPC(data)
 
-  if (!msg || msg.type !== 'request' || typeof msg.method !== 'string') return true
+  if (!msg || msg.type !== 'request' || typeof msg.method !== 'string') {
+    // Malformed request — still answer so the renderer's invoke never dangles.
+    return createResponse(msg && msg.id ? msg.id : '', null, 'Malformed request')
+  }
   if (!isProtocolCompatible(msg)) {
-    if (win) {
-      respond(
-        win,
-        msg,
-        null,
-        `Protocol version mismatch (expected ${require('../src/shared/protocol.js').PROTOCOL_VERSION})`
-      )
-    }
-    return true
+    return createResponse(
+      msg.id,
+      null,
+      `Protocol version mismatch (expected ${require('../src/shared/protocol.js').PROTOCOL_VERSION})`
+    )
   }
 
   // Drive (WebDAV) operations are answered by the main-process webdav module
@@ -340,8 +335,7 @@ ipcMain.handle('pear:worker:writeIPC:' + WORKER_SPECIFIER, async (evt, data) => 
     } catch (err) {
       error = err.message
     }
-    if (win) await respond(win, msg, result, error)
-    return true
+    return createResponse(msg.id, result, error)
   }
 
   const ts = new Date().toISOString().slice(11, 23)
@@ -364,8 +358,9 @@ ipcMain.handle('pear:worker:writeIPC:' + WORKER_SPECIFIER, async (evt, data) => 
     error = err && err.message ? err.message : String(err)
     console.error(`[Main:${label}] engine request ${msg.method} failed:`, error)
   }
-  if (win) await respond(win, msg, result, error)
-  return true
+  // Always return a serialized response — success OR error — so the renderer's
+  // invoke promise resolves and the pending request is never left hanging.
+  return createResponse(msg.id, result, error)
 })
 
 ipcMain.handle('pear:startWorker', () => {
@@ -790,19 +785,30 @@ function handleDeepLink(url) {
     win.show()
     win.focus()
   }
-  // Two supported shapes:
-  //   meshdrop://?code=DROP-ABCD-EFGH   (legacy query form)
-  //   meshdrop://drop/DROP-ABCD-EFGH    (link form copied from the UI)
+  // Supported shapes:
+  //   meshdrop://?code=DROP-ABCD-EFGH      (legacy query form)
+  //   meshdrop://drop/DROP-ABCD-EFGH       (link form copied from the UI)
+  //   meshdrop://site/SITE-ABCD-EFGH       (MeshDrop Sites visit link)
   let code = null
+  let kind = 'drop'
   try {
     const u = new URL(url)
     code = u.searchParams.get('code')
+    if (code) {
+      kind = /^SITE-/i.test(code) ? 'site' : 'drop'
+    }
     if (!code) {
-      const m = /^\/drop\/([A-Z0-9-]+)/i.exec(u.pathname)
-      if (m) code = m[1]
+      const siteMatch = /^\/site\/([A-Z0-9-]+)/i.exec(u.pathname)
+      if (siteMatch) {
+        code = siteMatch[1]
+        kind = 'site'
+      } else {
+        const m = /^\/drop\/([A-Z0-9-]+)/i.exec(u.pathname)
+        if (m) code = m[1]
+      }
     }
   } catch {}
-  if (win) win.webContents.send('app:deep-link', { url, code })
+  if (win) win.webContents.send('app:deep-link', { url, code, kind })
 }
 
 app.setAsDefaultProtocolClient(protocol)
@@ -893,6 +899,10 @@ function ensureWindowsFirewallRule() {
       console.error('[Main] Engine stop failed:', err)
     })
     stopWebDAVServer()
+    try {
+      const { stopSitesGateway } = require('./sites-gateway')
+      stopSitesGateway()
+    } catch {}
   })
 }
 

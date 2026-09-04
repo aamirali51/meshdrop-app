@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/Modal'
 import type { ActivityType } from '@/types'
 
 type Filter = 'all' | 'transfer' | 'session'
+const FILTER_LABEL: Record<Filter, string> = { all: 'All', transfer: 'Transfers', session: 'Watch Sessions' }
 
 export function History() {
   const { activity, clearHistory } = useActivity()
@@ -68,13 +69,13 @@ export function History() {
               <button
                 key={t}
                 onClick={() => setFilterType(t)}
-                className={`rounded-lg px-3 py-1 text-xs font-bold capitalize transition-all ${
+                className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${
                   filterType === t
                     ? 'bg-background text-foreground shadow-sm border border-border/60'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {t}
+                {FILTER_LABEL[t]}
               </button>
             ))}
           </div>

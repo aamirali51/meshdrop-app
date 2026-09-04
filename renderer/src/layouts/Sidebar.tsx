@@ -18,7 +18,8 @@ import {
   Settings,
   Waypoints,
   RefreshCw,
-  Tv
+  Tv,
+  Globe
 } from 'lucide-react'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useDevices } from '@/hooks/useDevices'
@@ -53,15 +54,19 @@ export function Sidebar() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Auto-collapse to icons-only when the window is too narrow for labels
-  // (below lg). The user can still toggle manually between breakpoint changes.
+  // Persist user collapse choice; only auto-collapse on first load.
   useEffect(() => {
+    const saved = localStorage.getItem('meshdrop:sidebar_collapsed')
+    if (saved != null) {
+      setIsCollapsed(saved === '1')
+      return
+    }
     const mq = window.matchMedia('(min-width: 1024px)')
-    const apply = () => setIsCollapsed(!mq.matches)
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
+    if (!mq.matches) setIsCollapsed(true)
   }, [])
+  useEffect(() => {
+    localStorage.setItem('meshdrop:sidebar_collapsed', isCollapsed ? '1' : '0')
+  }, [isCollapsed])
 
   const activeTransfers = transfers.filter(
     (t) => t.status === 'active' || t.status === 'queued' || t.status === 'pending_approval'
@@ -100,6 +105,11 @@ export function Sidebar() {
       label: 'Mesh Party',
       route: '/party',
       icon: <Tv className='h-4 w-4' />
+    },
+    {
+      label: 'Shared Folders',
+      route: '/shared-folders',
+      icon: <Globe className='h-4 w-4' />
     },
     {
       label: 'Settings',
@@ -244,9 +254,9 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Footer Node Status */}
+      {/* Footer Node Status — hidden on lg+ (TopBar owns the mesh pill there) */}
       {!isCollapsed && (
-        <div className='border-t border-hairline/10 bg-muted/20 p-3 text-xs'>
+        <div className='border-t border-hairline/10 bg-muted/20 p-3 text-xs lg:hidden'>
           <button
             onClick={(e) => setProfileMenu({ x: e.clientX, y: e.clientY })}
             className='flex w-full items-center gap-2.5 rounded-xl px-1.5 py-1.5 text-left transition-colors hover:bg-accent/60'

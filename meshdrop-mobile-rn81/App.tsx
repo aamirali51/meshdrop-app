@@ -13,9 +13,9 @@ import {
   TouchableOpacity,
   AppState,
   type AppStateStatus,
-  Animated,
   Alert,
   useWindowDimensions,
+  ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
@@ -75,18 +75,20 @@ type TabType =
 
 const TABS: { key: TabType; label: string; icon: React.ElementType }[] = [
   { key: 'devices', label: 'Swarm', icon: Radio },
-  { key: 'share', label: 'Beam', icon: Upload },
+  { key: 'share', label: 'Share', icon: Upload },
   { key: 'party', label: 'Party', icon: Tv },
   { key: 'receive', label: 'Claim', icon: Download },
   { key: 'sync', label: 'Sync', icon: FolderSync },
   { key: 'activity', label: 'Live', icon: Activity },
   { key: 'history', label: 'Logs', icon: HistoryIcon },
-  { key: 'settings', label: 'Node', icon: SettingsIcon },
+  { key: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 function MainApp(): React.JSX.Element {
   const { theme, isDark, toggleTheme } = useTheme()
   const [currentTab, setCurrentTab] = useState<TabType>('devices')
+  const currentTabRef = useRef<TabType>('devices')
+  useEffect(() => { currentTabRef.current = currentTab }, [currentTab])
   const [engineStatus, setEngineStatus] = useState<'starting' | 'ready' | 'error'>('starting')
   const [identity, setIdentity] = useState<any>(null)
   const [peerCount, setPeerCount] = useState(0)
@@ -296,16 +298,16 @@ function MainApp(): React.JSX.Element {
     })
 
     const unsubWatch = on('watch:state:updated', (data: any) => {
-      if (data && (data.roomCode || data.action === 'play')) {
-        setWatchParty((prev) => ({
-          visible: true,
-          roomCode: data.roomCode || prev.roomCode || 'PARTY-MESH-P2P',
-          roomTitle: data.roomTitle || prev.roomTitle || 'Synchronized Mesh Stream',
-          transferId: data.transferId || prev.transferId,
-          filePath: data.filePath || prev.filePath,
-          isHost: false,
-        }))
-      }
+      if (!data || !(data.roomCode || data.action === 'play')) return
+      if (currentTabRef.current !== 'party') return
+      setWatchParty((prev) => ({
+        visible: true,
+        roomCode: data.roomCode || prev.roomCode || 'PARTY-MESH-P2P',
+        roomTitle: data.roomTitle || prev.roomTitle || 'Synchronized Mesh Stream',
+        transferId: data.transferId || prev.transferId,
+        filePath: data.filePath || prev.filePath,
+        isHost: false,
+      }))
     })
 
     return () => {
@@ -494,17 +496,20 @@ function MainApp(): React.JSX.Element {
         onClose={() => setWatchParty({ visible: false })}
       />
 
-      {/* Floating Luminous Bottom Navigation Dock */}
+      {/* Floating Bottom Dock — horizontal scroll on narrow screens */}
       {!hideAppChrome && (
         <View style={styles.dockContainer}>
-          <View
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 0 }}
             style={[
               styles.dockBar,
               {
                 backgroundColor: theme.dockBg,
                 borderColor: theme.border,
                 shadowColor: theme.shadowLg?.shadowColor || '#000',
-              },
+              } as any,
             ]}
           >
             {TABS.map((tab) => {
@@ -535,7 +540,7 @@ function MainApp(): React.JSX.Element {
                 </TouchableOpacity>
               )
             })}
-          </View>
+          </ScrollView>
         </View>
       )}
     </SafeAreaView>
@@ -656,7 +661,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 4,
-    justifyContent: 'space-around',
     alignItems: 'center',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,

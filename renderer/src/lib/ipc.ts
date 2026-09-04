@@ -180,14 +180,35 @@ async function doCall(method: MethodName, params?: unknown): Promise<unknown> {
     })
 
     const msg: RequestMessage = { type: 'request', id, method, params }
-    window.bridge.writeWorkerIPC(WORKER_SPECIFIER, encodeMessage(msg)).catch((err) => {
-      pending.delete(id)
-      clearTimeout(timer)
-      console.log(
-        `[IPC ${new Date().toISOString().slice(11, 23)}] !! ${id} WRITE FAILED ${method}: ${err.message}`
-      )
-      reject(err)
-    })
+    window.bridge
+      .writeWorkerIPC(WORKER_SPECIFIER, encodeMessage(msg))
+      .then((rawReply) => {
+        // The invoke now resolves with the actual response payload (Electron
+        // returns the ipcMain.handle value). Resolve the pending request from
+        // it directly — no reliance on a side channel that could drop replies.
+        const reply = parseMessage(rawReply)
+        const req = pending.get(id)
+        if (!req) return
+        pending.delete(id)
+        clearTimeout(req.timer)
+        if (!reply || reply.type !== 'response') {
+          req.reject(new Error(`Malformed reply for ${method}`))
+          return
+        }
+        if (reply.error) {
+          req.reject(new Error(String(reply.error)))
+        } else {
+          req.resolve(reply.result)
+        }
+      })
+      .catch((err) => {
+        pending.delete(id)
+        clearTimeout(timer)
+        console.log(
+          `[IPC ${new Date().toISOString().slice(11, 23)}] !! ${id} WRITE FAILED ${method}: ${err.message}`
+        )
+        reject(err)
+      })
   })
 }
 
@@ -202,17 +223,36 @@ async function ensureReady(): Promise<void> {
   }
 
   startBridge()
-  await window.bridge.startWorker(WORKER_SPECIFIER)
+  try {
+    await window.bridge.startWorker(WORKER_SPECIFIER)
+  } catch (err) {
+    // Never leave queued calls hanging: mark ready and flush. Each call's
+    // doCall() will surface the transport failure (or time out) instead of
+    // waiting on a queue that never drains.
+    console.warn(
+      `[IPC ${new Date().toISOString().slice(11, 23)}] startWorker failed:`,
+      (err as Error)?.message || String(err)
+    )
+    ready = true
+    processQueue()
+    return
+  }
 
+  // The queue is NOT flushed on a fixed short timer. The engine boot can take
+  // well over a second (DHT bootstrap, relay connect, store init), and calls
+  // flushed early would sit in main awaiting engineBridge.start() until the
+  // renderer's per-call timeout kills them. Instead we wait for the engine's
+  // WORKER_READY event (startBridge sets ready + flushes), with a long
+  // last-resort timer only in case WORKER_READY never arrives (engine crash).
   setTimeout(() => {
     if (!ready) {
-      console.log(
-        `[IPC ${new Date().toISOString().slice(11, 23)}] Native Electron IPC ready = true`
+      console.warn(
+        `[IPC ${new Date().toISOString().slice(11, 23)}] WORKER_READY never arrived after startWorker — force-flushing queue`
       )
       ready = true
       processQueue()
     }
-  }, 1000)
+  }, 60000)
 }
 
 let bridgeStarted = false

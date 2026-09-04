@@ -107,6 +107,7 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     engine.on('watch:state:updated', (d) => forward(EVENTS.WATCH_STATE_CHANGED, d))
     engine.on('party:room:created', (d) => forward(EVENTS.WATCH_ROOM_CREATED, d))
     engine.on('party:room:joined', (d) => forward(EVENTS.WATCH_ROOM_JOINED, d))
+    engine.on('party:room:updated', (d) => forward(EVENTS.WATCH_ROOM_UPDATED, d))
     engine.on('party:room:left', (d) => forward(EVENTS.WATCH_ROOM_LEFT, d))
     engine.on('party:room:closed', (d) => forward(EVENTS.WATCH_ROOM_CLOSED, d))
     engine.on('party:peer:joined', (d) => forward(EVENTS.WATCH_PEER_JOINED, d))
@@ -118,6 +119,26 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     engine.on('party:media:offer', (d) => forward(EVENTS.WATCH_MEDIA_OFFER, d))
     engine.on('party:media:ready', (d) => forward(EVENTS.WATCH_MEDIA_READY, d))
     engine.on('party:media:error', (d) => forward(EVENTS.WATCH_MEDIA_ERROR, d))
+    engine.on('site:visitor:added', (d) => forward(EVENTS.SITE_VISITOR_ADDED, d))
+    engine.on('site:invite:received', (d) => forward(EVENTS.SITE_INVITE_RECEIVED, d))
+    engine.on('site:visitor:removed', (d) => forward(EVENTS.SITE_VISITOR_REMOVED, d))
+    engine.on('site:visitor:failed', (d) => forward(EVENTS.SITE_VISITOR_FAILED, d))
+    engine.on('site:visit:started', (d) => {
+      forward(EVENTS.SITE_VISIT_STARTED, d)
+      try {
+        const { resetToken } = require('./sites-gateway')
+        resetToken()
+      } catch {}
+      // Also persist as notification so Visit tab shows it after restart
+      try { if (engine.notificationStore) engine.notificationStore.addNotification('Shared Folder', `"${d.name || d.code || 'A folder'}" is now available`, 'info') } catch {}
+    })
+    engine.on('site:visit:stopped', (d) => {
+      forward(EVENTS.SITE_VISIT_STOPPED, d)
+      try {
+        const { resetToken } = require('./sites-gateway')
+        resetToken()
+      } catch {}
+    })
     engine.on('notification:received', (n) => forward(EVENTS.NOTIFICATION_RECEIVED, n))
     engine.on('error', (err) => {
       if (err && err.code && err.code !== 'claim_rejected') {

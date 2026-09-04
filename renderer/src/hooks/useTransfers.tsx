@@ -8,6 +8,9 @@ import type { Device, IncomingOffer, NavRoute, TransferRecord } from '@/types'
 interface TransfersContextValue {
   transfers: TransferRecord[]
   pendingOffers: IncomingOffer[]
+  incomingPill: string | null
+  dismissIncomingPill: () => void
+  goToIncoming: () => void
   acceptTransfer: (transferId: string) => void
   declineTransfer: (transferId: string) => void
   pauseTransfer: (transferId: string) => void
@@ -25,8 +28,6 @@ const TransfersContext = createContext<TransfersContextValue | null>(null)
 export function TransfersProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast()
   const { navigate, currentRoute } = useNavigation()
-  // Where the user was before an auto-shift to /transfers, so completion can
-  // return them. Refs keep the subscription effect stable across route changes.
   const returnRouteRef = useRef<NavRoute | null>(null)
   const currentRouteRef = useRef<NavRoute>(currentRoute)
   useEffect(() => {
@@ -35,9 +36,10 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
 
   const [transfers, setTransfers] = useState<TransferRecord[]>([])
   const [pendingOffers, setPendingOffers] = useState<IncomingOffer[]>([])
+  const [incomingPill, setIncomingPill] = useState<string | null>(null)
 
   // Initial load + live subscriptions: incoming offers, transfer lifecycle
-  // events (upsert records), and the auto-navigate there-and-back behavior.
+  // events (upsert records), and the pill prompt (not forced nav).
   useEffect(() => {
     call(METHODS.TRANSFERS_LIST, null)
       .then((res: any) => {
@@ -52,12 +54,11 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
         setPendingOffers((prev) =>
           prev.some((o) => o.transferId === offer.transferId) ? prev : [...prev, offer]
         )
-        // Shift the receiver to the Transfers page so the incoming file is
-        // visible (with its approval dialog) the moment it arrives; remember
-        // where they came from so completion can shift them back.
-        if (currentRouteRef.current !== '/transfers')
+        if (currentRouteRef.current !== '/transfers') {
           returnRouteRef.current = currentRouteRef.current
-        navigate('/transfers')
+          setIncomingPill(offer.filename || 'Incoming transfer')
+          setTimeout(() => setIncomingPill(null), 8000)
+        }
       }
     })
 
@@ -229,11 +230,20 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     [navigate, toast]
   )
 
+  const dismissIncomingPill = useCallback(() => setIncomingPill(null), [])
+  const goToIncoming = useCallback(() => {
+    setIncomingPill(null)
+    navigate('/transfers')
+  }, [navigate])
+
   return (
     <TransfersContext.Provider
       value={{
         transfers,
         pendingOffers,
+        incomingPill,
+        dismissIncomingPill,
+        goToIncoming,
         acceptTransfer,
         declineTransfer,
         pauseTransfer,

@@ -80,6 +80,7 @@ export function WatchPartyModal({
     }
 
     let active = true
+    let retryTimer: ReturnType<typeof setInterval> | null = null
 
     const resolveVideo = async () => {
       if (filePath) {
@@ -91,30 +92,40 @@ export function WatchPartyModal({
         const downloadDir = '/storage/emulated/0/Download'
         const stagingDir = `${downloadDir}/.p2p-staging/${transferId}`
         try {
-          if (await RNFS.exists(stagingDir)) {
-            const files = await RNFS.readDir(stagingDir)
-            const part = files.find((f) => f.name.endsWith('.part'))
-            if (active && part) {
-              setVideoSrc(part.path)
-              return
-            }
-          }
-        } catch {}
-
-        try {
           const list = await call('listTransfers').catch(() => [])
           const match = Array.isArray(list) ? list.find((t: any) => t.id === transferId) : null
-          if (active && match?.destPath) {
-            setVideoSrc(match.destPath)
-            return
+          // Progressive-playback gate: only mount once the engine has verified
+          // enough of the file head to be playable (moov / prefix watermark).
+          const ready = match && (match.playable === true || match.status === 'completed')
+          if (ready) {
+            if (match.destPath && (await RNFS.exists(match.destPath))) {
+              if (active) setVideoSrc(match.destPath)
+              return
+            }
+            if (await RNFS.exists(stagingDir)) {
+              const files = await RNFS.readDir(stagingDir)
+              const part = files.find((f) => f.name.endsWith('.part'))
+              if (active && part) {
+                setVideoSrc(part.path)
+                return
+              }
+            }
           }
         } catch {}
       }
     }
 
     resolveVideo()
+    // Keep polling at a low rate until the transfer becomes playable (or the
+    // modal closes) so a claim/party transfer never dead-ends on "Connecting".
+    retryTimer = setInterval(() => {
+      if (!active) return
+      resolveVideo()
+    }, 3000)
+
     return () => {
       active = false
+      if (retryTimer) clearInterval(retryTimer)
     }
   }, [visible, filePath, transferId])
 
@@ -164,7 +175,7 @@ export function WatchPartyModal({
   useEffect(() => {
     if (!visible) return
 
-    const unsub = on('watch:state:updated', (state: any) => {
+    const applyState = (state: any) => {
       if (!state) return
       if (!syncWithHost && !isHost) return
 
@@ -183,10 +194,16 @@ export function WatchPartyModal({
           setCurrentTime(state.positionSec)
         }
       }
-    })
+    }
+    // Legacy claim/group flow surfaces state on watch:state:updated; a
+    // room-based party surfaces it on party:state:sync. Accept both so a
+    // viewer follows the host in either flow.
+    const unsubLegacy = on('watch:state:updated', applyState)
+    const unsubParty = on('party:state:sync', applyState)
 
     return () => {
-      unsub()
+      unsubLegacy()
+      unsubParty()
     }
   }, [visible, syncWithHost, isHost])
 

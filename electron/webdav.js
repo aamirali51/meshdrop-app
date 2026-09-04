@@ -172,26 +172,23 @@ async function resolveTransferStreamPath(engine, transferId) {
     const bee = await engine.getBee('transfers').catch(() => null)
     if (bee) {
       const entry = await bee.get(transferId).catch(() => null)
-      if (entry?.value?.stagingPath && fs.existsSync(entry.value.stagingPath)) {
-        return entry.value.stagingPath
+      const rec = entry?.value
+      if (!rec) return null
+      // Progressive-playback gate: do NOT hand the player a .part until the
+      // transfer has verified enough of the file head to be playable (moov /
+      // prefix watermark). Surfacing a near-empty .part early is what caused
+      // "timeline but no video" on guests.
+      const playable = rec.playable === true || rec.status === 'completed'
+      if (!playable) return null
+      if (rec.stagingPath && fs.existsSync(rec.stagingPath)) {
+        return rec.stagingPath
       }
-      if (entry?.value?.destPath && fs.existsSync(entry.value.destPath)) {
-        return entry.value.destPath
+      if (rec.destPath && fs.existsSync(rec.destPath)) {
+        return rec.destPath
       }
-      if (entry?.value?.filePath && fs.existsSync(entry.value.filePath)) {
-        return entry.value.filePath
+      if (rec.filePath && fs.existsSync(rec.filePath)) {
+        return rec.filePath
       }
-    }
-
-    const downloadsDir =
-      (engine.getDownloadDirectory ? await engine.getDownloadDirectory() : null) ||
-      engine.downloadsDir ||
-      path.join(os.homedir(), 'Downloads')
-    const stagingDir = path.join(downloadsDir, '.p2p-staging', transferId)
-    if (fs.existsSync(stagingDir)) {
-      const files = await fsp.readdir(stagingDir).catch(() => [])
-      const part = files.find((f) => f.endsWith('.part'))
-      if (part) return path.join(stagingDir, part)
     }
   } catch {}
   return null

@@ -70,20 +70,41 @@ export function WatchPartyModal({
     }
 
     let active = true
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let attempts = 0
     const method = METHODS.STREAM_URL_GET || 'stream.getUrl'
-    call(method, { transferId, filePath })
-      .then((res: any) => {
-        if (active && res?.url) {
-          setStreamUrl(res.url)
-        }
-      })
-      .catch((err) => {
-        console.warn('[WatchParty] Failed to get stream url:', err)
-        toast.error('Stream Error', 'Could not initialize local stream server.')
-      })
+    const tryResolve = () => {
+      call(method, { transferId, filePath })
+        .then((res: any) => {
+          if (!active) return
+          if (res?.url) {
+            setStreamUrl(res.url)
+            return
+          }
+          // Not playable yet (progressive transfer still verifying the moov /
+          // prefix watermark). Retry a bounded number of times — the engine
+          // only hands out a URL once the source is genuinely playable.
+          if (attempts < 60) {
+            attempts++
+            retryTimer = setTimeout(tryResolve, 3000)
+          }
+        })
+        .catch((err) => {
+          console.warn('[WatchParty] Failed to get stream url:', err)
+          if (!active) return
+          if (attempts < 5) {
+            attempts++
+            retryTimer = setTimeout(tryResolve, 3000)
+          } else {
+            toast.error('Stream Error', 'Could not initialize local stream server.')
+          }
+        })
+    }
+    tryResolve()
 
     return () => {
       active = false
+      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [open, transferId, filePath, toast])
 
@@ -193,11 +214,13 @@ export function WatchPartyModal({
     [isHost, syncWithHost, roomCode]
   )
 
-  // Listen for incoming Watch state sync signals from Host (viewers only)
+  // Listen for incoming Watch state sync signals from Host (viewers only).
+  // A room-based party surfaces state on watch.state_sync (forwarded from the
+  // engine's party:state:sync); the legacy claim/player path surfaces it on
+  // watch.stateChanged. Accept both so a viewer follows the host in either flow.
   useEffect(() => {
     if (!open || isHost) return
-    const eventName = EVENTS.WATCH_STATE_CHANGED || 'watch.stateChanged'
-    const unsub = on(eventName, (data: unknown) => {
+    const applyState = (data: unknown) => {
       const state = data as WatchState | null
       if (!state || !syncWithHost) return
 
@@ -220,10 +243,13 @@ export function WatchPartyModal({
           setCurrentTime(state.positionSec)
         }
       }
-    })
+    }
+    const unsubChanged = on(EVENTS.WATCH_STATE_CHANGED || 'watch.stateChanged', applyState)
+    const unsubSync = on(EVENTS.WATCH_STATE_SYNC || 'watch.state_sync', applyState)
 
     return () => {
-      unsub?.()
+      unsubChanged?.()
+      unsubSync?.()
     }
   }, [open, isHost, syncWithHost])
 

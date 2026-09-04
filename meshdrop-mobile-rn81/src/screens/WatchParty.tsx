@@ -57,10 +57,13 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
 
   // Room State
   const [activeRoom, setActiveRoom] = useState<any | null>(null)
+  const activeRoomRef = useRef<any | null>(null)
+  activeRoomRef.current = activeRoom
   const [discoveredRooms, setDiscoveredRooms] = useState<DiscoveredRoom[]>([])
   const [roomCodeInput, setRoomCodeInput] = useState('')
   const [roomTitleInput, setRoomTitleInput] = useState('')
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null)
+  const [controlsMode, setControlsMode] = useState<'host' | 'open'>('host')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -138,18 +141,50 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
       }),
       on('party:room:created', (room: any) => {
         setActiveRoom(room)
+        setVideoSrc('')
+        setIsPlaying(false)
       }),
       on('party:room:joined', (room: any) => {
+        setActiveRoom(room)
+        setVideoSrc('')
+        setIsPlaying(false)
+      }),
+      on('party:room:updated', (room: any) => {
+        // Fresh snapshot after a guest's media offer arrives (host identity,
+        // real media title / controlsMode) — but also on every throttled roster
+        // tick. Only replace state when the room materially changed so the
+        // [activeRoom] effect (and its media retry) does not restart constantly.
+        if (!room) return
+        const cur = activeRoomRef.current
+        if (cur && cur.roomCode === room.roomCode) {
+          const materiallyChanged =
+            room.hostName !== cur.hostName ||
+            room.title !== cur.title ||
+            room.controlsMode !== cur.controlsMode ||
+            room.participantCount !== cur.participantCount
+          if (!materiallyChanged) return
+        }
         setActiveRoom(room)
       }),
       on('party:room:left', () => {
         setActiveRoom(null)
         setVideoSrc('')
+        setIsPlaying(false)
+        setLoading(false)
       }),
-      on('party:room:closed', () => {
+      on('party:room:closed', (evt: any) => {
         setActiveRoom(null)
         setVideoSrc('')
-        Alert.alert('Party Closed', 'The host has ended the Watch Party.')
+        setIsPlaying(false)
+        setLoading(false)
+        const reason = evt?.reason || ''
+        if (reason === 'join-timeout') {
+          Alert.alert('Room Not Found', evt?.error || 'No host responded to your join request.')
+        } else if (reason === 'host-lost') {
+          Alert.alert('Party Ended', 'The host is no longer reachable.')
+        } else {
+          Alert.alert('Party Closed', 'The host has ended the Watch Party.')
+        }
       }),
       on('party:state:sync', (state: any) => {
         if (!state) return
@@ -184,8 +219,9 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
       on('party:media:ready', () => {
         resolvePartyMediaRef.current?.(true)
       }),
-      on('party:media:error', () => {
-        Alert.alert('Media Error', 'The party media could not be transferred.')
+      on('party:media:error', (media: any) => {
+        setLoading(false)
+        Alert.alert('Media Error', media?.error || 'The party media could not be transferred.')
       }),
       on('transfer:progress', (t: any) => {
         if (t?.id && shareIdRef.current && t.id === shareIdRef.current) {
@@ -211,27 +247,40 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
   // than scanning the staging directory a single time.
   const shareIdRef = useRef<string | null>(null)
   const lastMediaScanRef = useRef<number>(0)
+  const mediaFoundRef = useRef(false)
 
   const resolvePartyMedia = useCallback(async (force: boolean) => {
     const shareId = shareIdRef.current
     if (!shareId) return
+    if (mediaFoundRef.current) return
     const now = Date.now()
     if (!force && now - lastMediaScanRef.current < 1500) return
     lastMediaScanRef.current = now
 
+    // Progressive-playback gate: only mount the .part once the engine has
+    // verified enough of the file head to be playable (moov / prefix
+    // watermark). Playing a near-empty .part is the "timeline but no video"
+    // failure. The record carries playable/completed once the threshold hits.
     const stagingDir = `/storage/emulated/0/Download/.p2p-staging/${shareId}`
     try {
+      const list = await call('listTransfers').catch(() => [])
+      const match = Array.isArray(list) ? list.find((t: any) => t.id === shareId) : null
+      if (!match) return
+      const ready = match.playable === true || match.status === 'completed'
+      if (!ready) return
+      if (match.destPath && (await RNFS.exists(match.destPath))) {
+        mediaFoundRef.current = true
+        setVideoSrc(match.destPath)
+        return
+      }
       if (await RNFS.exists(stagingDir)) {
         const files = await RNFS.readDir(stagingDir)
         const part = files.find((f) => f.name.endsWith('.part'))
         if (part) {
+          mediaFoundRef.current = true
           setVideoSrc(part.path)
-          return
         }
       }
-      const list = await call('listTransfers').catch(() => [])
-      const match = Array.isArray(list) ? list.find((t: any) => t.id === shareId) : null
-      if (match?.destPath) setVideoSrc(match.destPath)
     } catch {}
   }, [])
   const resolvePartyMediaRef = useRef<((force: boolean) => Promise<void>) | null>(null)
@@ -242,24 +291,44 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
     if (!activeRoom) {
       setVideoSrc('')
       shareIdRef.current = null
+      mediaFoundRef.current = false
       return
     }
 
     if (activeRoom.filePath) {
+      mediaFoundRef.current = true
       setVideoSrc(activeRoom.filePath)
+      shareIdRef.current = null
       return
     }
 
+    mediaFoundRef.current = false
     if (activeRoom.roomCode) {
       shareIdRef.current = `watch-${activeRoom.roomCode.toLowerCase()}`
     }
+    // Resolve once immediately, then keep a slow retry so a guest source that
+    // appears late (missed media-ready / transfer events) still starts playing.
     resolvePartyMediaRef.current?.(true)
+    const retry = setInterval(() => {
+      if (!shareIdRef.current || mediaFoundRef.current) return
+      resolvePartyMediaRef.current?.(false)
+    }, 3000)
+    return () => {
+      clearInterval(retry)
+      shareIdRef.current = null
+    }
   }, [activeRoom])
 
   const broadcastPlayback = (action: 'play' | 'pause' | 'seek', posSec: number) => {
     const now = Date.now()
     if (now - lastSyncRef.current < 200 && action !== 'seek') return
     lastSyncRef.current = now
+
+    // Host-authority: only the host (or an open/collaborative room) drives the
+    // swarm. The core drops non-host syncs in host mode, but we shouldn't even
+    // try — or let the user think their tap reached everyone.
+    const room = activeRoom
+    if (room && !room.isHost && room.controlsMode === 'host') return
 
     call('broadcastWatchState', {
       roomCode: activeRoom?.roomCode,
@@ -295,7 +364,7 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
       const room = await call('createPartyRoom', {
         title: roomTitleInput || selectedFile.name,
         filePath: selectedFile.path,
-        controlsMode: 'host',
+        controlsMode,
       })
       setActiveRoom(room)
     } catch (err: any) {
@@ -450,6 +519,31 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
               placeholder="Party Title (optional)"
               placeholderTextColor={theme.muted}
             />
+
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setControlsMode('host')}
+                style={{
+                  flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1,
+                  borderColor: controlsMode === 'host' ? theme.primary : theme.border,
+                  backgroundColor: controlsMode === 'host' ? theme.primarySoft : theme.bgElevated,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: controlsMode === 'host' ? theme.primary : theme.muted }}>Host Only</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setControlsMode('open')}
+                style={{
+                  flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1,
+                  borderColor: controlsMode === 'open' ? theme.primary : theme.border,
+                  backgroundColor: controlsMode === 'open' ? theme.primarySoft : theme.bgElevated,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: controlsMode === 'open' ? theme.primary : theme.muted }}>Collaborative</Text>
+              </TouchableOpacity>
+            </View>
 
             <Btn
               label={loading ? 'Starting...' : 'Start Watch Party'}
@@ -739,7 +833,7 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
               <View style={styles.rosterRow}>
                 <Users size={14} color={theme.primary} />
                 <Text style={[styles.rosterText, { color: theme.text }]}>
-                  {activeRoom.isHost ? '👑 Host (You)' : `Host: ${activeRoom.hostName}`} · 🟢 Synchronized
+                  {activeRoom.isHost ? '👑 Host (You)' : `Host: ${activeRoom.hostName || 'the host'}`} · 🟢 Synchronized
                 </Text>
               </View>
             </View>

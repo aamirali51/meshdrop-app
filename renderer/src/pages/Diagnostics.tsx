@@ -25,6 +25,8 @@ export function Diagnostics() {
   const { diagnostics } = useApp()
 
   const uptime = diagnostics.uptimeMs != null ? formatUptime(diagnostics.uptimeMs) : '—'
+  const hasPeers = (diagnostics.connectedPeersCount ?? 0) > 0
+  const isOnline = diagnostics.connected !== false
 
   return (
     <div className='space-y-6 pb-12'>
@@ -34,6 +36,19 @@ export function Diagnostics() {
           Live connection metrics for advanced troubleshooting.
         </p>
       </div>
+
+      {!isOnline && (
+        <div className='rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs'>
+          <p className='font-bold text-amber-600 dark:text-amber-400'>Mesh is connecting…</p>
+          <p className='text-muted-foreground mt-1'>Pair a device or check your network. Metrics below populate once peers connect.</p>
+        </div>
+      )}
+      {!hasPeers && isOnline && (
+        <div className='rounded-xl border border-border/40 bg-card/40 p-4 text-xs'>
+          <p className='font-bold text-foreground'>No peers connected yet</p>
+          <p className='text-muted-foreground mt-1'>Latency, packet loss and throughput appear once a device links.</p>
+        </div>
+      )}
 
       <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
         <Card className='glass-card border-border/60'>

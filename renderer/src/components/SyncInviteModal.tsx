@@ -23,31 +23,18 @@ export function SyncInviteModal() {
   const [busy, setBusy] = useState<boolean>(false)
 
   useEffect(() => {
-    const fetchInvites = () => {
-      call(METHODS.SYNC_LIST_INVITES || 'sync.listInvites')
-        .then((res: any) => {
-          if (Array.isArray(res) && res.length > 0) {
-            setInvites(res)
-          }
-        })
-        .catch(() => {})
+    call(METHODS.SYNC_LIST_INVITES || 'sync.listInvites')
+      .then((res: unknown) => { if (Array.isArray(res)) setInvites(res as SyncInvite[]) })
+      .catch(() => {})
+    const onInvite = (data: unknown) => {
+      const d = data as SyncInvite | null
+      if (d && d.id) setInvites((prev) => (prev.some((x) => x.id === d.id) ? prev : [...prev, d]))
     }
-
-    fetchInvites()
-    const timer = setInterval(fetchInvites, 3000)
-
-    const onInvite = (data: any) => {
-      if (data && data.id) {
-        setInvites((prev) => (prev.some((x) => x.id === data.id) ? prev : [...prev, data]))
-      }
-    }
-
     const unsub1 = on(EVENTS.SYNC_INVITE_RECEIVED, onInvite)
-
-    return () => {
-      clearInterval(timer)
-      unsub1()
-    }
+    const unsub2 = on(EVENTS.SYNC_LIBRARY_ADDED, () => {
+      // Reconcile: library added means invite was accepted elsewhere
+    })
+    return () => { unsub1(); unsub2() }
   }, [])
 
   if (invites.length === 0) return null

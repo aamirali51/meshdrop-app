@@ -2,6 +2,7 @@ import { ThemeProvider } from '@/hooks/useTheme'
 import { NavigationProvider } from '@/hooks/useNavigation'
 import { DataProviders } from '@/hooks/DataProviders'
 import { SyncProvider } from '@/hooks/useSync'
+import { SharedFoldersProvider } from '@/hooks/useSharedFolders'
 import { ToastProvider } from '@/hooks/useToast'
 import { ToastContainer } from '@/components/Toast'
 import { UpdateToaster } from '@/components/UpdateToaster'
@@ -19,12 +20,14 @@ export default function App() {
           <NavigationProvider>
             <DataProviders>
               <SyncProvider>
-                <MainLayout />
-                <WelcomeModal />
-                <QuickSendModal />
-                <UpdateToaster />
-                <PortableBanner />
-                <ToastContainer />
+                <SharedFoldersProvider>
+                  <MainLayout />
+                  <WelcomeModal />
+                  <QuickSendModal />
+                  <UpdateToaster />
+                  <PortableBanner />
+                  <ToastContainer />
+                </SharedFoldersProvider>
               </SyncProvider>
             </DataProviders>
           </NavigationProvider>

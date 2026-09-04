@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -68,6 +69,7 @@ interface ConfirmDialogProps {
   title: React.ReactNode
   description: string
   confirmLabel: string
+  requireConfirmText?: string
   onConfirm: () => void
 }
 
@@ -77,18 +79,35 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  requireConfirmText,
   onConfirm
 }: ConfirmDialogProps) {
+  const [confirmInput, setConfirmInput] = useState('')
+  const requiresText = !!requireConfirmText
+  const canConfirm = !requiresText || confirmInput === requireConfirmText
+  useEffect(() => {
+    if (open) setConfirmInput('')
+  }, [open])
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={title}>
       <p className='text-xs leading-relaxed text-muted-foreground'>{description}</p>
+      {requiresText && (
+        <input
+          value={confirmInput}
+          onChange={(e) => setConfirmInput(e.target.value)}
+          placeholder={`Type ${requireConfirmText} to confirm`}
+          className='mt-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono focus:border-primary focus:outline-none'
+        />
+      )}
       <div className='mt-5 flex items-center justify-end gap-3'>
         <Button variant='outline' onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
         <Button
           variant='destructive'
+          disabled={requiresText && !canConfirm}
           onClick={() => {
+            if (!canConfirm) return
             onConfirm()
             onOpenChange(false)
           }}

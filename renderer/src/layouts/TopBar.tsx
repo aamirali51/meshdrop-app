@@ -30,6 +30,7 @@ export function TopBar() {
     '/devices': 'My Devices',
     '/sync': 'Sync Folders',
     '/party': 'Watch Party',
+    '/shared-folders': 'Shared Folders',
     '/transfers': 'Transfers',
     '/activity': 'Activity',
     '/history': 'History',
@@ -50,9 +51,9 @@ export function TopBar() {
         isElectron && !isMac ? 'drag-region' : ''
       )}
     >
-      {/* Left: MeshDrop brand + section title */}
+      {/* Left: brand (mobile only — Sidebar owns it on md+) + section title */}
       <div className='flex min-w-0 items-center gap-3'>
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg gradient-brand shadow-md'>
+        <div className='flex md:hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg gradient-brand shadow-md'>
           <Waypoints className='h-4 w-4 text-white' />
         </div>
         <div className='min-w-0 leading-tight'>

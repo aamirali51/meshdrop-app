@@ -10,8 +10,8 @@ type Filter = 'all' | ActivityType
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'transfer', label: 'Transfers' },
-  { key: 'session', label: 'Sessions' },
-  { key: 'notification', label: 'Notifications' }
+  { key: 'session', label: 'Watch Sessions' },
+  { key: 'notification', label: 'System' }
 ]
 
 const TYPE_META: Record<ActivityType, { icon: React.ReactNode; label: string; styles: string }> = {

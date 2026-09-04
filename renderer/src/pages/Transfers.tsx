@@ -41,15 +41,15 @@ const STATUS_LABEL: Record<TransferStatus, string> = {
 }
 
 const STATUS_STYLE: Record<TransferStatus, string> = {
-  queued: 'text-status-away border-status-away/30 bg-status-away/10',
+  queued: 'text-muted-foreground border-border/40 bg-muted/20',
   active: 'text-meshdrop-cyan border-meshdrop-cyan/30 bg-meshdrop-cyan/10',
   paused: 'text-status-away border-status-away/30 bg-status-away/10',
-  interrupted: 'text-status-away border-status-away/30 bg-status-away/10',
+  interrupted: 'text-amber-500 border-amber-500/30 bg-amber-500/10 border-dashed',
   completed: 'text-status-online border-status-online/30 bg-status-online/10',
   failed: 'text-destructive border-destructive/30 bg-destructive/10',
   cancelled: 'text-muted-foreground border-border/40 bg-muted/20',
   pending_approval: 'text-primary border-primary/30 bg-primary/10',
-  waiting_peer: 'text-status-away border-status-away/30 bg-status-away/10'
+  waiting_peer: 'text-amber-500 border-amber-500/30 bg-amber-500/10 border-dashed'
 }
 
 export function Transfers() {
@@ -543,13 +543,14 @@ export function Transfers() {
         onOpenChange={(open) => {
           if (!open) setClearMode(null)
         }}
-        title={clearMode === 'all' ? 'Clear all transfer logs?' : 'Clear finished transfers?'}
+        title={clearMode === 'all' ? 'Clear ALL transfers? This cancels active ones.' : 'Clear finished transfers?'}
         description={
           clearMode === 'all'
-            ? 'All transfer records, including active, queued, and waiting transfers, will be cancelled and cleared from your transfer history.'
-            : 'Completed, failed, cancelled, and interrupted transfers will be removed from the list. Active transfers will be kept.'
+            ? 'This will CANCEL active/queued transfers and delete all history. Type CLEAR below to confirm.'
+            : 'Completed, failed, cancelled, and interrupted transfers will be removed. Active transfers will be kept.'
         }
-        confirmLabel={clearMode === 'all' ? 'Clear All Logs' : 'Clear Finished'}
+        confirmLabel={clearMode === 'all' ? 'Type CLEAR to confirm' : 'Clear Finished'}
+        requireConfirmText={clearMode === 'all' ? 'CLEAR' : undefined}
         onConfirm={() => {
           if (clearMode === 'all') {
             clearTransfers({ includePending: true })

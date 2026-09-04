@@ -5,6 +5,8 @@ const ROUTE_ORDER: NavRoute[] = [
   '/dashboard',
   '/devices',
   '/sync',
+  '/party',
+  '/shared-folders',
   '/transfers',
   '/activity',
   '/history',
@@ -20,11 +22,12 @@ export const ROUTE_SHORTCUTS: Partial<Record<NavRoute, number>> = {
   '/devices': 2,
   '/sync': 3,
   '/transfers': 4,
-  '/activity': 5,
-  '/history': 6,
-  '/diagnostics': 7,
-  '/settings': 8,
-  '/about': 9
+  '/shared-folders': 5,
+  '/activity': 6,
+  '/history': 7,
+  '/diagnostics': 8,
+  '/settings': 9,
+  '/about': 10
 }
 
 export function isMacPlatform(): boolean {
@@ -44,10 +47,23 @@ interface NavigationContextValue {
 const NavigationContext = createContext<NavigationContextValue | null>(null)
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
-  const [currentRoute, setCurrentRoute] = useState<NavRoute>('/dashboard')
+  const [currentRoute, setCurrentRoute] = useState<NavRoute>(() => {
+    const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : ''
+    return (ROUTE_ORDER as string[]).includes(hash) ? (hash as NavRoute) : '/dashboard'
+  })
 
   const navigate = useCallback((route: NavRoute) => {
     setCurrentRoute(route)
+    if (typeof window !== 'undefined') window.location.hash = route
+  }, [])
+
+  useEffect(() => {
+    const onHash = () => {
+      const h = window.location.hash.slice(1)
+      if ((ROUTE_ORDER as string[]).includes(h)) setCurrentRoute(h as NavRoute)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
   // Global keyboard shortcuts: ⌘/Ctrl + 1..8 navigates to the matching page.

@@ -12,6 +12,7 @@ import { History } from '@/pages/History'
 import { Diagnostics } from '@/pages/Diagnostics'
 import { Settings } from '@/pages/Settings'
 import { WatchParty } from '@/pages/WatchParty'
+import { SharedFolders } from '@/pages/SharedFolders'
 import { About } from '@/pages/About'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Upload } from 'lucide-react'
@@ -30,12 +31,14 @@ import { DropPreviewModal } from '@/components/DropPreviewModal'
 import { WhatsNewModal } from '@/components/WhatsNewModal'
 import { WatchPartyModal } from '@/components/WatchPartyModal'
 import { useDevices } from '@/hooks/useDevices'
+import { useTransfers } from '@/hooks/useTransfers'
 
 const pages: Record<string, React.FC> = {
   '/dashboard': Dashboard,
   '/devices': Devices,
   '/sync': Sync,
   '/party': WatchParty,
+  '/shared-folders': SharedFolders,
   '/transfers': Transfers,
   '/activity': Activity,
   '/history': History,
@@ -48,6 +51,7 @@ export function MainLayout() {
   const { currentRoute } = useNavigation()
   const { isQRCodeModalOpen, toggleQRCodeModal } = useDevices()
   const { openShareWith, watchParty, closeWatchParty } = useShares()
+  const { incomingPill, dismissIncomingPill, goToIncoming } = useTransfers()
   const { toast } = useToast()
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0)
@@ -140,8 +144,18 @@ export function MainLayout() {
         />
       )}
 
+      {/* Incoming transfer pill — non-intrusive, replaces forced nav */}
+      {incomingPill && (
+        <div className='fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2 rounded-full border border-primary/30 bg-card px-4 py-2 shadow-xl'>
+          <span className='h-2 w-2 rounded-full bg-meshdrop-cyan animate-pulse' />
+          <span className='text-xs font-bold text-foreground truncate max-w-[220px]'>{incomingPill}</span>
+          <button onClick={goToIncoming} className='rounded-full bg-primary px-3 py-1 text-xs font-bold text-white'>View →</button>
+          <button onClick={dismissIncomingPill} className='text-muted-foreground hover:text-foreground px-1'>✕</button>
+        </div>
+      )}
+
       {/* Drag-and-drop share overlay: pointer-events-none so the drop still
-          lands on the window root above. */}
+           lands on the window root above. */}
       {dragging && (
         <div className='pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-md transition-all'>
           <div className='flex flex-col items-center gap-4 rounded-3xl border-2 border-dashed border-primary bg-card/95 p-12 text-center shadow-2xl animate-pulse'>

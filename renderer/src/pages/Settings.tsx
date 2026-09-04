@@ -47,6 +47,8 @@ interface AppSettings {
   theme: 'dark' | 'light'
   deviceName: string
   autoTrustLAN: boolean
+  /** When a relayed peer is heard on the local network, reconnect it onto LAN. */
+  autoLanSwitch: boolean
   /** @mesh/core auto-accept flag — inverted by the "Require Manual File Acceptance" toggle. */
   autoAcceptOffers: boolean
   /** Prefer an online paired desktop as relay before public bootstrap nodes. */
@@ -67,6 +69,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   deviceName: '',
   autoTrustLAN: false,
+  autoLanSwitch: true,
   autoAcceptOffers: true,
   preferOwnRelay: true,
   relayMode: 'auto',
@@ -88,11 +91,17 @@ export function Settings() {
   const { identity } = useDevices()
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(true)
+  const [savedSettings, setSavedSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
+  const isDirty = JSON.stringify(settings) !== JSON.stringify(savedSettings)
 
   useEffect(() => {
     call(METHODS.SETTINGS_GET, null)
       .then((res: any) => {
-        if (res && typeof res === 'object') setSettings({ ...DEFAULT_SETTINGS, ...res })
+        if (res && typeof res === 'object') {
+          const merged = { ...DEFAULT_SETTINGS, ...res }
+          setSettings(merged)
+          setSavedSettings(merged)
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -100,19 +109,44 @@ export function Settings() {
     const unsub = on(EVENTS.SETTINGS_UPDATED, (data: any) => {
       if (data && typeof data === 'object') {
         setSettings((prev) => ({ ...prev, ...data }))
+        setSavedSettings((prev) => ({ ...prev, ...data }))
       }
     })
 
     return () => unsub()
   }, [])
 
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
+  const persistPartial = useCallback(async (patch: Partial<AppSettings>, prev: AppSettings) => {
+    try {
+      await call(METHODS.SETTINGS_UPDATE, patch)
+    } catch (err: any) {
+      setSettings(prev)
+      toast.error('Save Failed', err?.message || 'Could not save setting.')
+    }
+  }, [toast])
+
   const set = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
-  }, [])
+    setSettings((prev) => {
+      const next = { ...prev, [key]: value }
+      persistPartial({ [key]: value } as Partial<AppSettings>, prev)
+      return next
+    })
+  }, [persistPartial])
 
   const handleSave = async () => {
     try {
       await call(METHODS.SETTINGS_UPDATE, settings)
+      setSavedSettings(settings)
       if (settings.theme !== theme) setTheme(settings.theme)
       toast.success('Settings Saved', 'Your preferences were saved.')
     } catch (err: any) {
@@ -121,8 +155,10 @@ export function Settings() {
   }
 
   const handleThemeSelect = (t: 'dark' | 'light') => {
-    set('theme', t)
+    const prev = settings
+    setSettings((p) => ({ ...p, theme: t }))
     setTheme(t)
+    persistPartial({ theme: t } as Partial<AppSettings>, prev)
   }
 
   const [updateStatus, setUpdateStatus] = useState<UpdateStatusData | null>(null)
@@ -274,13 +310,13 @@ export function Settings() {
         <div>
           <h2 className='text-xl font-black text-foreground'>Security & Settings</h2>
           <p className='text-xs text-muted-foreground'>
-            Configure how MeshDrop connects, stores files, and hardens your mesh.
+            Changes save automatically. Use Save to flush any pending edits.
           </p>
         </div>
 
-        <Button onClick={handleSave} disabled={loading} className='font-bold text-xs gap-2'>
+        <Button onClick={handleSave} disabled={loading || !isDirty} className='font-bold text-xs gap-2'>
           <Check className='h-4 w-4' />
-          Save Changes
+          {isDirty ? 'Save Changes •' : 'All Saved'}
         </Button>
       </div>
 
@@ -432,6 +468,21 @@ export function Settings() {
                     checked={settings.preferOwnRelay !== false}
                     onCheckedChange={(v) => set('preferOwnRelay', v)}
                     aria-label='Prefer own devices as relay'
+                  />
+                </div>
+
+                {/* Auto LAN Switch */}
+                <div className='flex items-center justify-between border-t border-border/40 pt-4'>
+                  <div>
+                    <p className='font-bold text-foreground text-xs'>Prefer Direct LAN when Available</p>
+                    <p className='text-[11px] text-muted-foreground'>
+                      When a device connected over the internet/relay is detected on your local network, automatically reconnect it over direct LAN for faster transfers and playback.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.autoLanSwitch !== false}
+                    onCheckedChange={(v) => set('autoLanSwitch', v)}
+                    aria-label='Prefer direct LAN when available'
                   />
                 </div>
               </CardContent>

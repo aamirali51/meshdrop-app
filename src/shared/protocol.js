@@ -81,12 +81,36 @@ const METHODS = {
   WATCH_PARTY_LIST_ROOMS: 'watch.listRooms',
   WATCH_PARTY_REACTION: 'watch.reaction',
   WATCH_PARTY_STATUS: 'watch.status',
-  STREAM_URL_GET: 'stream.getUrl'
+  STREAM_URL_GET: 'stream.getUrl',
+  SITES_LIST: 'sites.list',
+  SITES_LIST_ACTIVE: 'sites.listActive',
+  SITES_LIST_RECEIVED: 'sites.listReceived',
+  SITES_REMOVE_RECEIVED: 'sites.removeReceived',
+  SITES_PUBLISH: 'sites.publish',
+  SITES_UNPUBLISH: 'sites.unpublish',
+  SITES_UPDATE: 'sites.update',
+  SITES_ADD_VISITOR: 'sites.addVisitor',
+  SITES_UPDATE_VISITOR_ROLE: 'sites.updateVisitorRole',
+  SITES_REMOVE_VISITOR: 'sites.removeVisitor',
+  SITES_VISIT: 'sites.visit',
+  SITES_LEAVE: 'sites.leave',
+  SITES_GET_ACTIVE: 'sites.getActive',
+  // siteId-scoped file ops: address a specific concurrent visit (a device may
+  // browse several hosts' shared folders at once). `path` is always required;
+  // the siteId selects which visit.
+  SITES_LIST_FILES: 'sites.listFiles',
+  SITES_WRITE_FILE: 'sites.writeFile',
+  SITES_MKDIR: 'sites.mkdir',
+  SITES_DELETE: 'sites.delete',
+  SITES_GET_URL: 'sites.getUrl',
+  SITES_LIST_PATH: 'sites.listPath',
+  SITES_GET_STATS: 'sites.getStats'
 }
 
 const EVENTS = {
   WATCH_ROOM_CREATED: 'watch.room_created',
   WATCH_ROOM_JOINED: 'watch.room_joined',
+  WATCH_ROOM_UPDATED: 'watch.room_updated',
   WATCH_ROOM_LEFT: 'watch.room_left',
   WATCH_ROOM_CLOSED: 'watch.room_closed',
   WATCH_PEER_JOINED: 'watch.peer_joined',
@@ -143,7 +167,14 @@ const EVENTS = {
   SETTINGS_UPDATED: 'settings.updated',
   SPEEDTEST_PROGRESS: 'speedtest.progress',
   LAN_DISCOVERY_KEY: 'lan.discoveryKey',
-  WATCH_STATE_CHANGED: 'watch.stateChanged'
+  WATCH_STATE_CHANGED: 'watch.stateChanged',
+  SITE_VISITOR_ADDED: 'site.visitor_added',
+  SITE_VISITOR_REMOVED: 'site.visitor_removed',
+  SITE_VISITOR_FAILED: 'site.visitor_failed',
+  SITE_VISIT_STARTED: 'site.visit_started',
+  SITE_VISIT_STOPPED: 'site.visit_stopped',
+  SITE_INVITE_RECEIVED: 'site.invite_received',
+  SITE_UPDATED: 'site.updated'
 }
 
 // A message is compatible when it is unversioned (legacy v1) or exactly matches

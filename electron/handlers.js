@@ -22,6 +22,9 @@ const DEFAULT_SETTINGS = {
   // Security default: devices must pair via the key/code handshake. LAN
   // discovery connects peers, it does NOT grant trust.
   autoTrustLAN: false,
+  // When a relayed/internet peer is heard on the local network, reconnect it
+  // over direct LAN automatically (faster transfers + playback).
+  autoLanSwitch: true,
   // When false the engine holds incoming transfers at "pending approval"
   // until the user explicitly accepts (Require Manual File Acceptance).
   autoAcceptOffers: true,
@@ -376,6 +379,8 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     return mergeSettings({
       ...(entry?.value || {}),
       autoAcceptOffers: live.autoAcceptOffers,
+      autoTrustLAN: live.autoTrustLAN,
+      autoLanSwitch: live.autoLanSwitch,
       preferOwnRelay: live.preferOwnRelay,
       relayMode: live.relayMode,
       customRelayUrl: live.customRelayUrl
@@ -394,6 +399,9 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     }
     if (typeof merged.autoTrustLAN === 'boolean') {
       engine.autoTrustLAN = merged.autoTrustLAN
+    }
+    if (typeof merged.autoLanSwitch === 'boolean') {
+      await engine.setAutoLanSwitch(merged.autoLanSwitch)
     }
     if (typeof merged.autoAcceptOffers === 'boolean') {
       await engine.setAutoAcceptOffers(merged.autoAcceptOffers)
@@ -719,11 +727,18 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
   handlers[METHODS.WATCH_STATE_BROADCAST] = async (params) => {
     if (!engine) return { success: false }
     const res = engine.broadcastWatchState ? engine.broadcastWatchState(params) : { success: true }
-    emit(EVENTS.WATCH_STATE_CHANGED, {
-      ...params,
-      timestampMs: Date.now(),
-      senderDevice: engine.deviceIdentity ? { id: engine.deviceIdentity.id, name: engine.deviceIdentity.name } : null
-    })
+    // When a party room is active, the manager's broadcast already emits the
+    // authoritative party:state:sync (forwarded to watch.state_sync), and the
+    // router gates foreign watch.stateChanged by room membership. Only echo the
+    // legacy watch.stateChanged locally on the non-room claim path to avoid
+    // double-driving the same host UI.
+    if (!(engine.watchParty && engine.watchParty.activeRoom)) {
+      emit(EVENTS.WATCH_STATE_CHANGED, {
+        ...params,
+        timestampMs: Date.now(),
+        senderDevice: engine.deviceIdentity ? { id: engine.deviceIdentity.id, name: engine.deviceIdentity.name } : null
+      })
+    }
     return res || { success: true }
   }
 
@@ -784,6 +799,80 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
       return { url: `http://127.0.0.1:${port}/stream/file?path=${encodeURIComponent(params.filePath)}` }
     }
     return { url: `http://127.0.0.1:${port}/p2p/` }
+  }
+
+  // ─── MeshDrop Sites ──────────────────────────────────────────────────────
+  // Thin RPC shells over the MeshEngine site methods (registry, allowlist,
+  // visit + live read). The visitor-side HTTP gateway lives in sites-gateway.js
+  // and is reached through sites.getUrl.
+
+  handlers[METHODS.SITES_LIST] = async () => engine.listSites()
+  handlers[METHODS.SITES_LIST_ACTIVE] = async () => engine.listActiveSites ? engine.listActiveSites() : []
+  handlers[METHODS.SITES_LIST_RECEIVED] = async () => engine.listReceivedSites ? engine.listReceivedSites() : []
+  handlers[METHODS.SITES_REMOVE_RECEIVED] = async (params) => engine.removeReceivedSite ? engine.removeReceivedSite(params?.siteId) : { success: true }
+  handlers[METHODS.SITES_PUBLISH] = async (params) => {
+    const site = await engine.publishSite({ folderPath: params?.folderPath, name: params?.name, writeMode: params?.writeMode, spa: params?.spa, expirationPreset: params?.expirationPreset })
+    emit(EVENTS.SITE_UPDATED, { site, action: 'published' })
+    return site
+  }
+  handlers[METHODS.SITES_UPDATE] = async (params) => {
+    const site = await engine.updateSite(params?.siteId, params?.patch || {})
+    emit(EVENTS.SITE_UPDATED, { site, action: 'updated' })
+    return site
+  }
+  handlers[METHODS.SITES_UNPUBLISH] = async (params) => {
+    await engine.unpublishSite(params?.siteId)
+    emit(EVENTS.SITE_UPDATED, { siteId: params?.siteId, action: 'unpublished' })
+    return { success: true }
+  }
+  handlers[METHODS.SITES_ADD_VISITOR] = async (params) => {
+    return engine.addSiteVisitor(params?.siteId, params?.code, { timeoutMs: 60000, role: params?.role })
+  }
+  handlers[METHODS.SITES_UPDATE_VISITOR_ROLE] = async (params) => {
+    await engine.siteManager.updateAllowlistRole(params?.siteId, params?.publicKey, params?.role)
+    emit(EVENTS.SITE_UPDATED, { siteId: params?.siteId, action: 'visitor_role' })
+    return { success: true }
+  }
+  handlers[METHODS.SITES_REMOVE_VISITOR] = async (params) => {
+    await engine.removeSiteVisitor(params?.siteId, params?.publicKey)
+    emit(EVENTS.SITE_UPDATED, { siteId: params?.siteId, action: 'visitor_removed' })
+    return { success: true }
+  }
+  handlers[METHODS.SITES_VISIT] = async (params) => engine.visitSite(params?.code)
+  // Leave a specific visit by siteId (or all when omitted).
+  handlers[METHODS.SITES_LEAVE] = async (params) => engine.leaveSite(params?.siteId)
+  handlers[METHODS.SITES_GET_ACTIVE] = async () => ({
+    hosting: engine.getActiveSite ? engine.getActiveSite() : null,
+    activeSites: engine.listActiveSites ? engine.listActiveSites() : [],
+    visiting: engine.getActiveVisit ? engine.getActiveVisit() : null,
+    // Multi-visit: every folder this device is currently browsing.
+    visits: engine.getActiveVisits ? engine.getActiveVisits() : []
+  })
+  // Legacy single-visit file ops: keep `siteId` optional and let the engine
+  // resolve the (single) active visit when omitted.
+  handlers[METHODS.SITES_LIST_FILES] = async (params) => engine.listSitePath(params?.path || '/', params?.siteId)
+  handlers[METHODS.SITES_LIST_PATH] = async (params) => engine.listSitePath(params?.path || '/', params?.siteId)
+  handlers[METHODS.SITES_GET_STATS] = async (params) => engine.siteStats(params?.siteId)
+  handlers[METHODS.SITES_WRITE_FILE] = async (params) => {
+    const data = params?.dataBase64 ? Buffer.from(params.dataBase64, 'base64') : Buffer.from(String(params?.data || ''), 'utf8')
+    return engine.writeSiteFile(params?.path, data, params?.siteId)
+  }
+  handlers[METHODS.SITES_MKDIR] = async (params) => engine.mkdirSitePath(params?.path, params?.siteId)
+  handlers[METHODS.SITES_DELETE] = async (params) => engine.deleteSitePath(params?.path, params?.siteId)
+  handlers[METHODS.SITES_GET_URL] = async (params) => {
+    // The gateway serves ANY open visit (or hosted site) via ?siteId=, so the
+    // base URL is valid whenever the gateway is up and there is at least one
+    // share to read. Renderers append /raw?t=<token>&siteId=<id>&path=<p>.
+    const visits = (engine.getActiveVisits ? engine.getActiveVisits() : []) || []
+    const activeVisit = engine.getActiveVisit ? engine.getActiveVisit() : null
+    const hosting = engine.siteServer && engine.siteServer._sites && engine.siteServer._sites.size > 0
+    if (visits.length === 0 && !activeVisit && !hosting) return { url: null }
+    const { startSitesGateway, setSitesGatewayEngine, getSitesGatewayUrl } = require('./sites-gateway')
+    setSitesGatewayEngine(engine)
+    await startSitesGateway().catch(() => {})
+    const base = getSitesGatewayUrl()
+    if (!base) return { url: null }
+    return { url: base }
   }
 
   return handlers

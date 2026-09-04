@@ -183,10 +183,18 @@ const copyLink = async (s: PendingShare) => {
           </div>
 
           <div
-            role='button'
+            role='group'
+            aria-label='File drop zone — drop files or use buttons below'
             tabIndex={0}
-            onClick={pickFiles}
-            onKeyDown={(e) => e.key === 'Enter' && pickFiles()}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) pickFiles()
+            }}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+                e.preventDefault()
+                pickFiles()
+              }
+            }}
             onDragEnter={(e) => {
               e.preventDefault()
               zoneDepth.current++
@@ -205,7 +213,7 @@ const copyLink = async (s: PendingShare) => {
               resolveDroppedFiles(e)
             }}
             className={cn(
-              'flex w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-all',
+              'flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
               zoneDragging
                 ? 'border-primary/70 bg-primary/10 scale-[1.01]'
                 : 'border-hairline/15 bg-muted/20 hover:border-primary/50 hover:bg-primary/5'

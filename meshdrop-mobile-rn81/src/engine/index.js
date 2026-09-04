@@ -243,6 +243,7 @@ async function boot() {
       'watch:peer:status',
       'party:room:created',
       'party:room:joined',
+      'party:room:updated',
       'party:room:left',
       'party:room:closed',
       'party:peer:joined',

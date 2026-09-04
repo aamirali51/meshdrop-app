@@ -78,6 +78,8 @@ export function WatchParty() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSyncBroadcastRef = useRef<number>(0)
+  const activeRoomRef = useRef<any | null>(null)
+  activeRoomRef.current = activeRoom
 
   // Fetch initial state & discover rooms
   useEffect(() => {
@@ -95,18 +97,49 @@ export function WatchParty() {
       }),
       on(EVENTS.WATCH_ROOM_CREATED, (room: any) => {
         setActiveRoom(room)
+        setStreamUrl('')
+        setIsPlaying(false)
       }),
       on(EVENTS.WATCH_ROOM_JOINED, (room: any) => {
+        setActiveRoom(room)
+        setStreamUrl('')
+        setIsPlaying(false)
+      }),
+      on(EVENTS.WATCH_ROOM_UPDATED, (room: any) => {
+        // Fresh snapshot after a guest's media offer arrives (host identity,
+        // real media title / controlsMode) — but also on throttled roster ticks.
+        // Only replace state on material changes so the [activeRoom] effect
+        // (stream URL re-resolution) does not churn every few hundred ms.
+        if (!room) return
+        const cur = activeRoomRef.current
+        if (cur && cur.roomCode === room.roomCode) {
+          const materiallyChanged =
+            room.hostName !== cur.hostName ||
+            room.title !== cur.title ||
+            room.controlsMode !== cur.controlsMode ||
+            room.participantCount !== cur.participantCount
+          if (!materiallyChanged) return
+        }
         setActiveRoom(room)
       }),
       on(EVENTS.WATCH_ROOM_LEFT, () => {
         setActiveRoom(null)
         setStreamUrl('')
+        setIsPlaying(false)
+        setLoading(false)
       }),
-      on(EVENTS.WATCH_ROOM_CLOSED, () => {
+      on(EVENTS.WATCH_ROOM_CLOSED, (evt: any) => {
         setActiveRoom(null)
         setStreamUrl('')
-        toast.info('Party Ended', 'The host has closed the Watch Party room.')
+        setIsPlaying(false)
+        setLoading(false)
+        if (evt?.reason === 'join-timeout') {
+          toast.error('Room Not Found', evt?.error || 'No host responded to your join request.')
+        } else if (evt?.reason === 'host-left') {
+          toast.info('Party Ended', 'The host has closed the Watch Party room.')
+        } else {
+          toast.info('Party Ended', evt?.error || 'The host has closed the Watch Party room.')
+        }
       }),
       on(EVENTS.WATCH_STATE_SYNC, (state: any) => {
         if (!state) return
@@ -150,28 +183,52 @@ export function WatchParty() {
     // and a version bump forces the player to reload when media arrives.
     const shareId = `watch-${activeRoom.roomCode.toLowerCase()}`
     let version = 0
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let stopped = false
     const resolve = () => {
       call(METHODS.STREAM_URL_GET, { transferId: shareId })
         .then((res: any) => {
+          if (stopped) return
           if (res?.url) {
             setStreamUrl(version > 0 ? `${res.url}&vw=${version}` : res.url)
+          } else if (!retryTimer) {
+            // Not resolvable yet (transfer still staging / no .part). Poll at
+            // a low rate as a safety net in case a media-ready event is missed.
+            retryTimer = setTimeout(() => {
+              retryTimer = null
+              resolve()
+            }, 3000)
           }
         })
-        .catch(() => {})
+        .catch(() => {
+          if (!stopped && !retryTimer) {
+            retryTimer = setTimeout(() => {
+              retryTimer = null
+              resolve()
+            }, 3000)
+          }
+        })
     }
     resolve()
     const unsubs = [
       on(EVENTS.WATCH_MEDIA_READY, (media: any) => {
         if (media?.shareId && media.shareId !== shareId) return
         version += 1
+        if (retryTimer) {
+          clearTimeout(retryTimer)
+          retryTimer = null
+        }
         resolve()
       }),
       on(EVENTS.WATCH_MEDIA_ERROR, (media: any) => {
         if (media?.shareId && media.shareId !== shareId) return
-        toast.error('Media Error', 'The party media could not be transferred.')
+        setLoading(false)
+        toast.error('Media Error', media?.error || 'The party media could not be transferred.')
       }),
     ]
     return () => {
+      stopped = true
+      if (retryTimer) clearTimeout(retryTimer)
       unsubs.forEach((u) => u?.())
     }
   }, [activeRoom])
@@ -688,7 +745,7 @@ export function WatchParty() {
               <div>
                 <h3 className='font-bold text-sm text-foreground'>{activeRoom.title}</h3>
                 <p className='text-xs text-muted-foreground font-mono mt-0.5'>
-                  {activeRoom.isHost ? '👑 Host' : `Hosted by ${activeRoom.hostName}`}
+                  {activeRoom.isHost ? '👑 Host' : `Hosted by ${activeRoom.hostName || 'the host'}`}
                 </p>
               </div>
               <div className='flex items-center gap-1.5 text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20'>

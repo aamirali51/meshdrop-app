@@ -3,6 +3,7 @@ export type NavRoute =
   | '/devices'
   | '/sync'
   | '/party'
+  | '/shared-folders'
   | '/transfers'
   | '/activity'
   | '/history'

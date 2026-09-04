@@ -71,7 +71,7 @@ interface Bridge {
   onWorkerStderr: (specifier: string, listener: (data: unknown) => void) => () => void
   onWorkerIPC: (specifier: string, listener: (data: unknown) => void) => () => void
   onWorkerExit: (specifier: string, listener: (code: number) => void) => () => void
-  writeWorkerIPC: (specifier: string, data: Uint8Array) => Promise<void>
+  writeWorkerIPC: (specifier: string, data: Uint8Array) => Promise<unknown>
   getPathForFile?: (file: File) => string
   openFileDialog: () => Promise<DialogResult | null>
   openFilesDialog: () => Promise<DialogResult[] | null>
@@ -83,7 +83,7 @@ interface Bridge {
   writeClipboard: (data: { text: string }) => Promise<void>
   onClipboardChanged: (callback: (data: { type: string; content: string }) => void) => () => void
   onTrayHidden?: (callback: () => void) => () => void
-  onDeepLink: (callback: (data: { url: string; code?: string | null }) => void) => () => void
+  onDeepLink: (callback: (data: { url: string; code?: string | null; kind?: string }) => void) => () => void
   onQuickSend?: (
     callback: (data: {
       peerId?: string | null

@@ -51,9 +51,7 @@ export function Devices() {
   const { toast } = useToast()
 
   const [query, setQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<'all' | 'online' | 'trusted' | 'desktops' | 'mobile'>(
-    'all'
-  )
+  const [activeTab, setActiveTab] = useState<'all' | 'online' | 'offline'>('all')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [pairOpen, setPairOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Device | null>(null)
@@ -98,9 +96,7 @@ export function Devices() {
       if (!matchesQuery) return false
 
       if (activeTab === 'online') return d.isOnline
-      if (activeTab === 'trusted') return d.isTrusted
-      if (activeTab === 'desktops') return d.deviceType === 'desktop' || d.deviceType === 'laptop'
-      if (activeTab === 'mobile') return d.deviceType === 'mobile'
+      if (activeTab === 'offline') return !d.isOnline
       return true
     })
   }, [devices, query, activeTab])
@@ -236,7 +232,7 @@ export function Devices() {
 
         {/* Filter Tabs */}
         <div className='flex items-center gap-1 overflow-x-auto rounded-xl border border-border/40 bg-muted/40 p-1 text-xs'>
-          {(['all', 'online', 'trusted', 'desktops', 'mobile'] as const).map((tab) => (
+          {(['all', 'online', 'offline'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
