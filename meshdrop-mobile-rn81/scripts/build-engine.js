@@ -30,7 +30,10 @@ console.log(`[build-engine] Target host: ${host}`)
 
 console.log('[build-engine] Pass 1: linked bundle...')
 // Pass 1: linked bundle (records the addon map).
-execSync(`npx bare-pack "${entry}" ${common} --linked --out "${out}"`, { cwd: root, stdio: 'inherit' })
+// Pinned bare-pack@2.1.3: bare 2.2.x pulls a bare-module-lexer prebuild whose
+// node_api_is_sharedarraybuffer symbol is undefined under the CI Node 20
+// runner ("symbol lookup error"), breaking the Android engine bundle.
+execSync(`npx --yes bare-pack@2.1.3 "${entry}" ${common} --linked --out "${out}"`, { cwd: root, stdio: 'inherit' })
 
 // Guard: the Bare worklet evaluates each module as a plain script, so any
 // top-level `await` (e.g. inside a non-async function) is a SyntaxError on
@@ -48,7 +51,7 @@ try {
 
 console.log('[build-engine] Pass 2: offload addons...')
 // Pass 2: offload the addon prebuilds.
-execSync(`npx bare-pack "${entry}" ${common} --offload-addons --out "${path.join(addonsOut, 'offload.bundle.js')}"`, {
+execSync(`npx --yes bare-pack@2.1.3 "${entry}" ${common} --offload-addons --out "${path.join(addonsOut, 'offload.bundle.js')}"`, {
   cwd: root,
   stdio: 'inherit',
 })
