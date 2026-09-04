@@ -17,7 +17,7 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import {
   Laptop,
   Upload,
@@ -340,7 +340,7 @@ function MainApp(): React.JSX.Element {
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: hideAppChrome ? '#000000' : theme.bg }]}
-      edges={hideAppChrome ? [] : ['top', 'left', 'right']}
+      edges={hideAppChrome ? [] : ['top', 'right', 'bottom', 'left']}
     >
       <StatusBar
         hidden={hideAppChrome}
@@ -544,9 +544,11 @@ function MainApp(): React.JSX.Element {
 
 export default function App(): React.JSX.Element {
   return (
-    <ThemeProvider>
-      <MainApp />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <MainApp />
+      </ThemeProvider>
+    </SafeAreaProvider>
   )
 }
 
@@ -683,4 +685,3 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 })
-
