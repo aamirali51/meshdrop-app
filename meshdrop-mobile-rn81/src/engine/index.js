@@ -12,6 +12,34 @@
 const path = require('bare-path')
 const b4a = require('b4a')
 
+// Map the Android transport ('wifi' | 'cellular' | ...) to the core network
+// profile (mirrors networkRefreshPolicy.ts on the RN side — the worklet is a
+// separate JS context, so the constants are duplicated here deliberately).
+function netProfileForType(type) {
+  if (type === 'cellular') {
+    return {
+      kind: 'mobile-cellular',
+      headBytes: 1 * 1024 * 1024,
+      tailBytes: 512 * 1024,
+      lookaheadBlocks: 64,
+      syncWindowBytes: 2 * 1024 * 1024,
+      requestTimeoutMs: 1500,
+      maxConcurrentPeers: 2,
+      lruBytes: 8 * 1024 * 1024
+    }
+  }
+  return {
+    kind: 'mobile-wifi',
+    headBytes: 4 * 1024 * 1024,
+    tailBytes: 2 * 1024 * 1024,
+    lookaheadBlocks: 128,
+    syncWindowBytes: 4 * 1024 * 1024,
+    requestTimeoutMs: 500,
+    maxConcurrentPeers: 3,
+    lruBytes: 16 * 1024 * 1024
+  }
+}
+
 console.error('MESHDROP worklet boot: BareKit=' + typeof BareKit + ' IPC=' + !!(typeof BareKit !== 'undefined' && BareKit.IPC))
 
 const IPC = (typeof BareKit !== 'undefined' && BareKit.IPC) ? BareKit.IPC : null
@@ -194,6 +222,10 @@ async function boot() {
     console.log('[MDLOG] storageDir:', storageDir, 'downloadsDir:', downloadsDir)
 
     console.log('[MDLOG] creating MeshEngine...')
+    // Default to the mobile-wifi profile at boot; the RN side pushes the exact
+    // profile (wifi vs cellular) via the setNetworkProfile RPC on engine-ready
+    // and on every network-type change.
+    const initialProfile = netProfileForType('wifi')
     engine = new MeshEngine({
       storageDir,
       downloadsDir,
@@ -201,7 +233,8 @@ async function boot() {
       autoAcceptOffers: false,
       autoTrustLAN: true,
       lanDiscovery: true,
-      relayHttp
+      relayHttp,
+      networkProfile: initialProfile
     })
     console.log('[MDLOG] MeshEngine created OK')
 
@@ -239,6 +272,9 @@ async function boot() {
       'sync:invite:received',
       'sync:phase',
       'claim:preview',
+      'site:invite:received',
+      'site:visit:started',
+      'site:visit:stopped',
       'watch:state:updated',
       'watch:peer:status',
       'party:room:created',
@@ -545,6 +581,41 @@ function call(method, params) {
     case 'sync.trigger':
     case 'syncFolder':
       return engine.syncLibrary(params?.id)
+    case 'sites.listReceived':
+      return engine.listReceivedSites()
+    case 'sites.activeVisits':
+      return engine.getActiveVisits()
+    case 'sites.visit':
+      return engine.visitSite(params?.code)
+    case 'sites.leave':
+      return engine.leaveSite(params?.siteId)
+    case 'sites.listPath':
+      return engine.listSitePath(params?.path || '/', params?.siteId)
+    case 'sites.stats':
+      return engine.siteStats(params?.siteId)
+    case 'sites.removeReceived':
+      return engine.removeReceivedSite(params?.siteId)
+    case 'sites.cacheDir':
+      return { path: path.join(storageDir, 'site-cache') }
+    case 'sites.fetchRange': {
+      // Byte-range read from a shared folder: the visitor streams only the
+      // requested slice (host honors the inclusive bytes=a-b range). The body
+      // is a Buffer in-core; encode it as base64 so the JSON bridge can carry
+      // it to RN, which writes it into the local site-cache at the right
+      // offset. Bounded to CHUNK by the caller so frames stay small.
+      const { range } = params || {}
+      const res = await engine.readSiteFile(params.path, { range }, params.siteId)
+      if (!res || res.status === 'not-modified' || res.status === 'not-found') {
+        throw new Error(res && res.status === 'not-modified' ? 'not-modified' : 'file not found on host')
+      }
+      const buf = res.body
+      return {
+        start: res.start || 0,
+        end: res.end || (res.size ? res.size - 1 : 0),
+        size: res.size,
+        base64: b4a.toString(buf, 'base64'),
+      }
+    }
     case 'refreshNetwork':
       // resolve with plain status, NOT the engine: the RPC layer JSON-serializes
       // every response, and the engine references the DHT routing table
@@ -560,6 +631,14 @@ function call(method, params) {
           return { ok: false, error: String((err && err.message) || err) }
         }
       )
+    case 'setNetworkProfile':
+      // wifi<->cellular switch: retune head/tail windows, sync byte cap, and
+      // peer fan-in without rebuilding the swarm.
+      if (params && params.profile && typeof engine.setNetworkProfile === 'function') {
+        engine.setNetworkProfile(params.profile)
+        return { ok: true }
+      }
+      return { ok: false, error: 'invalid profile' }
     case 'broadcastWatchState':
     case 'watchStateBroadcast':
     case 'watch.broadcastState':

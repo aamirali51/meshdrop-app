@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import mpegts from 'mpegts.js'
+import Hls from 'hls.js'
 import {
   Film,
   Tv,
@@ -76,6 +78,7 @@ export function WatchParty() {
   const [floatingReactions, setFloatingReactions] = useState<{ id: number; emoji: string; x: number }[]>([])
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const mpegtsPlayerRef = useRef<any>(null)
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSyncBroadcastRef = useRef<number>(0)
   const activeRoomRef = useRef<any | null>(null)
@@ -232,6 +235,87 @@ export function WatchParty() {
       unsubs.forEach((u) => u?.())
     }
   }, [activeRoom])
+
+  // Universal playback engine: mpegts.js (MSE) for TS/MPEG-TS/FLV, hls.js for
+  // m3u8, and the native <video> element otherwise. Chromium cannot demux
+  // MPEG-TS/FLV natively — feeding the raw stream URL to <video> throws
+  // "element has no supported sources" (the exact failure when hosting a .ts).
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !streamUrl) return
+
+    // Derive the container from the room's media filename/path when present.
+    const fname = (activeRoom?.filename || activeRoom?.filePath || activeRoom?.title || '').toLowerCase()
+    const lowerUrl = streamUrl.toLowerCase()
+    const isTs = fname.endsWith('.ts') || fname.endsWith('.m2ts') || fname.endsWith('.mts') || lowerUrl.includes('.ts')
+    const isFlv = fname.endsWith('.flv') || lowerUrl.includes('.flv')
+    const isHls = fname.endsWith('.m3u8') || lowerUrl.includes('.m3u8')
+
+    let mpegtsPlayer: any = null
+    let hlsPlayer: Hls | null = null
+
+    if ((isTs || isFlv) && mpegts.isSupported()) {
+      try {
+        mpegtsPlayer = mpegts.createPlayer(
+          { type: isFlv ? 'flv' : 'mse', isLive: false, url: streamUrl, cors: true },
+          {
+            enableWorker: true,
+            lazyLoad: true,
+            lazyLoadMaxDuration: 180,
+            lazyLoadRecoverDuration: 30,
+            deferLoadAfterSourceOpen: false,
+            autoCleanupSourceBuffer: true,
+            autoCleanupMaxBackwardDuration: 120,
+            autoCleanupMinBackwardDuration: 60,
+            seekType: 'range',
+            fixAudioTimestampGap: true
+          }
+        )
+        mpegtsPlayerRef.current = mpegtsPlayer
+        mpegtsPlayer.attachMediaElement(video)
+        mpegtsPlayer.load()
+        mpegtsPlayer.on(mpegts.Events.MEDIA_INFO, (info: any) => {
+          if (info?.duration && isFinite(info.duration) && info.duration > 0) {
+            setDuration(info.duration / 1000)
+          }
+        })
+        mpegtsPlayer.on(mpegts.Events.ERROR, (errType: string, errDetail: string, errInfo: any) => {
+          console.warn('[WatchParty] mpegts player event:', errType, errDetail, errInfo)
+        })
+      } catch (err) {
+        console.warn('[WatchParty] mpegts init failed, falling back to native:', err)
+        video.src = streamUrl
+      }
+    } else if (isHls && Hls.isSupported()) {
+      try {
+        hlsPlayer = new Hls({ enableWorker: true })
+        hlsPlayer.loadSource(streamUrl)
+        hlsPlayer.attachMedia(video)
+      } catch (err) {
+        console.warn('[WatchParty] hls init failed, falling back to native:', err)
+        video.src = streamUrl
+      }
+    } else {
+      video.src = streamUrl
+    }
+
+    return () => {
+      mpegtsPlayerRef.current = null
+      if (mpegtsPlayer) {
+        try {
+          mpegtsPlayer.pause()
+          mpegtsPlayer.unload()
+          mpegtsPlayer.detachMediaElement()
+          mpegtsPlayer.destroy()
+        } catch {}
+      }
+      if (hlsPlayer) {
+        try {
+          hlsPlayer.destroy()
+        } catch {}
+      }
+    }
+  }, [streamUrl, activeRoom])
 
   // Remote Sync Handler
   const handleRemotePlaybackState = useCallback((state: any) => {
@@ -574,14 +658,19 @@ export function WatchParty() {
             className='lg:col-span-8 relative flex flex-col justify-center items-center rounded-2xl bg-black border border-border/60 overflow-hidden shadow-2xl group min-h-[420px]'
             onMouseMove={handleMouseMove}
           >
-            {/* HTML5 Video Surface */}
+            {/* HTML5 Video Surface — src/engine attached by the universal
+                engine effect above (mpegts.js for TS/FLV, hls.js, or native) */}
             {streamUrl ? (
               <video
                 ref={videoRef}
-                src={streamUrl}
                 className='w-full h-full object-contain'
                 autoPlay
                 playsInline
+                onError={() => {
+                  // Native <video> failed to load the source (e.g. a container
+                  // Chromium cannot demux and no MSE engine is available).
+                  console.warn('[WatchParty] native video error on', streamUrl)
+                }}
                 onTimeUpdate={() => {
                   if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
                 }}

@@ -137,8 +137,14 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     // Source of truth is the devices bee (written by the trusted-handshake
     // path) merged with live connection state. Rows are deduplicated by the
     // stable identity key so stale noise-key-derived duplicates never surface.
+    // Presence is NEVER read from the bee: a relay-paired phone leaves no close
+    // event, so its persisted isOnline row would stay true forever. It is
+    // derived here from live connections + relay-liveness freshness.
     const bee = await engine.getBee('devices')
     const deviceMap = new Map()
+    const isDeviceOnline = typeof engine.isDeviceOnline === 'function'
+      ? (dev) => engine.isDeviceOnline(dev)
+      : () => false
 
     for await (const node of bee.createReadStream()) {
       const dev = node.value
@@ -156,7 +162,11 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
         if (!key) continue
         const existing = deviceMap.get(key)
         if (existing && (existing.lastSeen || '') > (dev.lastSeen || '')) continue
-        deviceMap.set(key, { ...dev, isOnline: false })
+        // A row's name may be a stale "MeshDrop Mobile" overwritten by a
+        // reconnect before the preserve-name fix landed — customName wins and
+        // old clobbers self-heal.
+        const rowName = dev.customName || dev.name || ''
+        deviceMap.set(key, { ...dev, isOnline: isDeviceOnline(dev), name: rowName })
       }
     }
 
@@ -171,7 +181,10 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
         }
         const key = canonicalDeviceKey(dev)
         if (!key) continue
-        deviceMap.set(key, { ...dev, isOnline: true })
+        const existing = deviceMap.get(key)
+        // The user's custom name outranks whatever the peer currently reports.
+        const name = (existing && existing.customName) ? existing.customName : dev.name
+        deviceMap.set(key, { ...dev, ...existing, name, isOnline: isDeviceOnline(dev) })
       }
     }
 

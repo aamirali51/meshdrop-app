@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext policy: the media loopback server (LoopbackMediaServer) serves
+     MKV byte-ranges over http://127.0.0.1 for ExoPlayer/Media3. Android 9+
+     blocks cleartext by default, so allow it ONLY to the loopback interface —
+     all other traffic stays HTTPS/no cleartext. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

@@ -38,7 +38,24 @@ function networkSignature() {
 }
 
 function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, getLabel }) {
-  const engine = new MeshEngine({ storageDir, downloadsDir, deviceName, autoAcceptOffers: false })
+  // Desktop runs on LAN/Wi-Fi with no tight memory budget: the largest head/
+  // tail windows, widest sync-stream byte cap, and unlimited peer fan-in.
+  const engine = new MeshEngine({
+    storageDir,
+    downloadsDir,
+    deviceName,
+    autoAcceptOffers: false,
+    networkProfile: {
+      kind: 'desktop',
+      headBytes: 4 * 1024 * 1024,
+      tailBytes: 2 * 1024 * 1024,
+      lookaheadBlocks: 256,
+      syncWindowBytes: 8 * 1024 * 1024,
+      requestTimeoutMs: 500,
+      maxConcurrentPeers: Infinity,
+      lruBytes: 64 * 1024 * 1024
+    }
+  })
   let started = false
   let startPromise = null
   let networkPollStarted = false

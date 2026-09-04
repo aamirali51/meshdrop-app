@@ -32,10 +32,12 @@ import {
   Sun,
   Moon,
   Tv,
+  FolderOpen,
 } from 'lucide-react-native'
 import { Devices } from './src/screens/Devices'
 import { Sync } from './src/screens/Sync'
 import { Share } from './src/screens/Share'
+import { Folders } from './src/screens/Folders'
 import { Receive } from './src/screens/Receive'
 import { Transfers } from './src/screens/Transfers'
 import { History } from './src/screens/History'
@@ -65,6 +67,7 @@ import {
 type TabType =
   | 'devices'
   | 'share'
+  | 'folders'
   | 'party'
   | 'receive'
   | 'sync'
@@ -76,6 +79,7 @@ type TabType =
 const TABS: { key: TabType; label: string; icon: React.ElementType }[] = [
   { key: 'devices', label: 'Swarm', icon: Radio },
   { key: 'share', label: 'Share', icon: Upload },
+  { key: 'folders', label: 'Folders', icon: FolderOpen },
   { key: 'party', label: 'Party', icon: Tv },
   { key: 'receive', label: 'Claim', icon: Download },
   { key: 'sync', label: 'Sync', icon: FolderSync },
@@ -454,6 +458,7 @@ function MainApp(): React.JSX.Element {
       <View style={[styles.body, { backgroundColor: hideAppChrome ? '#000000' : theme.bg }]}>
         {currentTab === 'devices' && <Devices identity={identity} />}
         {currentTab === 'share' && <Share />}
+        {currentTab === 'folders' && <Folders />}
         {currentTab === 'party' && <WatchParty onActiveRoomChange={setIsPartyActive} />}
         {currentTab === 'receive' && <Receive />}
         {currentTab === 'sync' && <Sync identity={identity} />}

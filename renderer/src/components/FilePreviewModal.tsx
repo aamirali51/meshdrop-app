@@ -61,12 +61,54 @@ export const isPreviewAudio = (n: string) => /\.(mp3|wav|ogg|flac|aac|m4a|opus|w
 //     decode; show a clear message + download/open instead of a vague error
 export type VideoEngine = 'mpegts' | 'hls' | 'native' | 'unsupported'
 
+// Sync classifier for the fast path. MKV/AVI/etc are NOT blanket-unsupported:
+// Chromium's <video> can natively demux many H.264/AAC MKVs (the failures are
+// tail-cues on seek, which the core's head/tail prefetch now guarantees, and
+// exotic codecs). The async sniff (below) upgrades mkv-h264/aac to 'native'.
 export function videoEngineFor(name: string): VideoEngine {
   const n = name.toLowerCase()
   if (/\.(ts|m2ts|mts|flv)$/.test(n)) return 'mpegts'
   if (/\.m3u8$/.test(n)) return 'hls'
-  if (/\.(mp4|m4v|webm|mov|ogv)$/.test(n)) return 'native'
-  return 'unsupported' // mkv, avi, wmv, mpg, mpeg, 3gp, ...
+  if (/\.(mp4|m4v|webm|mov|ogv|mkv|avi|wmv|mpg|mpeg|3gp)$/.test(n)) return 'native'
+  return 'unsupported'
+}
+
+// Sniff a raw media URL's head to decide whether a container Chromium can't
+// blanket-handle (mkv/avi...) is actually H.264/AAC inside — in which case the
+// native <video> element will demux it. Reads the server's
+// X-MeshDrop-Container header (webdav.js) when present; falls back to a tiny
+// range GET when the header is absent (e.g. the sites gateway). Resolves to a
+// VideoEngine.
+export async function sniffVideoEngine(url: string): Promise<VideoEngine> {
+  try {
+    const res = await fetch(url, { headers: { Range: 'bytes=0-262143' } })
+    if (!res.ok && res.status !== 206) return 'native'
+    const header = res.headers.get('x-meshdrop-container') || ''
+    if (header) {
+      const [container, codecs] = header.split(':')
+      if (container === 'mkv') {
+        const hasH264 = !codecs || codecs.split(',').includes('h264')
+        const hasAac = !codecs || codecs.split(',').includes('aac')
+        return hasH264 && hasAac ? 'native' : 'unsupported'
+      }
+      // mp4/webm/mov from the header are all natively demuxable.
+      return 'native'
+    }
+    // No header (sites gateway): sniff the returned bytes directly.
+    const buf = await res.arrayBuffer()
+    const bytes = new Uint8Array(buf)
+    // EBML magic 0x1A45DFA3 => Matroska/WebM; check for h264/aac codec IDs in
+    // the first 256 KiB (cheap heuristic — a real parse lives in core).
+    if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+      const headStr = new TextDecoder('latin1').decode(bytes.subarray(0, Math.min(bytes.length, 262144)))
+      const hasH264 = headStr.includes('V_MPEG4/ISO/AVC')
+      const hasAac = headStr.includes('A_AAC')
+      return hasH264 && hasAac ? 'native' : 'unsupported'
+    }
+    return 'native'
+  } catch {
+    return 'native'
+  }
 }
 
 export function FilePreviewModal({ open, file, rawUrl, onDownload, onOpenExternal, siblings = [], onNavigate, onClose }: FilePreviewModalProps) {
@@ -112,62 +154,82 @@ export function FilePreviewModal({ open, file, rawUrl, onDownload, onOpenExterna
   // When the file changes, resolve its URL and (re)load the correct engine.
   useEffect(() => {
     if (!open || !file) return
-    destroyEngines()
-    const src = rawUrl(file.path)
-    setMediaUrl(src)
-    setCurrent(0); setDuration(0); setBuffered(0); setError(null); setLoading(!!src); setPlaying(false); setRotate(0)
+    let cancelled = false
+    ;(async () => {
+      destroyEngines()
+      const src = rawUrl(file.path)
+      setMediaUrl(src)
+      setCurrent(0); setDuration(0); setBuffered(0); setError(null); setLoading(!!src); setPlaying(false); setRotate(0)
 
-    if (!isVideo) {
-      // Audio / other: plain media element src.
-      const el = mediaRef.current
-      if (el && src) { el.src = src; el.load() }
-      return
-    }
+      if (!isVideo) {
+        // Audio / other: plain media element src.
+        const el = mediaRef.current
+        if (el && src) { el.src = src; el.load() }
+        return
+      }
 
-    const engine = videoEngineFor(file.name)
-    setVideoEngine(engine)
-    if (engine === 'unsupported') {
-      setLoading(false)
-      return
-    }
-    const video = videoRef.current
-    if (!video || !src) return
+      const engine = videoEngineFor(file.name)
+      setVideoEngine(engine)
+      if (engine === 'unsupported') {
+        setLoading(false)
+        return
+      }
+      const video = videoRef.current
+      if (!video || !src) return
 
-    if (engine === 'mpegts' && mpegts.isSupported()) {
-      try {
-        mpegtsRef.current = mpegts.createPlayer(
-          { type: /\.flv$/i.test(file.name) ? 'flv' : 'mse', isLive: false, url: src, cors: true },
-          { enableWorker: true, lazyLoad: true, lazyLoadMaxDuration: 180, lazyLoadRecoverDuration: 30, seekType: 'range', fixAudioTimestampGap: true, autoCleanupSourceBuffer: true }
-        )
-        mpegtsRef.current.attachMediaElement(video)
-        mpegtsRef.current.load()
-        mpegtsRef.current.on(mpegts.Events.ERROR, (_t: string, d: string) => {
-          console.warn('[Preview] mpegts error:', _t, d)
-          setError('Could not play this video — the stream or format is not supported')
+      // P4: for MKV (and similar), verify the codecs before mounting native —
+      // an MKV with HEVC/VP9/other is not Chromium-demuxable and would show a
+      // vague black screen instead of the "unsupported" card. Only when the
+      // sniff says h264+aac do we keep native.
+      if (/\.(mkv|m4v|webm|mov|avi|mpg|mpeg|3gp)$/i.test(file.name)) {
+        const sniffed = await sniffVideoEngine(src)
+        if (cancelled) return
+        if (sniffed === 'unsupported') {
+          setVideoEngine('unsupported')
           setLoading(false)
-        })
-        return
-      } catch (err) {
-        console.warn('[Preview] mpegts init failed, falling back to native:', err)
+          return
+        }
+        // native (or header says mp4/webm/mov): proceed to the <video> below.
       }
-    } else if (engine === 'hls' && Hls.isSupported()) {
-      try {
-        hlsRef.current = new Hls({ enableWorker: true })
-        hlsRef.current.loadSource(src)
-        hlsRef.current.attachMedia(video)
-        hlsRef.current.on(Hls.Events.ERROR, (_e, data) => {
-          if (data?.fatal) { setError('Could not play this HLS stream'); setLoading(false) }
-        })
-        return
-      } catch (err) {
-        console.warn('[Preview] hls init failed, falling back to native:', err)
-      }
-    }
 
-    // Native fallback (mp4/m4v/webm/mov/ogv and any engine that failed to init).
-    setVideoEngine('native')
-    video.src = src
-    video.load()
+      if (engine === 'mpegts' && mpegts.isSupported()) {
+        try {
+          mpegtsRef.current = mpegts.createPlayer(
+            { type: /\.flv$/i.test(file.name) ? 'flv' : 'mse', isLive: false, url: src, cors: true },
+            { enableWorker: true, lazyLoad: true, lazyLoadMaxDuration: 180, lazyLoadRecoverDuration: 30, seekType: 'range', fixAudioTimestampGap: true, autoCleanupSourceBuffer: true }
+          )
+          mpegtsRef.current.attachMediaElement(video)
+          mpegtsRef.current.load()
+          mpegtsRef.current.on(mpegts.Events.ERROR, (_t: string, d: string) => {
+            console.warn('[Preview] mpegts error:', _t, d)
+            setError('Could not play this video — the stream or format is not supported')
+            setLoading(false)
+          })
+          return
+        } catch (err) {
+          console.warn('[Preview] mpegts init failed, falling back to native:', err)
+        }
+      } else if (engine === 'hls' && Hls.isSupported()) {
+        try {
+          hlsRef.current = new Hls({ enableWorker: true })
+          hlsRef.current.loadSource(src)
+          hlsRef.current.attachMedia(video)
+          hlsRef.current.on(Hls.Events.ERROR, (_e, data) => {
+            if (data?.fatal) { setError('Could not play this HLS stream'); setLoading(false) }
+          })
+          return
+        } catch (err) {
+          console.warn('[Preview] hls init failed, falling back to native:', err)
+        }
+      }
+
+      // Native fallback (mp4/m4v/webm/mov/ogv/mkv-h264 and any engine that
+      // failed to init).
+      setVideoEngine('native')
+      video.src = src
+      video.load()
+    })()
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, file?.path, rawUrl])
 

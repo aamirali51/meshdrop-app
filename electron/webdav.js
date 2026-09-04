@@ -7,6 +7,39 @@ const { exec } = require('child_process')
 const util = require('util')
 const execAsync = util.promisify(exec)
 
+// P4: container sniffing for the media gateway. The sniff helper lives in the
+// shared core (meshdrop-core) so desktop and mobile agree; here we only read
+// the file head and cache the result per (path, mtime).
+const { sniffContainer } = require('@mesh/core/engine/transfer/integrity.js')
+const sniffCache = new Map() // `${path}:${mtimeMs}` -> containerResult
+
+async function sniffLocalContainer(localPath) {
+  try {
+    const st = await fsp.stat(localPath)
+    const cacheKey = `${localPath}:${st.mtimeMs}`
+    const hit = sniffCache.get(cacheKey)
+    if (hit) return hit
+    const fd = await fsp.open(localPath, 'r')
+    try {
+      const head = Buffer.alloc(Math.min(256 * 1024, st.size))
+      if (head.length === 0) return null
+      const { bytesRead } = await fd.read(head, 0, head.length, 0)
+      const result = sniffContainer(head.subarray(0, bytesRead))
+      if (result) sniffCache.set(cacheKey, result)
+      // Bound the cache (a folder full of videos should not grow unbounded).
+      if (sniffCache.size > 500) {
+        const oldestKey = sniffCache.keys().next().value
+        sniffCache.delete(oldestKey)
+      }
+      return result
+    } finally {
+      await fd.close().catch(() => {})
+    }
+  } catch {
+    return null
+  }
+}
+
 const DEFAULT_PORT = 41983
 const DEFAULT_DRIVE_LETTER = 'Z'
 
@@ -250,6 +283,16 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
     const mimeType = getMimeType(localPath)
     const rangeHeader = req.headers['range']
 
+    // P4: expose the container/codec sniff so the renderer can decide native
+    // vs MSE without reading the file itself. Only for media extensions.
+    const ext = path.extname(localPath).toLowerCase()
+    const sniff = ['.mp4', '.m4v', '.mkv', '.webm', '.mov', '.ts', '.m2ts'].includes(ext)
+      ? await sniffLocalContainer(localPath)
+      : null
+    const sniffHeader = sniff
+      ? `${sniff.container}${sniff.codecs && sniff.codecs.length ? ':' + sniff.codecs.join(',') : ''}`
+      : ''
+
     // Handle HTTP 206 Range Requests for smooth seeking in video players
     if (rangeHeader && stat.size > 0) {
       let start = 0
@@ -281,30 +324,42 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
 
       end = Math.min(end, stat.size - 1)
 
-      // Notify chunk scheduler to prioritize chunks around this playhead
+      // Notify chunk scheduler to prioritize chunks around this playhead, and
+      // mark the transfer media-active (widens the sync sender window while a
+      // player is actually consuming the stream).
       if (transferId && boundEngine && typeof boundEngine.setPlayheadByte === 'function') {
         boundEngine.setPlayheadByte(transferId, start)
+        if (typeof boundEngine.noteMediaRead === 'function') {
+          boundEngine.noteMediaRead(transferId, start)
+        }
       }
 
       const chunkSize = end - start + 1
-      res.writeHead(206, {
-        'Content-Range': `bytes ${start}-${end}/${stat.size}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunkSize,
+      const commonHeaders = {
         'Content-Type': mimeType,
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
         DAV: '1, 2'
+      }
+      if (sniffHeader) commonHeaders['X-MeshDrop-Container'] = sniffHeader
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        ...commonHeaders
       })
 
       if (isHead) {
         res.end()
       } else {
+        // Modest highWaterMark: don't pull more from disk than the player
+        // consumes — the scheduler's speculative prefetch aligns with the read
+        // position via setPlayheadByte above.
         const stream = fs.createReadStream(localPath, {
           start,
           end,
-          highWaterMark: 1024 * 1024
+          highWaterMark: 256 * 1024
         })
         req.on('close', () => stream.destroy())
         res.on('close', () => stream.destroy())
@@ -312,7 +367,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
         stream.pipe(res)
       }
     } else {
-      res.writeHead(200, {
+      const headers200 = {
         'Content-Type': mimeType,
         'Content-Length': stat.size,
         'Accept-Ranges': 'bytes',
@@ -320,7 +375,9 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
         DAV: '1, 2'
-      })
+      }
+      if (sniffHeader) headers200['X-MeshDrop-Container'] = sniffHeader
+      res.writeHead(200, headers200)
       if (isHead) {
         res.end()
       } else {

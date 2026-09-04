@@ -23,6 +23,8 @@ import {
   INITIAL_NETWORK_REFRESH_STATE,
   recordEngineReady,
   recordNetworkChange,
+  profileForNetworkType,
+  type MobileNetworkProfile,
 } from './networkRefreshPolicy'
 
 type Resolve = (value: any) => void
@@ -40,6 +42,7 @@ let engineReady = false
 let lastEngineMsg: any = null
 let networkTimer: ReturnType<typeof setTimeout> | null = null
 let networkRefreshState = INITIAL_NETWORK_REFRESH_STATE
+let lastNetworkType: string | undefined
 
 function emit(event: string, data: any) {
   const set = listeners.get(event)
@@ -102,6 +105,9 @@ function handle(msg: any) {
     lastEngineMsg = msg
     if (msg.status === 'ready') {
       engineReady = true
+      // Push the current transport's network profile so the core's head/tail
+      // windows and sync byte cap match the radio from the first transfer.
+      call('setNetworkProfile', { profile: profileForNetworkType(lastNetworkType) }).catch(() => {})
       const decision = recordEngineReady(networkRefreshState)
       networkRefreshState = decision.state
       if (decision.action === 'refresh') scheduleNetworkRefresh()
@@ -268,6 +274,14 @@ export function watchNetworkChanges(): void {
   const emitter = new NativeEventEmitter(mod as unknown as NativeModule)
   emitter.addListener('MeshDropNetworkChanged', (params: { type?: string; online?: boolean }) => {
     const online = params?.online !== false
+    lastNetworkType = params?.type
+    // Retune head/tail/lookahead/sync-byte caps for the new radio even when
+    // the swarm-rebuild is debounced; the profile RPC is cheap and immediate.
+    if (online && params?.type && engineReady) {
+      call('setNetworkProfile', { profile: profileForNetworkType(params.type) }).catch((err: Error) => {
+        console.warn('[bridge] setNetworkProfile failed:', String(err?.message || err))
+      })
+    }
     const decision = recordNetworkChange(networkRefreshState, online, engineReady)
     networkRefreshState = decision.state
 
