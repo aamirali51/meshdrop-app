@@ -522,7 +522,7 @@ export function WatchParty() {
               <video
                 ref={videoRef}
                 src={streamUrl}
-                className='w-full h-full object-contain'
+                className='absolute inset-0 h-full w-full object-contain'
                 autoPlay
                 playsInline
                 onTimeUpdate={() => {
