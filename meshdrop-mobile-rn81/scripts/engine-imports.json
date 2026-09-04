@@ -1,3 +1,5 @@
 {
-  "fs": "bare-fs"
+  "fs": "bare-fs",
+  "path": "bare-path",
+  "crypto": "bare-crypto"
 }

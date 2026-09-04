@@ -20,6 +20,7 @@
     "@react-native/new-app-screen": "0.81.4",
     "b4a": "^1.8.1",
     "bare-bundle": "^1.10.0",
+    "bare-crypto": "^1.15.3",
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.1",
     "events": "^3.3.0",
