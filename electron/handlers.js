@@ -782,12 +782,62 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
 
   handlers[METHODS.WATCH_PARTY_REACTION] = async (params) => {
     if (!engine || !engine.sendPartyReaction) return false
-    return engine.sendPartyReaction(params?.emoji)
+    return engine.sendPartyReaction(params || {})
   }
 
   handlers[METHODS.WATCH_PARTY_STATUS] = async (params) => {
     if (!engine || !engine.broadcastPartyStatus) return false
     return engine.broadcastPartyStatus(params)
+  }
+
+  handlers[METHODS.WATCH_PARTY_CHAT] = async (params) => {
+    if (!engine || !engine.sendPartyChat) return false
+    return engine.sendPartyChat(params || {})
+  }
+
+  handlers[METHODS.WATCH_PARTY_CHAT_HISTORY] = async () => {
+    if (!engine || !engine.getPartyChatHistory) return []
+    return engine.getPartyChatHistory()
+  }
+
+  handlers[METHODS.WATCH_PARTY_MODERATE] = async (params) => {
+    if (!engine || !engine.moderateParty) return { success: false, error: 'no party' }
+    return engine.moderateParty(params || {})
+  }
+
+  handlers[METHODS.WATCH_PARTY_QUEUE_ADD] = async (params) => {
+    if (!engine || !engine.addPartyQueueItem) throw new Error('Engine watch party unavailable')
+    return engine.addPartyQueueItem(params || {})
+  }
+
+  handlers[METHODS.WATCH_PARTY_QUEUE_REMOVE] = async (params) => {
+    if (!engine || !engine.removePartyQueueItem) return { success: false }
+    return engine.removePartyQueueItem(params || {})
+  }
+
+  handlers[METHODS.WATCH_PARTY_QUEUE_NEXT] = async () => {
+    if (!engine || !engine.playNextPartyMedia) throw new Error('Engine watch party unavailable')
+    return engine.playNextPartyMedia()
+  }
+
+  handlers[METHODS.WATCH_PARTY_SUBTITLE_SET] = async (params) => {
+    if (!engine || !engine.setPartySubtitle) throw new Error('Engine watch party unavailable')
+    return engine.setPartySubtitle(params || {})
+  }
+
+  handlers[METHODS.WATCH_PARTY_SUBTITLE_GET] = async () => {
+    if (!engine || !engine.getPartySubtitle) return null
+    return engine.getPartySubtitle()
+  }
+
+  handlers[METHODS.WATCH_PARTY_REWIND_SET] = async (params) => {
+    if (!engine || !engine.setPartyRewindWindow) return false
+    return engine.setPartyRewindWindow(params || {})
+  }
+
+  handlers[METHODS.WATCH_PARTY_VOICE] = async (params) => {
+    if (!engine || !engine.sendPartyVoiceChunk) return false
+    return engine.sendPartyVoiceChunk(params || {})
   }
 
   handlers[METHODS.STREAM_URL_GET] = async (params) => {

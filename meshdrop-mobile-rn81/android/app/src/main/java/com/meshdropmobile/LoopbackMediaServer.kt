@@ -89,7 +89,7 @@ class LoopbackMediaServer(
     // How long a read waits for the writer to advance before giving up. Must be
     // well under ExoPlayer's own socket read timeout (30 s) so a genuinely
     // stalled download surfaces as a player buffering/error rather than a hang.
-    private val MAX_WAIT_MS = 10000L
+    private val MAX_WAIT_MS = 25000L
     private val POLL_MS = 50L
 
     val port: Int

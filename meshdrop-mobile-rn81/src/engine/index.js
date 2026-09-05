@@ -19,8 +19,11 @@ function netProfileForType(type) {
   if (type === 'cellular') {
     return {
       kind: 'mobile-cellular',
-      headBytes: 1 * 1024 * 1024,
-      tailBytes: 512 * 1024,
+      // headBytes must cover a typical MP4 moov atom (~1-8MB) before the
+      // progressive-playback watermark (playable) flips — mounting with a
+      // truncated moov gives ExoPlayer PARSING_CONTAINER_MALFORMED.
+      headBytes: 8 * 1024 * 1024,
+      tailBytes: 2 * 1024 * 1024,
       lookaheadBlocks: 64,
       syncWindowBytes: 2 * 1024 * 1024,
       requestTimeoutMs: 1500,
@@ -30,8 +33,8 @@ function netProfileForType(type) {
   }
   return {
     kind: 'mobile-wifi',
-    headBytes: 4 * 1024 * 1024,
-    tailBytes: 2 * 1024 * 1024,
+    headBytes: 8 * 1024 * 1024,
+    tailBytes: 4 * 1024 * 1024,
     lookaheadBlocks: 128,
     syncWindowBytes: 4 * 1024 * 1024,
     requestTimeoutMs: 500,
@@ -290,7 +293,11 @@ async function boot() {
       'party:rooms:discovered',
       'party:media:offer',
       'party:media:ready',
-      'party:media:error'
+      'party:media:error',
+      'party:chat',
+      'party:chat:history',
+      'party:voice',
+      'party:moderated'
     ]
     for (const evt of EVENTS) {
       engine.on(evt, (data) => {
@@ -662,10 +669,43 @@ function call(method, params) {
       return engine.listPartyRooms ? engine.listPartyRooms() : []
     case 'sendPartyReaction':
     case 'watch.reaction':
-      return engine.sendPartyReaction ? engine.sendPartyReaction(params?.emoji) : false
+      return engine.sendPartyReaction ? engine.sendPartyReaction(params) : false
     case 'broadcastPartyStatus':
     case 'watch.status':
       return engine.broadcastPartyStatus ? engine.broadcastPartyStatus(params) : false
+    case 'sendPartyChat':
+    case 'watch.chat':
+      return engine.sendPartyChat ? engine.sendPartyChat(params) : false
+    case 'getPartyChatHistory':
+    case 'watch.chatHistory':
+      return engine.getPartyChatHistory ? engine.getPartyChatHistory() : []
+    case 'moderateParty':
+    case 'watch.moderate':
+      return engine.moderateParty ? engine.moderateParty(params) : { success: false, error: 'no party' }
+    case 'setPartyRewindWindow':
+    case 'watch.rewindSet':
+      return engine.setPartyRewindWindow ? engine.setPartyRewindWindow(params) : false
+    case 'addPartyQueueItem':
+    case 'watch.queueAdd':
+      if (!engine.addPartyQueueItem) throw new Error('Party engine unavailable')
+      return engine.addPartyQueueItem(params)
+    case 'removePartyQueueItem':
+    case 'watch.queueRemove':
+      return engine.removePartyQueueItem ? engine.removePartyQueueItem(params) : { success: false }
+    case 'playNextPartyMedia':
+    case 'watch.queueNext':
+      if (!engine.playNextPartyMedia) throw new Error('Party engine unavailable')
+      return engine.playNextPartyMedia()
+    case 'setPartySubtitle':
+    case 'watch.subtitleSet':
+      if (!engine.setPartySubtitle) throw new Error('Party engine unavailable')
+      return engine.setPartySubtitle(params)
+    case 'getPartySubtitle':
+    case 'watch.subtitleGet':
+      return engine.getPartySubtitle ? engine.getPartySubtitle() : null
+    case 'sendPartyVoiceChunk':
+    case 'watch.voice':
+      return engine.sendPartyVoiceChunk ? engine.sendPartyVoiceChunk(params) : false
     case 'setPlayheadByte':
       return engine.setPlayheadByte ? engine.setPlayheadByte(params?.transferId, params?.byteOffset) : false
     default:

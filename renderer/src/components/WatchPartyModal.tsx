@@ -57,6 +57,7 @@ export function WatchPartyModal({
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [syncWithHost, setSyncWithHost] = useState(true)
+  const [hostPos, setHostPos] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const hideControlsTimer = useRef<NodeJS.Timeout | null>(null)
@@ -222,7 +223,9 @@ export function WatchPartyModal({
     if (!open || isHost) return
     const applyState = (data: unknown) => {
       const state = data as WatchState | null
-      if (!state || !syncWithHost) return
+      if (!state) return
+      if (typeof state.positionSec === 'number') setHostPos(state.positionSec)
+      if (!syncWithHost) return
 
       const vid = videoRef.current
       if (!vid) return
@@ -415,6 +418,19 @@ export function WatchPartyModal({
               <Layers className='h-3.5 w-3.5 text-accent' />
               <span>P2P Range Streaming</span>
             </div>
+            {!isHost && hostPos != null && !syncWithHost && videoRef.current && Math.abs(hostPos - currentTime) > 3 && (
+              <button
+                onClick={() => {
+                  const vid = videoRef.current
+                  if (!vid || hostPos == null) return
+                  vid.currentTime = hostPos
+                  setCurrentTime(hostPos)
+                }}
+                className='rounded px-2 py-0.5 text-[10px] font-bold border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all'
+              >
+                Jump to host ({formatTime(Math.abs(hostPos - currentTime))} {hostPos > currentTime ? 'behind' : 'ahead'})
+              </button>
+            )}
             {!isHost && (
               <button
                 onClick={() => setSyncWithHost((v) => !v)}
