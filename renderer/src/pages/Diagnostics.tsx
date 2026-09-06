@@ -167,16 +167,10 @@ export function Diagnostics() {
             </span>
           </div>
           <div className='rounded-xl border border-border/40 bg-card/40 p-4 flex items-center justify-between'>
-            <span className='text-muted-foreground'>Relay</span>
-            <span
-              className={`font-mono font-bold flex items-center gap-1 ${
-                diagnostics.relayStatus && diagnostics.relayStatus !== 'Disabled'
-                  ? 'text-status-away'
-                  : 'text-muted-foreground'
-              }`}
-            >
+            <span className='text-muted-foreground'>DHT Nodes</span>
+            <span className='font-mono font-bold text-foreground flex items-center gap-1'>
               <Clock className='h-3.5 w-3.5' />
-              {diagnostics.relayStatus || 'Disabled'}
+              {diagnostics.dhtNodes != null ? diagnostics.dhtNodes : '—'}
             </span>
           </div>
         </div>

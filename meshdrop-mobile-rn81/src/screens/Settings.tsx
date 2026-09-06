@@ -35,7 +35,6 @@ import {
   FlaskConical,
   Moon,
   Sun,
-  Globe,
 } from 'lucide-react-native'
 import { call, on } from '../bridge'
 import {
@@ -86,8 +85,6 @@ export function Settings({ identity }: { identity?: any }) {
   // Preferences
   const [autoAcceptTrusted, setAutoAcceptTrusted] = useState(false)
   const [preferOwnRelay, setPreferOwnRelay] = useState(true)
-  const [relayMode, setRelayMode] = useState<'auto' | 'relay-primary' | 'direct-only'>('auto')
-  const [customRelayUrl, setCustomRelayUrl] = useState('')
   const [backgroundKeepAlive, setBackgroundKeepAlive] = useState(true)
   const [batteryIgnored, setBatteryIgnored] = useState(true)
 
@@ -192,16 +189,6 @@ export function Settings({ identity }: { identity?: any }) {
     call('setPreferOwnRelay', { enabled: enable }).catch(() => {})
   }
 
-  const handleSelectRelayMode = (mode: 'auto' | 'relay-primary' | 'direct-only') => {
-    setRelayMode(mode)
-    call('setRelayMode', { mode }).catch(() => {})
-  }
-
-  const handleUpdateCustomRelayUrl = (url: string) => {
-    setCustomRelayUrl(url)
-    call('setCustomRelayUrl', { url }).catch(() => {})
-  }
-
   const handleRequestBatteryExemption = async () => {
     const res = await requestIgnoreBatteryOptimizations()
     if (res) {
@@ -232,8 +219,6 @@ export function Settings({ identity }: { identity?: any }) {
       .then((s: any) => {
         if (s && typeof s.autoAcceptOffers === 'boolean') setAutoAcceptTrusted(s.autoAcceptOffers)
         if (s && typeof s.preferOwnRelay === 'boolean') setPreferOwnRelay(s.preferOwnRelay)
-        if (s && typeof s.relayMode === 'string') setRelayMode(s.relayMode)
-        if (s && typeof s.customRelayUrl === 'string') setCustomRelayUrl(s.customRelayUrl)
       })
       .catch(() => {})
 
@@ -496,143 +481,9 @@ export function Settings({ identity }: { identity?: any }) {
         </View>
       </Card>
 
-      {/* Network Transport & Relay Strategy */}
-      <SectionHeader title="Network Transport & Relay" />
+      {/* Network Transport */}
+      <SectionHeader title="Network Transport" />
       <Card style={styles.card}>
-        <View style={styles.themeOptionsGrid}>
-          <TouchableOpacity
-            style={[
-              styles.themeOptionCard,
-              { backgroundColor: theme.bgElevated, borderColor: theme.border },
-              (relayMode || 'auto') === 'auto' && {
-                borderColor: theme.primary,
-                backgroundColor: theme.primarySoft,
-                borderWidth: 2,
-              },
-            ]}
-            onPress={() => handleSelectRelayMode('auto')}
-            activeOpacity={0.8}
-          >
-            <View
-              style={[
-                styles.themeOptionIconBox,
-                { backgroundColor: (relayMode || 'auto') === 'auto' ? theme.primary : theme.bgCard },
-              ]}
-            >
-              <Zap
-                size={18}
-                color={(relayMode || 'auto') === 'auto' ? '#FFFFFF' : theme.primary}
-              />
-            </View>
-            <Text
-              style={[
-                styles.themeOptionTitle,
-                { color: theme.text },
-                (relayMode || 'auto') === 'auto' && { color: theme.primary, fontWeight: '900' },
-              ]}
-            >
-              ⚡ Auto
-            </Text>
-            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
-              Hybrid Dual
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.themeOptionCard,
-              { backgroundColor: theme.bgElevated, borderColor: theme.border },
-              relayMode === 'relay-primary' && {
-                borderColor: theme.primary,
-                backgroundColor: theme.primarySoft,
-                borderWidth: 2,
-              },
-            ]}
-            onPress={() => handleSelectRelayMode('relay-primary')}
-            activeOpacity={0.8}
-          >
-            <View
-              style={[
-                styles.themeOptionIconBox,
-                { backgroundColor: relayMode === 'relay-primary' ? theme.primary : theme.bgCard },
-              ]}
-            >
-              <Globe
-                size={18}
-                color={relayMode === 'relay-primary' ? '#FFFFFF' : theme.accent}
-              />
-            </View>
-            <Text
-              style={[
-                styles.themeOptionTitle,
-                { color: theme.text },
-                relayMode === 'relay-primary' && { color: theme.primary, fontWeight: '900' },
-              ]}
-            >
-              🌐 Cloudflare
-            </Text>
-            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
-              Relay First
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.themeOptionCard,
-              { backgroundColor: theme.bgElevated, borderColor: theme.border },
-              relayMode === 'direct-only' && {
-                borderColor: theme.primary,
-                backgroundColor: theme.primarySoft,
-                borderWidth: 2,
-              },
-            ]}
-            onPress={() => handleSelectRelayMode('direct-only')}
-            activeOpacity={0.8}
-          >
-            <View
-              style={[
-                styles.themeOptionIconBox,
-                { backgroundColor: relayMode === 'direct-only' ? theme.primary : theme.bgCard },
-              ]}
-            >
-              <Lock
-                size={18}
-                color={relayMode === 'direct-only' ? '#FFFFFF' : theme.warning}
-              />
-            </View>
-            <Text
-              style={[
-                styles.themeOptionTitle,
-                { color: theme.text },
-                relayMode === 'direct-only' && { color: theme.primary, fontWeight: '900' },
-              ]}
-            >
-              🔒 Direct P2P
-            </Text>
-            <Text style={[styles.themeOptionSub, { color: theme.muted }]}>
-              No Cloud
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {relayMode !== 'direct-only' && (
-          <View style={[styles.switchRow, { borderTopColor: theme.hairline, borderTopWidth: 1, flexDirection: 'column', alignItems: 'stretch' }]}>
-            <Text style={[styles.switchTitle, { color: theme.text }]}>Custom Relay Endpoint</Text>
-            <Text style={[styles.switchSub, { color: theme.muted, marginBottom: 8 }]}>
-              Leave blank to use default global Cloudflare Worker
-            </Text>
-            <TextInput
-              value={customRelayUrl}
-              onChangeText={handleUpdateCustomRelayUrl}
-              placeholder="https://meshdrop-relay.aamirabdullah33.workers.dev"
-              placeholderTextColor={theme.subtle}
-              style={[styles.customRelayInput, { backgroundColor: theme.bgElevated, borderColor: theme.border, color: theme.text }]}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-        )}
-
         <View style={[styles.switchRow, { borderTopColor: theme.hairline, borderTopWidth: 1 }]}>
           <View style={styles.flex1}>
             <Text style={[styles.switchTitle, { color: theme.text }]}>Prefer Paired Desktops as Relay</Text>

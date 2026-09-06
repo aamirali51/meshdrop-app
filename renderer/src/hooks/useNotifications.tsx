@@ -49,6 +49,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
   }, [])
 
+
   const clearNotifications = useCallback(() => {
     call(METHODS.NOTIFICATIONS_CLEAR, null).catch(() => {})
     setNotifications([])

@@ -161,7 +161,7 @@ export function DeviceCard({
             className='gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold'
           >
             <ShieldCheck className='h-2.5 w-2.5' />
-            {device.isTrusted ? 'Trusted' : 'Untrusted'}
+            {device.isTrusted ? 'Trusted' : device.lanLevel ? 'Detected on LAN' : 'Untrusted'}
           </Badge>
           {device.isEncrypted && (
             <span className='rounded-md border border-meshdrop-cyan/30 bg-meshdrop-cyan/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-meshdrop-cyan'>

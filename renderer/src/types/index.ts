@@ -31,6 +31,8 @@ export interface Device {
   osVersion: string
   avatar: string
   isTrusted: boolean
+  /** Two-tier trust: peer is LAN-recognized (identity display only) but NOT paired. */
+  lanLevel?: boolean
   isEncrypted: boolean
   isOnline: boolean
   isFavorite?: boolean
@@ -64,7 +66,6 @@ export interface ActivityItem {
 
 export interface NetworkDiagnostics {
   natType: string | null
-  relayStatus: string
   dhtNodes: number | null
   avgLatencyMs: number | null
   packetLossPercent: number | null

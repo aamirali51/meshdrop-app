@@ -231,6 +231,24 @@ function setWebDAVEngine(eng) {
   boundEngine = eng
 }
 
+// Fetch the persisted transfer record (manifest fileSize, staging paths, …).
+async function getTransferRecord(engine, transferId) {
+  if (!engine || !transferId || typeof engine.getBee !== 'function') return null
+  try {
+    const bee = await engine.getBee('transfers').catch(() => null)
+    if (!bee) return null
+    const entry = await bee.get(transferId).catch(() => null)
+    return (entry && entry.value) || null
+  } catch {}
+  return null
+}
+
+// Cap concurrent held (waiting) range responses per transfer. A looping
+// player that fires range requests into un-downloaded regions must not pile
+// up sockets — excess requests get an immediate 416 and retry later.
+const heldRangeWaits = new Map() // transferId -> held count
+const MAX_HELD_RANGE_WAITS = 4
+
 function getMimeType(filePath) {
   const ext = path.extname(filePath || '').toLowerCase()
   return MIME_TYPES[ext] || 'application/octet-stream'
@@ -293,10 +311,22 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
       ? `${sniff.container}${sniff.codecs && sniff.codecs.length ? ':' + sniff.codecs.join(',') : ''}`
       : ''
 
-    // Handle HTTP 206 Range Requests for smooth seeking in video players
+    // Handle HTTP 206 Range Requests for smooth seeking in video players.
+    // For transfers, `total` is the manifest fileSize, NOT the .part file's
+    // current on-disk size — the staging file is written positionally, so
+    // stat.size can reflect preallocation/extent growth and would make the
+    // player's seek bar jitter during progressive playback.
     if (rangeHeader && stat.size > 0) {
+      let total = stat.size
+      if (transferId && boundEngine) {
+        const rec = await getTransferRecord(boundEngine, transferId)
+        if (rec && Number.isFinite(rec.fileSize) && rec.fileSize > 0) {
+          total = rec.fileSize
+        }
+      }
+
       let start = 0
-      let end = stat.size - 1
+      let end = total - 1
 
       const match = /bytes=(\d*)-(\d*)/i.exec(rangeHeader)
       if (match) {
@@ -305,24 +335,24 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
           end = parseInt(match[2], 10)
         } else if (match[1]) {
           start = parseInt(match[1], 10)
-          end = stat.size - 1
+          end = total - 1
         } else if (match[2]) {
           const suffix = parseInt(match[2], 10)
-          start = Math.max(0, stat.size - suffix)
-          end = stat.size - 1
+          start = Math.max(0, total - suffix)
+          end = total - 1
         }
       }
 
-      if (isNaN(start) || isNaN(end) || start > end || start >= stat.size) {
+      if (isNaN(start) || isNaN(end) || start > end || start >= total) {
         res.writeHead(416, {
-          'Content-Range': `bytes */${stat.size}`,
+          'Content-Range': `bytes */${total}`,
           'Access-Control-Allow-Origin': '*'
         })
         res.end()
         return
       }
 
-      end = Math.min(end, stat.size - 1)
+      end = Math.min(end, total - 1)
 
       // Notify chunk scheduler to prioritize chunks around this playhead, and
       // mark the transfer media-active (widens the sync sender window while a
@@ -334,7 +364,79 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
         }
       }
 
-      const chunkSize = end - start + 1
+      // Coverage gate: never serve bytes from an un-downloaded region — the
+      // .part has zero-filled holes there, which a player renders as black
+      // frames / corruption. Coverage truth comes from the engine's
+      // hypercore bitfield (survives resume), not the scheduler's LRU.
+      let servedEnd = end
+      if (transferId && boundEngine) {
+        // Fail safe: an engine without coverage primitives (cold init race)
+        // must yield 416, never the legacy raw stream over zero-filled holes.
+        if (typeof boundEngine.coveredThrough !== 'function') {
+          res.writeHead(416, {
+            'Content-Range': `bytes */${total}`,
+            'Access-Control-Allow-Origin': '*'
+          })
+          res.end()
+          return
+        }
+        // coveredThrough is async (hypercore's has() is a Promise): a raw
+        // truthy Promise would mask holes as covered.
+        const coveredRaw = await boundEngine.coveredThrough(transferId, start, end)
+        const covered = Number.isFinite(coveredRaw) ? coveredRaw : null
+        if (covered === null || covered < start) {
+          // Uncovered: prioritize the range, then hold the response briefly
+          // (an active seek should land as soon as the blocks arrive).
+          if (isHead) {
+            res.writeHead(416, {
+              'Content-Range': `bytes */${total}`,
+              'Access-Control-Allow-Origin': '*'
+            })
+            res.end()
+            return
+          }
+          const held = heldRangeWaits.get(transferId) || 0
+          if (held >= MAX_HELD_RANGE_WAITS) {
+            res.writeHead(416, {
+              'Content-Range': `bytes */${total}`,
+              'Access-Control-Allow-Origin': '*'
+            })
+            res.end()
+            return
+          }
+          heldRangeWaits.set(transferId, held + 1)
+          try {
+            if (typeof boundEngine.prioritizeRange === 'function') {
+              await boundEngine.prioritizeRange(transferId, start, end)
+            }
+            const waitP = typeof boundEngine.waitForRange === 'function'
+              ? boundEngine.waitForRange(transferId, start, 10000)
+              : Promise.resolve(null)
+            // Release the held slot early if the player gives up mid-wait
+            // instead of pinning it for the full 10s budget.
+            const closedP = new Promise((resolve) => res.on('close', resolve))
+            const throughRaw = await Promise.race([waitP, closedP])
+            const through = Number.isFinite(throughRaw) ? throughRaw : null
+            if (through === null || through < start) {
+              res.writeHead(416, {
+                'Content-Range': `bytes */${total}`,
+                'Access-Control-Allow-Origin': '*'
+              })
+              res.end()
+              return
+            }
+            servedEnd = Math.min(end, through)
+          } finally {
+            heldRangeWaits.set(transferId, Math.max(0, (heldRangeWaits.get(transferId) || 1) - 1))
+          }
+        } else {
+          // Clamp the served range to the covered prefix. A shorter-than-
+          // requested 206 is valid HTTP; players re-request the remainder.
+          servedEnd = Math.min(end, covered)
+        }
+      }
+
+      const chunkSize = servedEnd - start + 1
       const commonHeaders = {
         'Content-Type': mimeType,
         'Access-Control-Allow-Origin': '*',
@@ -344,7 +446,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
       }
       if (sniffHeader) commonHeaders['X-MeshDrop-Container'] = sniffHeader
       res.writeHead(206, {
-        'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+        'Content-Range': `bytes ${start}-${servedEnd}/${total}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
         ...commonHeaders
@@ -358,7 +460,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
         // position via setPlayheadByte above.
         const stream = fs.createReadStream(localPath, {
           start,
-          end,
+          end: servedEnd,
           highWaterMark: 256 * 1024
         })
         req.on('close', () => stream.destroy())

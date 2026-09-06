@@ -18,7 +18,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast()
   const [diagnostics, setDiagnostics] = useState<NetworkDiagnostics>({
     natType: null,
-    relayStatus: 'Disabled',
     dhtNodes: null,
     avgLatencyMs: null,
     packetLossPercent: null,

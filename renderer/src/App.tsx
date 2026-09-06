@@ -9,6 +9,7 @@ import { UpdateToaster } from '@/components/UpdateToaster'
 import { PortableBanner } from '@/components/PortableBanner'
 import { WelcomeModal } from '@/components/WelcomeModal'
 import { QuickSendModal } from '@/components/QuickSendModal'
+import { LanPairPrompt } from '@/components/LanPairPrompt'
 import { MainLayout } from '@/layouts/MainLayout'
 import { MotionConfig } from 'framer-motion'
 
@@ -24,6 +25,7 @@ export default function App() {
                   <MainLayout />
                   <WelcomeModal />
                   <QuickSendModal />
+                  <LanPairPrompt />
                   <UpdateToaster />
                   <PortableBanner />
                   <ToastContainer />

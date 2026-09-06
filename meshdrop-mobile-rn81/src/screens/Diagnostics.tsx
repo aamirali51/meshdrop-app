@@ -173,10 +173,10 @@ export function Diagnostics({ identity }: { identity?: any }) {
         </View>
 
         <View style={[styles.infoRow, { borderBottomColor: 'transparent' }]}>
-          <Text style={[styles.infoLabel, { color: theme.muted }]}>Relay Connection</Text>
+          <Text style={[styles.infoLabel, { color: theme.muted }]}>Transport</Text>
           <Pill
-            label={status?.relayConnected ? 'Relay Active' : 'Direct P2P'}
-            color={status?.relayConnected ? theme.purple : theme.primary}
+            label="Direct P2P"
+            color={theme.primary}
           />
         </View>
       </Card>
