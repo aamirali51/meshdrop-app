@@ -176,12 +176,8 @@ export function PairDeviceModal({ isOpen, onClose, defaultTab = 'myCode' }: Pair
     setInputCode('')
     setPairMode('pair')
 
-    // Pairing intent: this screen open means the user wants to be reachable
-    // for pairing — the engine brings the relay fallback up immediately in
-    // lazy 'auto' mode. Sticky on close (never yanked mid-pairing).
-    ipc
-      .call('devices.pairingIntent', { active: true })
-      .catch((err) => console.warn('Pairing intent signal failed:', err))
+    // Pairing screen open — no extra signal needed; HyperDHT holepunch +
+    // blind-relay (when needed) is always available.
 
     getPairingCode()
       .then((res) => {

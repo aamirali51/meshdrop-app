@@ -149,55 +149,6 @@ let engine = null
 let storageDir = null
 let downloadsDir = null
 
-// ─── Relay HTTP bridge ─────────────────────────────────────────────────────
-// The Bare worklet has no global fetch/WebSocket, so the engine's relay
-// client proxies its HTTP through the RN side (which has real fetch):
-//   worklet -> RN:  { type: 'relayHttp', reqId, method, url, body }
-//   RN -> worklet:  { type: 'relayHttpResult', reqId, ok, text }
-const relayPending = new Map()
-let relaySeq = 1
-
-function relayCall(method, url, bodyObj) {
-  return new Promise((resolve) => {
-    const reqId = relaySeq++
-    relayPending.set(reqId, resolve)
-    send({
-      type: 'relayHttp',
-      reqId,
-      method,
-      url,
-      body: bodyObj === undefined ? undefined : JSON.stringify(bodyObj)
-    })
-    // Never hang the relay client on a dead bridge.
-    setTimeout(() => {
-      if (relayPending.has(reqId)) {
-        relayPending.delete(reqId)
-        resolve(null)
-      }
-    }, 10000)
-  })
-}
-
-function handleRelayHttpResult(msg) {
-  const resolve = relayPending.get(msg.reqId)
-  if (!resolve) return
-  relayPending.delete(msg.reqId)
-  let parsed = null
-  try {
-    parsed = msg.text ? JSON.parse(msg.text) : null
-  } catch {
-    parsed = null
-  }
-  resolve(msg.ok ? parsed : null)
-}
-
-// The transport object handed to MeshEngine (-> RelayClient): POST stores
-// relay frames in KV, GET polls the topic's message list.
-const relayHttp = {
-  post: (url, bodyObj) => relayCall('POST', url, bodyObj),
-  get: (url) => relayCall('GET', url)
-}
-
 // ─── Engine boot ───────────────────────────────────────────────────────────
 
 async function boot() {
@@ -375,25 +326,10 @@ function call(method, params) {
       return engine.setAutoTrustLAN(!!params?.enabled)
     case 'setPreferOwnRelay':
       return engine.setPreferOwnRelay(!!params?.enabled)
-    case 'setRelayMode':
-      return typeof engine.setRelayMode === 'function'
-        ? engine.setRelayMode(params?.mode)
-        : { success: false, supported: false }
-    case 'setCustomRelayUrl':
-      return typeof engine.setCustomRelayUrl === 'function'
-        ? engine.setCustomRelayUrl(params?.url)
-        : { success: false, supported: false }
     case 'setLANDiscovery':
       // LAN discovery cannot run inside the Bare worklet (no raw UDP
       // sockets), so this is intentionally a persisted-only non-op.
       return { supported: false, lanDiscovery: false }
-    case 'pairingIntent':
-      // Pairing screen open: bring the relay fallback up immediately so a
-      // remote device on a challenged network can reach us (lazy 'auto').
-      if (engine && typeof engine.setPairingIntent === 'function') {
-        engine.setPairingIntent(params?.active !== false)
-      }
-      return true
     case 'listDevices':
       return engine.listDevices()
     case 'removeDevice':
@@ -731,12 +667,6 @@ if (IPC) {
         try {
           msg = JSON.parse(trimmed)
         } catch {
-          continue
-        }
-        // Relay HTTP proxy results (RN -> worklet) resolve the engine's
-        // pending relay requests; they are not RPC calls.
-        if (msg && msg.type === 'relayHttpResult') {
-          handleRelayHttpResult(msg)
           continue
         }
         if (!msg || msg.id === undefined) continue

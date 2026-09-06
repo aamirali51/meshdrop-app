@@ -1101,15 +1101,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  customRelayInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 12,
-    fontFamily: fonts.mono,
-    marginTop: 4,
-  },
   exemptionBtn: {
     paddingVertical: 6,
     paddingHorizontal: 12,
