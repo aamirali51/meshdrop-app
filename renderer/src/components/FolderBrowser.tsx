@@ -37,7 +37,11 @@ export type SiteEntry = {
   mtimeMs?: number
 }
 
-type NamedEntry = { name: string; path: string; type: 'dir' | 'file'; size?: number; mtimeMs?: number }
+// Audit fix #12: single canonical entry type — producers may omit `name`
+// (the path is the identity), so the display layer derives it via entryName.
+function entryName(e: SiteEntry): string {
+  return e.name ?? e.path.split(/[\/]/).pop() ?? e.path
+}
 
 type SortKey = 'name' | 'size' | 'mtime'
 type ViewMode = 'grid' | 'list'
@@ -100,7 +104,10 @@ function FileTypeIcon({ name, className }: { name: string; className?: string })
   return <Icon className={className} />
 }
 
-function FileTypeColor({ name }: { name: string }): string {
+// Audit fix #12: was declared as a pseudo-component taking a props object but
+// invoked as a plain function at two call sites. It returns a class string —
+// make that explicit.
+function fileTypeColor(name?: string | null): string {
   switch (fileKind(name)) {
     case 'image': return 'text-violet-400'
     case 'video': return 'text-rose-400'
@@ -178,14 +185,14 @@ export function FolderBrowser({
 
   const navigate = useCallback((p: string) => load(p), [load])
 
-  const dirs = useMemo<NamedEntry[]>(() => (entries || []).filter((e): e is NamedEntry => !!e && e.type === 'dir' && typeof e.name === 'string'), [entries])
-  const rawFiles = useMemo<NamedEntry[]>(() => (entries || []).filter((e): e is NamedEntry => !!e && e.type === 'file' && typeof e.name === 'string'), [entries])
+  const dirs = useMemo<SiteEntry[]>(() => (entries || []).filter((e): e is SiteEntry => !!e && e.type === 'dir'), [entries])
+  const rawFiles = useMemo<SiteEntry[]>(() => (entries || []).filter((e): e is SiteEntry => !!e && e.type === 'file'), [entries])
 
   const files = useMemo(() => {
     let list = rawFiles
     if (search.trim()) {
       const q = search.trim().toLowerCase()
-      list = list.filter((f) => f.name.toLowerCase().includes(q))
+      list = list.filter((f) => entryName(f).toLowerCase().includes(q))
     }
     if (filterKind !== 'all') {
       list = list.filter((f) => fileKind(f.name) === filterKind)
@@ -196,7 +203,7 @@ export function FolderBrowser({
       let cmp = 0
       if (key === 'size') cmp = (a.size || 0) - (b.size || 0)
       else if (key === 'mtime') cmp = (a.mtimeMs || 0) - (b.mtimeMs || 0)
-      else cmp = a.name.localeCompare(b.name)
+      else cmp = entryName(a).localeCompare(entryName(b))
       return cmp * dir
     })
   }, [rawFiles, search, filterKind, sortKey, sortDir])
@@ -216,7 +223,7 @@ export function FolderBrowser({
     setMenu({ x: e.clientX, y: e.clientY, entry })
   }
 
-  const openFile = useCallback((entry: NamedEntry) => {
+  const openFile = useCallback((entry: SiteEntry) => {
     if (entry.type === 'file' && (onPreview && (fileKind(entry.name) === 'image' || fileKind(entry.name) === 'video' || fileKind(entry.name) === 'audio'))) {
       onPreview(entry)
       return
@@ -256,7 +263,7 @@ export function FolderBrowser({
       ? `${dirs.length} folder${dirs.length === 1 ? '' : 's'} · ${rawFiles.length} file${rawFiles.length === 1 ? '' : 's'}`
       : `${rawFiles.length} file${rawFiles.length === 1 ? '' : 's'}`
 
-  const renderGridItem = (entry: NamedEntry) => (
+  const renderGridItem = (entry: SiteEntry) => (
     <div
       key={entry.path}
       onContextMenu={(e) => openContextMenu(e, entry)}
@@ -267,7 +274,7 @@ export function FolderBrowser({
         {entry.type === 'dir' ? (
           <Folder className='h-10 w-10 text-primary/80' />
         ) : (
-          <FileTypeIcon name={entry.name} className={cn('h-10 w-10', FileTypeColor(entry.name))} />
+          <FileTypeIcon name={entryName(entry)} className={cn('h-10 w-10', fileTypeColor(entry.name))} />
         )}
         {entry.type === 'file' && (
           <button
@@ -280,7 +287,7 @@ export function FolderBrowser({
         )}
       </div>
       <div className='px-2.5 py-2'>
-        <p className='truncate text-xs font-bold text-foreground' title={entry.name}>{entry.name}</p>
+        <p className='truncate text-xs font-bold text-foreground' title={entryName(entry)}>{entryName(entry)}</p>
         <p className='mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground'>
           <span>{entry.type === 'dir' ? 'Folder' : fmtSize(entry.size)}</span>
           <span>{fmtDate(entry.mtimeMs)}</span>
@@ -289,7 +296,7 @@ export function FolderBrowser({
     </div>
   )
 
-  const renderListItem = (entry: NamedEntry) => (
+  const renderListItem = (entry: SiteEntry) => (
     <div
       key={entry.path}
       onContextMenu={(e) => openContextMenu(e, entry)}
@@ -298,8 +305,8 @@ export function FolderBrowser({
     >
       {entry.type === 'dir'
         ? <Folder className='h-5 w-5 shrink-0 text-primary/80' />
-        : <FileTypeIcon name={entry.name} className={cn('h-5 w-5 shrink-0', FileTypeColor(entry.name))} />}
-      <span className='min-w-0 flex-1 truncate text-xs font-semibold text-foreground'>{entry.name}</span>
+        : <FileTypeIcon name={entryName(entry)} className={cn('h-5 w-5 shrink-0', fileTypeColor(entry.name))} />}
+      <span className='min-w-0 flex-1 truncate text-xs font-semibold text-foreground'>{entryName(entry)}</span>
       <span className='w-20 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground'>{entry.type === 'file' ? fmtSize(entry.size) : '—'}</span>
       <span className='hidden w-24 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground sm:block'>{fmtDate(entry.mtimeMs)}</span>
       {entry.type === 'file' && (

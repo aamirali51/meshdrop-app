@@ -7,7 +7,7 @@ export interface SyncLibrary {
   name: string
   localPath: string
   peerId: string
-  status: 'idle' | 'scanning' | 'syncing' | 'waiting_peer' | 'up_to_date' | 'paused' | 'error'
+  status: 'idle' | 'scanning' | 'syncing' | 'waiting_peer' | 'blocked_unpaired' | 'revoked' | 'up_to_date' | 'paused' | 'error'
   mode?: 'two-way' | 'push' | 'receive_only'
   paused: boolean
   autoCreated: boolean

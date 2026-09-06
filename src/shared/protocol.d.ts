@@ -91,6 +91,7 @@ export declare const METHODS: {
   readonly TRANSFERS_EXTENT: 'transfers.extent'
   readonly STREAM_URL_GET: 'stream.getUrl'
   readonly SITES_LIST: 'sites.list'
+  readonly SITES_LIST_ACTIVE: 'sites.listActive'
   readonly SITES_LIST_RECEIVED: 'sites.listReceived'
   readonly SITES_REMOVE_RECEIVED: 'sites.removeReceived'
   readonly SITES_PUBLISH: 'sites.publish'
@@ -183,6 +184,7 @@ export declare const EVENTS: {
   readonly SITE_VISIT_STARTED: 'site.visit_started'
   readonly SITE_VISIT_STOPPED: 'site.visit_stopped'
   readonly SITE_UPDATED: 'site.updated'
+  readonly SITE_INVITE_RECEIVED: 'site.invite_received'
 }
 
 export declare function isProtocolCompatible(msg: unknown): boolean

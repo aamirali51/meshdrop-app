@@ -6,13 +6,11 @@ import { useToast } from '@/hooks/useToast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Modal, ConfirmDialog } from '@/components/Modal'
-import { FolderBrowser } from '@/components/FolderBrowser'
+import { FolderBrowser, type SiteEntry } from '@/components/FolderBrowser'
 import { FilePreviewModal, type PreviewFile } from '@/components/FilePreviewModal'
 import { cn } from '@/lib/utils'
 
 type Tab = 'host' | 'visit'
-
-type SiteEntry = { name: string; path: string; type: string; size?: number; mtimeMs?: number }
 
 function allowlistEntries(s: SiteRecord | null): { key: string; role: string }[] {
   if (!s || !Array.isArray(s.allowlist)) return []
@@ -64,7 +62,7 @@ export function SharedFolders() {
 
   const handlePreview = useCallback(async (entry: SiteEntry) => {
     await ensureGatewayBase()
-    setPreviewFile({ name: entry.name, path: entry.path, type: 'file', size: entry.size, mtimeMs: entry.mtimeMs })
+    setPreviewFile({ name: entry.name ?? entry.path.split(/[\/]/).pop() ?? entry.path, path: entry.path, type: 'file', size: entry.size, mtimeMs: entry.mtimeMs })
   }, [ensureGatewayBase])
 
   // When a new share arrives (site.invite_received) the provider refreshes; we
@@ -330,6 +328,7 @@ function BrowseView({ received, openVisits, opening, onOpen, onRemove, onManualV
                 onBrowse={() => onBrowse(r)}
                 onRemove={() => handleRemove(r)}
                 getSiteStats={getSiteStats}
+                onClose={onClose}
               />
             )
           })}
@@ -347,7 +346,7 @@ function fmtBytes(v: number): string {
   return `${x.toFixed(x >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function FolderCard({ share, isOpen, connecting, onOpen, onBrowse, onRemove, getSiteStats }: {
+function FolderCard({ share, isOpen, connecting, onOpen, onBrowse, onRemove, getSiteStats, onClose }: {
   share: ReceivedSite
   isOpen: boolean
   connecting: boolean
@@ -355,6 +354,7 @@ function FolderCard({ share, isOpen, connecting, onOpen, onBrowse, onRemove, get
   onBrowse: () => void
   onRemove: () => void
   getSiteStats: (siteId: string) => Promise<{ fileCount: number; dirCount: number; totalBytes: number; newestMtimeMs: number; partial?: boolean }>
+  onClose: (siteId: string) => void
 }) {
   const [stats, setStats] = useState<{ fileCount: number; dirCount: number; totalBytes: number; newestMtimeMs: number; partial?: boolean } | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
