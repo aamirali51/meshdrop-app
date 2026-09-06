@@ -27,14 +27,16 @@ import { useToast } from '@/hooks/useToast'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/Modal'
 import { cn } from '@/lib/utils'
-import { EVENTS } from '@/types/protocol'
-import { on } from '@/lib/ipc'
+import { EVENTS, METHODS } from '@/types/protocol'
+import { on, call } from '@/lib/ipc'
 
 const STATUS_LABEL: Record<string, string> = {
   idle: 'Synchronized',
   scanning: 'Scanning…',
   syncing: 'Syncing…',
   waiting_peer: 'Waiting for device',
+  blocked_unpaired: 'Pairing required',
+  revoked: 'Device removed',
   up_to_date: 'Synchronized',
   paused: 'Paused',
   error: 'Sync Error'
@@ -45,6 +47,8 @@ const STATUS_STYLE: Record<string, string> = {
   scanning: 'text-primary border-primary/30 bg-primary/10 animate-pulse',
   syncing: 'text-primary border-primary/30 bg-primary/10 animate-pulse',
   waiting_peer: 'text-amber-500 border-amber-500/30 bg-amber-500/10',
+  blocked_unpaired: 'text-amber-500 border-amber-500/30 bg-amber-500/10',
+  revoked: 'text-muted-foreground border-border/40 bg-muted/20',
   up_to_date: 'text-status-online border-status-online/30 bg-status-online/10',
   paused: 'text-muted-foreground border-border/40 bg-muted/20',
   error: 'text-destructive border-destructive/30 bg-destructive/10'
@@ -104,7 +108,7 @@ function formatRelativeTime(timestamp?: number | string): string {
 }
 
 export function Sync() {
-  const { libraries, transferProgress, phases, addSyncLibrary, removeSyncLibrary, triggerSync, pauseSync, resumeSync } =
+  const { libraries, transferProgress, phases, addSyncLibrary, removeSyncLibrary, triggerSync, pauseSync, resumeSync, refresh } =
     useSync()
   const { devices } = useDevices()
   const { toast } = useToast()
@@ -120,6 +124,51 @@ export function Sync() {
   const [activityLog, setActivityLog] = useState<ActivityItem[]>([])
   const [libraryErrors, setLibraryErrors] = useState<Record<string, string>>({})
   const [removingLib, setRemovingLib] = useState<SyncLibrary | null>(null)
+  // Audit fix F3: libraries whose peer has been waiting >30s (or that received
+  // an explicit SYNC_DENIED) — folder sync requires full pairing, and the UI
+  // must say so instead of spinning on "Waiting for device".
+  const [pairRequired, setPairRequired] = useState<Record<string, boolean>>({})
+  const waitingSinceRef = useRef<Record<string, number>>({})
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const now = Date.now()
+      setPairRequired((prev) => {
+        const next = { ...prev }
+        let changed = false
+        for (const lib of libraries) {
+          if (lib.status === 'waiting_peer') {
+            if (!waitingSinceRef.current[lib.id]) waitingSinceRef.current[lib.id] = now
+            if (now - waitingSinceRef.current[lib.id] > 30000 && !next[lib.id]) {
+              next[lib.id] = true
+              changed = true
+            }
+          } else if (lib.status !== 'blocked_unpaired' && (next[lib.id] || waitingSinceRef.current[lib.id])) {
+            delete next[lib.id]
+            delete waitingSinceRef.current[lib.id]
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+    }, 5000)
+    return () => clearInterval(iv)
+  }, [libraries])
+
+  const pairNow = async (lib: SyncLibrary) => {
+    const deviceName = deviceMap.get(lib.peerId)?.name || 'the device'
+    try {
+      await call(METHODS.DEVICES_CONFIRM_LAN as string, { publicKey: lib.peerId })
+      toast.success('Device Paired', `"${lib.name}" will resume syncing automatically.`)
+      refresh()
+    } catch {
+      toast.info(
+        'Device not detected right now',
+        `Open MeshDrop on ${deviceName} and try again, or pair via code from the Devices page.`
+      )
+    }
+  }
+
 
   const onlineDevices = useMemo(
     () => devices.filter((d) => d.publicKey && d.isTrusted !== false && d.isOnline !== false),
@@ -222,11 +271,36 @@ export function Sync() {
       }
     })
 
+    const unsubDenied = on(EVENTS.SYNC_DENIED, (data: any) => {
+      // Audit fix F3: the peer's router refused our SYNC_* traffic because the
+      // devices are not fully paired. Explain instead of waiting forever.
+      const name = data?.name || 'a folder'
+      toastRef.current.info(
+        'Sync Requires Pairing',
+        `Folder sync for "${name}" is paused until the devices are paired.`
+      )
+      if (data?.id || data?.libraryId) {
+        const libId = data.id || data.libraryId
+        setPairRequired((prev) => (prev[libId] ? prev : { ...prev, [libId]: true }))
+      }
+      setActivityLog((prev) => [
+        {
+          id: `act-${Date.now()}-${Math.random()}`,
+          type: 'error',
+          title: 'Sync Requires Pairing',
+          detail: `The device sharing "${name}" is detected but not paired.`,
+          timestamp: new Date()
+        },
+        ...prev.slice(0, 19)
+      ])
+    })
+
     return () => {
       unsubCompleted()
       unsubDeleted()
       unsubConflict()
       unsubError()
+      unsubDenied()
     }
   }, [])
 
@@ -648,6 +722,29 @@ export function Sync() {
                       <div className='flex items-center gap-1.5 text-[11px] text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-md px-2 py-1 mt-1'>
                         <AlertCircle className='h-3.5 w-3.5 shrink-0' />
                         <span className='truncate'>{libError || 'Folder synchronization encountered an issue. Check folder permissions or peer connection.'}</span>
+                      </div>
+                    )}
+
+                    {/* Audit fix F3: explain that sync requires pairing, with a
+                        one-click path into the existing pairing flow */}
+                    {(lib.status === 'blocked_unpaired' || lib.status === 'revoked' || pairRequired[lib.id]) && (
+                      <div className='flex items-center gap-2 text-[11px] text-amber-600 dark:text-amber-500 font-medium bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-1.5 mt-1'>
+                        <AlertCircle className='h-3.5 w-3.5 shrink-0' />
+                        <span className='min-w-0 flex-1 truncate'>
+                          {lib.status === 'revoked'
+                            ? 'This device was removed — re-pair to resume syncing.'
+                            : `Waiting for ${deviceMap.get(lib.peerId)?.name || 'device'} — folder sync requires pairing.`}
+                        </span>
+                        {lib.status !== 'revoked' && (
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            className='h-6 shrink-0 border-amber-500/40 px-2 text-[10px] font-bold'
+                            onClick={() => pairNow(lib)}
+                          >
+                            Pair now
+                          </Button>
+                        )}
                       </div>
                     )}
 

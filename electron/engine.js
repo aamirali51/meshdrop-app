@@ -125,6 +125,7 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     engine.on('sync:deleted', (d) => forward(EVENTS.SYNC_DELETED, d))
     engine.on('sync:conflict', (d) => forward(EVENTS.SYNC_CONFLICT, d))
     engine.on('sync:error', (d) => forward(EVENTS.SYNC_ERROR, d))
+    engine.on('sync:denied', (d) => forward(EVENTS.SYNC_DENIED, d))
     engine.on('sync:invite:received', (d) => forward(EVENTS.SYNC_INVITE_RECEIVED, d))
     engine.on('sync:phase', (d) => forward(EVENTS.SYNC_PHASE, d))
     engine.on('claim:preview', (d) => forward(EVENTS.CLAIM_PREVIEW_RECEIVED, d))

@@ -118,6 +118,8 @@ function MainApp(): React.JSX.Element {
   const hideAppChrome = (currentTab === 'party' && isPartyActive) || isLandscape
   // Avoid re-surfacing the update prompt on every background-resume.
   const updatePrompted = useRef(false)
+  // Audit fix F3b: dedupe sync-invite prompts (the engine may re-emit on reconnect)
+  const promptedSyncInvites = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     startBridge()
@@ -249,25 +251,49 @@ function MainApp(): React.JSX.Element {
       cancelTransferNotification('sync-active').catch(() => {})
     })
 
-    // Desktop-initiated sync folders arrive as invites. The desktop auto-accepts
-    // invites from trusted peers by default (autoAcceptOffers), so the mobile
-    // adopts the same behavior: accept into the engine's default Sync/<name>
-    // folder and let the Sync screen surface it. Incoming file *transfers* still
-    // go through manual approval via autoAcceptOffers:false.
+    // Desktop-initiated sync folders arrive as invites. Audit fix F3b: never
+    // silently accept — the user explicitly accepts or declines (default
+    // destination prefilled, changeable later in the Sync screen). Incoming
+    // file *transfers* still go through manual approval via autoAcceptOffers.
     const unsubSyncInvite = on('sync:invite:received', (data: any) => {
       if (!data || !data.id) return
-      call('acceptSyncInvite', {
-        id: data.id,
-        customPath: data.defaultPath || undefined,
-      })
-        .then(() => {
-          showTransferCompleteNotification(
-            `sync-invite-${data.id}`,
-            'Sync Folder Linked',
-            `"${data.name || 'Sync Folder'}" from ${data.peerName || 'a paired device'} is now syncing.`
-          ).catch(() => {})
-        })
-        .catch(() => {})
+      if (promptedSyncInvites.current.has(data.id)) return
+      promptedSyncInvites.current.add(data.id)
+      Alert.alert(
+        'Sync Folder Invite',
+        `"${data.name || 'Sync Folder'}" from ${
+          data.peerName || 'a paired device'
+        } will sync into your Download/Sync folder. Accept?`,
+        [
+          {
+            text: 'Decline',
+            style: 'cancel',
+            onPress: () => {
+              call('declineSyncInvite', { id: data.id }).catch(() => {})
+            },
+          },
+          {
+            text: 'Accept',
+            onPress: () => {
+              call('acceptSyncInvite', {
+                id: data.id,
+                customPath: data.defaultPath || undefined,
+              })
+                .then(() => {
+                  showTransferCompleteNotification(
+                    `sync-invite-${data.id}`,
+                    'Sync Folder Linked',
+                    `"${data.name || 'Sync Folder'}" from ${
+                      data.peerName || 'a paired device'
+                    } is now syncing.`
+                  ).catch(() => {})
+                })
+                .catch(() => {})
+            },
+          },
+        ],
+        { cancelable: false }
+      )
     })
 
     const unsubFailed = on('transfer:failed', (data: any) => {

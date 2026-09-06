@@ -24,7 +24,7 @@ interface DevicesContextValue {
   toggleTrustDevice: (deviceId: string) => void
   toggleFavoriteDevice: (deviceId: string) => void
   renameDevice: (deviceId: string, newName: string) => void
-  removeDevice: (deviceId: string) => void
+  removeDevice: (deviceId: string, opts?: { cancelDropCodes?: boolean }) => void
   getPairingCode: () => Promise<{ code: string; id: string }>
   pairWithCode: (code: string) => Promise<unknown>
 }
@@ -179,11 +179,11 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
   )
 
   const removeDevice = useCallback(
-    async (deviceId: string) => {
+    async (deviceId: string, opts?: { cancelDropCodes?: boolean }) => {
       const prev = devices
       setDevices((list) => list.filter((d) => d.id !== deviceId))
       try {
-        await call(METHODS.DEVICES_REMOVE, { id: deviceId })
+        await call(METHODS.DEVICES_REMOVE, { id: deviceId, cancelDropCodes: opts?.cancelDropCodes === true })
         toast.info('Device Removed', 'Device deleted from storage.')
       } catch (err: any) {
         setDevices(prev)

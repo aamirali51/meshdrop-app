@@ -176,6 +176,14 @@ export function DeviceCard({
               Not Paired
             </span>
           )}
+          {device.lanLevel && !device.isTrusted && (
+            <span
+              className='rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-amber-500'
+              title='Pairing enables folder sync — until then sync invites and sync traffic are refused.'
+            >
+              No sync until paired
+            </span>
+          )}
           {device.isOnline && (
             <span
               className={cn(

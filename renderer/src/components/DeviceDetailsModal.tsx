@@ -30,6 +30,7 @@ export function DeviceDetailsModal() {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [cancelDropCodes, setCancelDropCodes] = useState(false)
   const [keyCopied, setKeyCopied] = useState(false)
 
   if (!inspectingDevice) return null
@@ -259,10 +260,28 @@ export function DeviceDetailsModal() {
         open={confirmRemove}
         onOpenChange={setConfirmRemove}
         title={`Remove ${device.name}?`}
-        description='The device will be unpaired and removed from your device list. This cannot be undone.'
+        description='The device will be unpaired and removed from your device list. This cannot be undone. Its folder-sync access is revoked immediately.'
         confirmLabel='Remove Device'
+        extra={
+          <label className='mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground'>
+            <input
+              type='checkbox'
+              checked={cancelDropCodes}
+              onChange={(e) => setCancelDropCodes(e.target.checked)}
+              className='mt-0.5 accent-primary'
+            />
+            <span>
+              Also cancel active drop codes
+              <span className='block text-[10px] opacity-70'>
+                Drop codes are not device-bound — anyone holding one can claim it until it expires.
+                Off by default in case a code was shared beyond this device.
+              </span>
+            </span>
+          </label>
+        }
         onConfirm={() => {
-          removeDevice(device.id)
+          removeDevice(device.id, { cancelDropCodes })
+          setCancelDropCodes(false)
           setInspectingDevice(null)
         }}
       />

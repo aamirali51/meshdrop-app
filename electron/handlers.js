@@ -256,45 +256,12 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     const entry = await bee.get(params.id)
     const device = entry && entry.value
     await bee.del(params.id)
-    // Revoke trust: the in-memory trusted-key set survives the record delete,
-    // so without this the deleted device silently re-adds itself the next time
-    // it connects (isTrustedPublicKey -> directTrusted -> re-persisted).
-    //
-    // The key stays revoked only until a FRESH pairing: rotating the host code
-    // invalidates the code the deleted peer memorized (its stale answers no
-    // longer verify), while the revoked set blocks the auto-trust paths. The
-    // device is re-admitted exactly the way it should be — by pairing with the
-    // current code again.
-    if (device && device.publicKey) {
-      engine.trustManager.removeTrustedKey(device.publicKey)
-      await engine.trustManager.revokeKey(device.publicKey)
-    }
-    try {
-      await engine.trustManager.rotateHostPairingCode()
-    } catch (err) {
-      console.warn('[MeshEngine] Failed to rotate pairing code after device deletion:', err.message)
-    }
-    // Stop advertising the device's discovery topic and tear down any open
-    // session with it so the deletion is immediate and permanent.
-    if (device) {
-      try {
-        engine.topicRegistry.leave(`p2p-peer-${device.identityKey || device.publicKey}`)
-      } catch {}
-      for (const [, peerObj] of engine.peers.entries()) {
-        if (
-          peerObj &&
-          peerObj.device &&
-          (peerObj.device.id === params.id ||
-            (device.publicKey && peerObj.device.publicKey === device.publicKey))
-        ) {
-          try {
-            peerObj.connection.destroy()
-          } catch {}
-        }
-      }
-    }
+    // Delegate the revocation itself to the engine so the UI path and the API
+    // path cannot drift: trust revoke + code rotation + sync-library revocation
+    // + site-allowlist pruning + DEVICE_REMOVED delivery (audit fix F2).
+    await engine.removeDevice(params.id, { cancelDropCodes: params?.cancelDropCodes === true })
     emit(EVENTS.DEVICE_UPDATED, { id: params.id, deleted: true })
-    return { deleted: params.id }
+    return { deleted: params.id, device: device ? { id: device.id, name: device.name } : null }
   }
 
   handlers[METHODS.DEVICES_TRUST] = async (params) => {
@@ -845,6 +812,19 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
   handlers[METHODS.WATCH_PARTY_VOICE] = async (params) => {
     if (!engine || !engine.sendPartyVoiceChunk) return false
     return engine.sendPartyVoiceChunk(params || {})
+  }
+
+  handlers[METHODS.TRANSFERS_EXTENT] = async (params) => {
+    const id = params && params.transferId
+    if (!id || !engine || !engine.transferEngine) return { fileSize: 0, coveredBytes: 0, complete: false }
+    try {
+      const rec = await engine.transferEngine.getBee('transfers').then(b => b.get(id).then(e => e && e.value)).catch(() => null)
+      if (!rec || !Number.isFinite(rec.fileSize) || rec.fileSize <= 0) return { fileSize: 0, coveredBytes: 0, complete: false }
+      if (rec.status === 'completed') return { fileSize: rec.fileSize, coveredBytes: rec.fileSize, complete: true }
+      const covered = await engine.transferEngine.coveredThrough(id, 0).catch(() => null)
+      const coveredBytes = Number.isFinite(covered) ? covered + 1 : 0
+      return { fileSize: rec.fileSize, coveredBytes, complete: false }
+    } catch { return { fileSize: 0, coveredBytes: 0, complete: false } }
   }
 
   handlers[METHODS.STREAM_URL_GET] = async (params) => {

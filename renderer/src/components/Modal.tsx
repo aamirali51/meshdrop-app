@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -71,6 +71,7 @@ interface ConfirmDialogProps {
   confirmLabel: string
   requireConfirmText?: string
   onConfirm: () => void
+  extra?: ReactNode
 }
 
 export function ConfirmDialog({
@@ -80,7 +81,8 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   requireConfirmText,
-  onConfirm
+  onConfirm,
+  extra
 }: ConfirmDialogProps) {
   const [confirmInput, setConfirmInput] = useState('')
   const requiresText = !!requireConfirmText
@@ -91,6 +93,7 @@ export function ConfirmDialog({
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={title}>
       <p className='text-xs leading-relaxed text-muted-foreground'>{description}</p>
+      {extra}
       {requiresText && (
         <input
           value={confirmInput}
