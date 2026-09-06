@@ -29,8 +29,8 @@ const DEFAULT_SETTINGS = {
   // until the user explicitly accepts (Require Manual File Acceptance).
   autoAcceptOffers: true,
   preferOwnRelay: true,
-  relayMode: 'auto',
-  customRelayUrl: '',
+  // Relay connections for my paired devices (desktop only, default ON, hidden on mobile).
+  relayForPairedDevices: true,
   noiseEncryption: true,
   autoUpdate: true,
   releaseChannel: 'stable',
@@ -196,13 +196,6 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     return { ...(engine.deviceIdentity || {}), pairingCode: identity.pairingCode }
   }
 
-  handlers[METHODS.PAIRING_INTENT] = async (params) => {
-    if (engine && typeof engine.setPairingIntent === 'function') {
-      engine.setPairingIntent(params?.active !== false)
-    }
-    return true
-  }
-
   handlers[METHODS.DEVICES_GET_CODE] = async () => {
     const identity = engine.getIdentity()
     return {
@@ -322,6 +315,19 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     return device
   }
 
+  // One-tap confirm for the device-detected-on-lan prompt: promotes the
+  // lan-level peer to full pairing in the engine (handshake + exchange
+  // replication + trusted-key registration) and mirrors it into the row.
+  handlers[METHODS.DEVICES_CONFIRM_LAN] = async (params) => {
+    const publicKey = params?.publicKey
+    if (typeof publicKey !== 'string' || publicKey.length !== 64) {
+      throw new Error('A 64-character peer public key is required')
+    }
+    const device = await engine.confirmLanPair(publicKey)
+    if (device) emit(EVENTS.DEVICE_UPDATED, device)
+    return device || null
+  }
+
   handlers[METHODS.DEVICES_SPEED_TEST] = async () => {
     // No fabricated numbers. A real speed test ships with the transfer engine
     // (Phase 1+); until then this endpoint honestly reports unavailability.
@@ -386,8 +392,7 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
   handlers[METHODS.SETTINGS_GET] = async () => {
     const bee = await engine.getBee('settings')
     const entry = await bee.get('settings')
-    // Surface the engine's live auto-accept flag so the UI toggle reflects
-    // the actual @mesh/core state (Ground Truth Rule).
+    // Surface the engine's live flags so the UI toggle reflects actual @mesh/core state.
     const live = (await engine.getSettings()) || {}
     return mergeSettings({
       ...(entry?.value || {}),
@@ -395,8 +400,7 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
       autoTrustLAN: live.autoTrustLAN,
       autoLanSwitch: live.autoLanSwitch,
       preferOwnRelay: live.preferOwnRelay,
-      relayMode: live.relayMode,
-      customRelayUrl: live.customRelayUrl
+      relayForPairedDevices: live.relayForPairedDevices
     })
   }
 
@@ -422,17 +426,20 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     if (typeof merged.preferOwnRelay === 'boolean') {
       await engine.setPreferOwnRelay(merged.preferOwnRelay)
     }
-    if (typeof merged.relayMode === 'string') {
-      await engine.setRelayMode(merged.relayMode)
-    }
-    if (typeof merged.customRelayUrl === 'string') {
-      await engine.setCustomRelayUrl(merged.customRelayUrl)
+    if (typeof merged.relayForPairedDevices === 'boolean') {
+      await engine.setRelayForPairedDevices(merged.relayForPairedDevices)
     }
     if (updateAutoStart) {
       updateAutoStart(merged)
     }
     emit(EVENTS.SETTINGS_UPDATED, merged)
     return merged
+  }
+
+  // Relay stats for Settings UI aggregate: session count + "Relaying for <device name>" labels.
+  handlers['relay.stats'] = async () => {
+    if (engine.getRelayStats) return engine.getRelayStats()
+    return { active: 0, sessions: [] }
   }
 
   handlers[METHODS.STORAGE_STATS] = async () => {

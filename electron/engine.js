@@ -93,6 +93,13 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
       forward(EVENTS.DEVICE_PAIRED, peer)
       forward(EVENTS.DEVICE_UPDATED, peer)
     })
+    // Two-tier trust: a LAN peer was recognized at the 'lan' level. Surface
+    // the one-tap "pair?" prompt and refresh the device list (the lan-level
+    // identity row is display-only).
+    engine.on('device:detected:lan', (data) => {
+      forward(EVENTS.DEVICE_DISCOVERED, data)
+      forward(EVENTS.DEVICE_UPDATED, data)
+    })
     engine.on('trust:revoked', (data) => {
       // A remote host deleted this device. Forward so the renderer can surface
       // "you were removed" instead of the peer discovering it on next reconnect.

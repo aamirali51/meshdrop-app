@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   Sliders,
   Moon,
@@ -17,9 +17,7 @@ import {
   ClipboardCopy,
   FolderDown,
   Loader2,
-  Radio,
-  Globe,
-  Zap
+  Radio
 } from 'lucide-react'
 import { PortableInstallModal } from '@/components/PortableInstallModal'
 import { useTheme } from '@/hooks/useTheme'
@@ -53,8 +51,8 @@ interface AppSettings {
   autoAcceptOffers: boolean
   /** Prefer an online paired desktop as relay before public bootstrap nodes. */
   preferOwnRelay: boolean
-  relayMode: 'auto' | 'relay-primary' | 'direct-only'
-  customRelayUrl: string
+  /** Relay connections for my paired devices (desktop only, default ON). */
+  relayForPairedDevices: boolean
   noiseEncryption: boolean
   autoUpdate: boolean
   releaseChannel: string
@@ -72,8 +70,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoLanSwitch: true,
   autoAcceptOffers: true,
   preferOwnRelay: true,
-  relayMode: 'auto',
-  customRelayUrl: '',
+  relayForPairedDevices: true,
   noiseEncryption: true,
   autoUpdate: true,
   releaseChannel: 'stable',
@@ -332,7 +329,7 @@ export function Settings() {
               <Sliders className='h-3.5 w-3.5' /> General
             </TabsTrigger>
             <TabsTrigger value='network' className='gap-2'>
-              <Radio className='h-3.5 w-3.5' /> Network & Relay
+              <Radio className='h-3.5 w-3.5' /> Network
             </TabsTrigger>
             <TabsTrigger value='appearance' className='gap-2'>
               <Moon className='h-3.5 w-3.5' /> Appearance
@@ -345,116 +342,29 @@ export function Settings() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Network & Relay Tab */}
+          {/* Network Tab */}
           <TabsContent value='network' className='space-y-4 pt-4'>
             <Card className='glass-card border-hairline/10'>
               <CardContent className='p-6 space-y-5'>
                 <div>
-                  <h3 className='text-xs font-bold text-foreground'>Network Transport & Relay Strategy</h3>
-                  <p className='text-[11px] text-muted-foreground'>
-                    Choose how MeshDrop routes peer discovery, pairing nonces, and signaling handshakes across networks.
-                  </p>
+                  <h3 className='text-xs font-bold text-foreground'>Network Transport</h3>
                 </div>
 
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
-                  {/* Auto Hybrid */}
-                  <button
-                    type='button'
-                    onClick={() => set('relayMode', 'auto')}
-                    className={`flex flex-col text-left p-4 rounded-2xl border transition-all ${
-                      (settings.relayMode || 'auto') === 'auto'
-                        ? 'border-primary bg-primary/10 shadow-sm'
-                        : 'border-border/60 hover:border-border bg-background/50'
-                    }`}
-                  >
-                    <div className='flex items-center justify-between w-full mb-2'>
-                      <div className='p-2 rounded-xl bg-primary/10 text-primary'>
-                        <Zap className='h-4 w-4' />
-                      </div>
-                      {(settings.relayMode || 'auto') === 'auto' && (
-                        <span className='text-[10px] font-black uppercase tracking-wider text-primary bg-primary/20 px-2 py-0.5 rounded-full'>
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <p className='text-xs font-bold text-foreground mb-1'>⚡ Auto (Hybrid Dual-Track)</p>
-                    <p className='text-[11px] text-muted-foreground leading-relaxed'>
-                      Concurrently races Direct LAN/UDP holepunching and Cloudflare Relay (0ms latency). Fastest path wins.
-                    </p>
-                  </button>
-
-                  {/* Cloudflare Relay Primary */}
-                  <button
-                    type='button'
-                    onClick={() => set('relayMode', 'relay-primary')}
-                    className={`flex flex-col text-left p-4 rounded-2xl border transition-all ${
-                      settings.relayMode === 'relay-primary'
-                        ? 'border-primary bg-primary/10 shadow-sm'
-                        : 'border-border/60 hover:border-border bg-background/50'
-                    }`}
-                  >
-                    <div className='flex items-center justify-between w-full mb-2'>
-                      <div className='p-2 rounded-xl bg-cyan-500/10 text-cyan-500'>
-                        <Globe className='h-4 w-4' />
-                      </div>
-                      {settings.relayMode === 'relay-primary' && (
-                        <span className='text-[10px] font-black uppercase tracking-wider text-primary bg-primary/20 px-2 py-0.5 rounded-full'>
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <p className='text-xs font-bold text-foreground mb-1'>🌐 Cloudflare Relay Primary</p>
-                    <p className='text-[11px] text-muted-foreground leading-relaxed'>
-                      Prioritizes Port 443 WSS Cloudflare Edge Relay. Ideal for mobile 4G/5G CGNAT, university Wi-Fi, and firewalls.
-                    </p>
-                  </button>
-
-                  {/* Direct P2P Only */}
-                  <button
-                    type='button'
-                    onClick={() => set('relayMode', 'direct-only')}
-                    className={`flex flex-col text-left p-4 rounded-2xl border transition-all ${
-                      settings.relayMode === 'direct-only'
-                        ? 'border-primary bg-primary/10 shadow-sm'
-                        : 'border-border/60 hover:border-border bg-background/50'
-                    }`}
-                  >
-                    <div className='flex items-center justify-between w-full mb-2'>
-                      <div className='p-2 rounded-xl bg-amber-500/10 text-amber-500'>
-                        <Lock className='h-4 w-4' />
-                      </div>
-                      {settings.relayMode === 'direct-only' && (
-                        <span className='text-[10px] font-black uppercase tracking-wider text-primary bg-primary/20 px-2 py-0.5 rounded-full'>
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <p className='text-xs font-bold text-foreground mb-1'>🔒 Direct P2P Only</p>
-                    <p className='text-[11px] text-muted-foreground leading-relaxed'>
-                      Disables Cloudflare Relay fallback completely. Enforces pure local LAN + HyperDHT peer-to-peer only.
-                    </p>
-                  </button>
-                </div>
-
-                {/* Custom Relay Endpoint URL */}
-                {settings.relayMode !== 'direct-only' && (
-                  <div className='space-y-2 border-t border-border/40 pt-4'>
-                    <label className='text-xs font-bold text-foreground block' htmlFor='custom-relay-url'>
-                      Custom Relay Worker Endpoint (Optional)
-                    </label>
+                {/* Relay for Paired Devices */}
+                <div className='flex items-center justify-between border-t border-border/40 pt-4'>
+                  <div>
+                    <p className='font-bold text-foreground text-xs'>Relay connections for my paired devices</p>
                     <p className='text-[11px] text-muted-foreground'>
-                      Leave blank to use the global official MeshDrop Cloudflare Worker (`https://meshdrop-relay.aamirabdullah33.workers.dev`).
+                      Allow your paired devices to relay through this desktop when direct holepunch fails. Turn off to close relay sessions and use public bootstrap only.
                     </p>
-                    <input
-                      id='custom-relay-url'
-                      type='text'
-                      value={settings.customRelayUrl || ''}
-                      onChange={(e) => set('customRelayUrl', e.target.value)}
-                      placeholder='https://meshdrop-relay.aamirabdullah33.workers.dev'
-                      className='w-full max-w-lg rounded-xl border border-border/60 bg-background px-4 py-2 font-mono text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary'
-                    />
+                    <RelayStats />
                   </div>
-                )}
+                  <Switch
+                    checked={settings.relayForPairedDevices !== false}
+                    onCheckedChange={(v) => set('relayForPairedDevices', v)}
+                    aria-label='Relay connections for my paired devices'
+                  />
+                </div>
 
                 {/* Own Peer Relay */}
                 <div className='flex items-center justify-between border-t border-border/40 pt-4'>
@@ -948,6 +858,32 @@ export function Settings() {
             <PortableInstallModal open={showPortableModal} onOpenChange={setShowPortableModal} />
           </TabsContent>
         </Tabs>
+      )}
+    </div>
+  )
+}
+
+function RelayStats() {
+  const [stats, setStats] = React.useState<any>(null)
+  React.useEffect(() => {
+    let alive = true
+    const fetch = () => {
+      call('relay.stats', null).then((s: any) => { if (alive) setStats(s) }).catch(() => {})
+    }
+    fetch()
+    const id = setInterval(fetch, 4000)
+    return () => { alive = false; clearInterval(id) }
+  }, [])
+  if (!stats) return null
+  return (
+    <div className='mt-2 text-[11px] text-muted-foreground'>
+      <span className='font-mono'>{stats.active || 0} relay session(s)</span>
+      {stats.sessions && stats.sessions.length > 0 && (
+        <ul className='mt-1 space-y-0.5'>
+          {stats.sessions.slice(0, 8).map((s: any) => (
+            <li key={s.id} className='font-mono text-[10px]'>• {s.label} — {s.remotePrefix}…</li>
+          ))}
+        </ul>
       )}
     </div>
   )

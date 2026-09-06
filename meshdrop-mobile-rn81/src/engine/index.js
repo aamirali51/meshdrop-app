@@ -236,7 +236,9 @@ async function boot() {
       autoAcceptOffers: false,
       autoTrustLAN: true,
       lanDiscovery: true,
-      relayHttp,
+      isMobile: true,
+      platform: 'mobile',
+      relayForPairedDevices: false,
       networkProfile: initialProfile
     })
     console.log('[MDLOG] MeshEngine created OK')
