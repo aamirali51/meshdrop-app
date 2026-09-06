@@ -26,7 +26,6 @@ import {
   Smile,
   Flame,
   Zap,
-  MessageCircle,
   Mic,
   MicOff,
   UserX,
@@ -35,7 +34,6 @@ import {
   ListVideo,
   Captions,
   FastForward,
-  Send,
   Trash2,
   Plus,
 } from 'lucide-react'
@@ -98,10 +96,6 @@ export function WatchParty() {
   const [loading, setLoading] = useState(false)
 
   // Chat / roster panel
-  const [sidebarTab, setSidebarTab] = useState<'party' | 'chat'>('party')
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-  const [chatDraft, setChatDraft] = useState('')
-  const [unreadCount, setUnreadCount] = useState(0)
 
   // Playback State
   const [streamUrl, setStreamUrl] = useState<string>('')
@@ -115,6 +109,16 @@ export function WatchParty() {
   const [showControls, setShowControls] = useState(true)
   const [copiedCode, setCopiedCode] = useState(false)
   const [floatingReactions, setFloatingReactions] = useState<{ id: number; emoji: string; x: number }[]>([])
+
+  // FIX 2: error + autoplay + buffering
+  const [playerError, setPlayerError] = useState<{ code: number; message: string; source: string } | null>(null)
+  const [showTapToPlay, setShowTapToPlay] = useState(false)
+  const [isBuffering, setIsBuffering] = useState(false)
+  const bufferingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryVersionRef = useRef(0)
+
+  // FIX 4: guest transfer progress for placeholder
+  const [guestProgress, setGuestProgress] = useState<{ pct: number; mb: string } | null>(null)
 
   // Subtitles
   const [subtitleTrack, setSubtitleTrack] = useState<{ name: string; url: string } | null>(null)
@@ -139,9 +143,6 @@ export function WatchParty() {
   activeRoomRef.current = activeRoom
   const currentTimeRef = useRef(0)
   const voiceRef = useRef<WatchVoice | null>(null)
-  const chatScrollRef = useRef<HTMLDivElement | null>(null)
-  const sidebarTabRef = useRef(sidebarTab)
-  sidebarTabRef.current = sidebarTab
   const scheduledReactionsRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
   // Fetch initial state & discover rooms
@@ -209,7 +210,6 @@ export function WatchParty() {
         setStreamUrl('')
         setIsPlaying(false)
         setLoading(false)
-        setChatMessages([])
         setQueueItems([])
         setSubtitleTrack(null)
         setHostPosition(null)
@@ -221,7 +221,6 @@ export function WatchParty() {
         setStreamUrl('')
         setIsPlaying(false)
         setLoading(false)
-        setChatMessages([])
         setQueueItems([])
         setSubtitleTrack(null)
         setHostPosition(null)
@@ -248,14 +247,6 @@ export function WatchParty() {
         if (reaction?.emoji) {
           handleTimestampedReaction(reaction)
         }
-      }),
-      on(EVENTS.WATCH_CHAT_MESSAGE, (msg: any) => {
-        if (!msg?.text) return
-        setChatMessages((prev) => [...prev.slice(-199), msg])
-        if (sidebarTabRef.current !== 'chat') setUnreadCount((c) => c + 1)
-      }),
-      on(EVENTS.WATCH_CHAT_HISTORY, (payload: any) => {
-        if (Array.isArray(payload?.messages)) setChatMessages(payload.messages.slice(-200))
       }),
       on(EVENTS.WATCH_VOICE_CHUNK, (chunk: any) => {
         if (!chunk?.audioB64) return
@@ -359,6 +350,32 @@ export function WatchParty() {
     }
   }, [activeRoom])
 
+  // FIX 4: guest progress for connecting placeholder
+  useEffect(() => {
+    if (!activeRoom || activeRoom.filePath || !activeRoom.roomCode) { setGuestProgress(null); return }
+    const epoch = activeRoom.mediaEpoch || 1
+    const sid = `watch-${activeRoom.roomCode.toLowerCase()}${epoch > 1 ? `-e${epoch}` : ''}`
+    const fileSize = Number(activeRoom.fileSize) || 0
+    const unsub = on(EVENTS.TRANSFER_PROGRESS as any, (ev: any) => {
+      const d = ev as any
+      if (!d || d.id !== sid) return
+      const pct = typeof d.progress === 'number' ? d.progress : 0
+      const bytes = fileSize > 0 ? Math.round((fileSize * pct) / 100) : 0
+      const mb = (bytes / (1024 * 1024)).toFixed(1)
+      setGuestProgress({ pct, mb })
+      if (d.playable) setPlayerError(null)
+    })
+    call('transfers.list' as any).then((list: any) => {
+      const hit = Array.isArray(list) ? list.find((x: any) => x.id === sid) : null
+      if (hit && typeof hit.progress === 'number') {
+        const pct = hit.progress
+        const bytes = fileSize > 0 ? Math.round((fileSize * pct) / 100) : 0
+        setGuestProgress({ pct, mb: (bytes / (1024 * 1024)).toFixed(1) })
+      }
+    }).catch(() => {})
+    return () => { try { (unsub as any)?.() } catch {} }
+  }, [activeRoom])
+
   // Universal playback engine: mpegts.js (MSE) for TS/MPEG-TS/FLV, hls.js for
   // m3u8, and the native <video> element otherwise. Chromium cannot demux
   // MPEG-TS/FLV natively — feeding the raw stream URL to <video> throws
@@ -372,6 +389,7 @@ export function WatchParty() {
   useEffect(() => {
     const video = videoRef.current
     if (!video || !streamUrl) return
+    setPlayerError(null); setShowTapToPlay(false); setIsBuffering(false)
 
     // Derive the container from the room's media filename/path when present.
     const activeRoom = activeRoomRef.current
@@ -411,6 +429,7 @@ export function WatchParty() {
         })
         mpegtsPlayer.on(mpegts.Events.ERROR, (errType: string, errDetail: string, errInfo: any) => {
           console.warn('[WatchParty] mpegts player event:', errType, errDetail, errInfo)
+          setPlayerError({ code: 3, message: `${errType}: ${errDetail || ''}`.trim(), source: 'mpegts' })
         })
       } catch (err) {
         console.warn('[WatchParty] mpegts init failed, falling back to native:', err)
@@ -421,6 +440,12 @@ export function WatchParty() {
         hlsPlayer = new Hls({ enableWorker: true })
         hlsPlayer.loadSource(streamUrl)
         hlsPlayer.attachMedia(video)
+        hlsPlayer.on(Hls.Events.ERROR as any, (_ev: any, data: any) => {
+          if (!data || !data.fatal) return
+          console.warn('[WatchParty] hls fatal:', data.type, data.details)
+          const code = data.type === 'networkError' ? 2 : 3
+          setPlayerError({ code, message: String(data.details || data.type || 'HLS error'), source: 'hls' })
+        })
       } catch (err) {
         console.warn('[WatchParty] hls init failed, falling back to native:', err)
         video.src = streamUrl
@@ -447,16 +472,49 @@ export function WatchParty() {
     }
   }, [streamUrl])
 
+  // FIX 3: clamp a time position to the transfer contiguous covered extent
+  const clampSeekToCovered = useCallback(async (targetSec: number, dur: number) => {
+    try {
+      const room = activeRoomRef.current
+      if (!room || room.isHost || !room.roomCode) return targetSec
+      if (!(dur > 0) || !(targetSec >= 0)) return targetSec
+      const epoch = room.mediaEpoch || 1
+      const sid = `watch-${room.roomCode.toLowerCase()}${epoch > 1 ? `-e${epoch}` : ''}`
+      const ext: any = await call(METHODS.TRANSFERS_EXTENT as any, { transferId: sid }).catch(() => null)
+      if (!ext || !ext.fileSize || !(ext.coveredBytes > 0)) return targetSec
+      if (ext.complete) return targetSec
+      const fileSize = ext.fileSize
+      const covered = ext.coveredBytes
+      const marginSec = 2
+      const maxSec = Math.max(0, (covered / fileSize) * dur - marginSec)
+      if (targetSec > maxSec) {
+        const byteOff = Math.max(0, Math.floor((targetSec / Math.max(1, dur)) * fileSize))
+        call('setPlayheadByte' as any, { transferId: sid, byteOffset: byteOff }).catch(() => {})
+        return maxSec
+      }
+    } catch {}
+    return targetSec
+  }, [])
+
   // Remote Sync Handler
   const handleRemotePlaybackState = useCallback((state: any) => {
     const video = videoRef.current
     if (!video) return
 
     if (state.action === 'play') {
-      if (typeof state.positionSec === 'number' && Math.abs(video.currentTime - state.positionSec) > 1.5) {
-        video.currentTime = state.positionSec
+      const doPlay = async () => {
+        if (typeof state.positionSec === 'number' && Math.abs(video.currentTime - state.positionSec) > 1.5) {
+          const dur = video.duration || duration || 0
+          const clamped = dur > 0 ? await clampSeekToCovered(state.positionSec, dur) : state.positionSec
+          video.currentTime = clamped
+        }
+        video.play().catch((err: any) => {
+          const name = err && (err.name || '')
+          if (name === 'NotAllowedError') setShowTapToPlay(true)
+          else if (err) setPlayerError({ code: 0, message: err.message || String(err), source: 'play' })
+        })
       }
-      video.play().catch(() => {})
+      void doPlay()
       setIsPlaying(true)
     } else if (state.action === 'pause') {
       if (typeof state.positionSec === 'number' && Math.abs(video.currentTime - state.positionSec) > 1.5) {
@@ -466,8 +524,11 @@ export function WatchParty() {
       setIsPlaying(false)
     } else if (state.action === 'seek') {
       if (typeof state.positionSec === 'number') {
-        video.currentTime = state.positionSec
-        setCurrentTime(state.positionSec)
+        const dur = video.duration || duration || 0
+        clampSeekToCovered(state.positionSec, dur).then((clamped) => {
+          video.currentTime = clamped
+          setCurrentTime(clamped)
+        })
       }
     }
   }, [])
@@ -597,22 +658,6 @@ export function WatchParty() {
     setCopiedCode(true)
     setTimeout(() => setCopiedCode(false), 2000)
     toast.success('Copied', `Room code ${activeRoom.roomCode} copied to clipboard!`)
-  }
-
-  // ─── Chat ────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (sidebarTab === 'chat') {
-      setUnreadCount(0)
-      chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight })
-    }
-  }, [sidebarTab, chatMessages])
-
-  const handleSendChat = () => {
-    const text = chatDraft.trim()
-    if (!text) return
-    setChatDraft('')
-    call(METHODS.WATCH_PARTY_CHAT, { text }).catch(() => {})
   }
 
   // ─── Moderation (host) ───────────────────────────────────────────────────
@@ -1059,17 +1104,30 @@ export function WatchParty() {
             {/* HTML5 Video Surface — src/engine attached by the universal
                 engine effect above (mpegts.js for TS/FLV, hls.js, or native) */}
             {streamUrl ? (
+              <>
               <video
                 ref={videoRef}
                 className='w-full h-full object-contain'
                 autoPlay
                 playsInline
                 crossOrigin='anonymous'
-                onError={() => {
-                  // Native <video> failed to load the source (e.g. a container
-                  // Chromium cannot demux and no MSE engine is available).
-                  console.warn('[WatchParty] native video error on', streamUrl)
+                onError={(e) => {
+                  const me: any = (e.currentTarget as HTMLVideoElement).error
+                  const code = me ? me.code : 0
+                  const msg = me ? (me.message || `MediaError code ${code}`) : 'MediaError'
+                  console.warn('[WatchParty] native video error', code, msg, 'on', streamUrl)
+                  setPlayerError({ code: code || 3, message: msg, source: 'native' })
                 }}
+                onWaiting={() => {
+                  if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current)
+                  bufferingTimerRef.current = setTimeout(() => setIsBuffering(true), 5000)
+                }}
+                onStalled={() => {
+                  if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current)
+                  bufferingTimerRef.current = setTimeout(() => setIsBuffering(true), 5000)
+                }}
+                onPlaying={() => { if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); setIsBuffering(false); setShowTapToPlay(false); setPlayerError(null) }}
+                onCanPlay={() => { if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); setIsBuffering(false) }}
                 onTimeUpdate={() => {
                   if (videoRef.current) {
                     currentTimeRef.current = videoRef.current.currentTime
@@ -1104,11 +1162,36 @@ export function WatchParty() {
                   />
                 )}
               </video>
+              {showTapToPlay && !playerError && (
+                <button onClick={() => { const v = videoRef.current; if (!v) return; setShowTapToPlay(false); v.play().catch((err: any) => setPlayerError({ code: 0, message: err.message || String(err), source: 'play' })) }} className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm'>
+                  <div className='flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl'><Play className='h-7 w-7 fill-current ml-1' /></div>
+                  <span className='text-sm font-semibold text-white'>Tap to play</span>
+                  <span className='text-xs text-white/70'>Autoplay was blocked — tap to start</span>
+                </button>
+              )}
+              {playerError && (
+                <div className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/80 p-6 text-center'>
+                  <p className='text-sm font-semibold text-white'>{playerError.code === 2 ? 'Connection interrupted' : playerError.code === 3 || playerError.code === 4 ? 'Format not supported on this device' : 'Playback failed'}</p>
+                  <p className='text-xs text-white/70 max-w-[32ch]'>{playerError.message || (playerError.code === 2 ? 'Retrying…' : 'Try a different file or retry.')} </p>
+                  <button onClick={() => { setPlayerError(null); setShowTapToPlay(false); retryVersionRef.current += 1; const room = activeRoomRef.current; if (!room || !room.roomCode) return; const epoch = room.mediaEpoch || 1; const sid = `watch-${room.roomCode.toLowerCase()}${epoch > 1 ? `-e${epoch}` : ''}`; call(METHODS.STREAM_URL_GET as any, { transferId: sid }).then((res: any) => { if (res?.url) setStreamUrl(`${res.url}&vw=${retryVersionRef.current}`); }).catch(() => {}) }} className='rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground'>Retry</button>
+                </div>
+              )}
+              {isBuffering && !playerError && !showTapToPlay && (
+                <div className='absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/30 pointer-events-none'>
+                  <div className='h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white' />
+                  <span className='text-xs text-white/80'>Buffering…</span>
+                </div>
+              )}
+              </>
             ) : (
               <div className='flex flex-col items-center justify-center gap-3 p-8 text-center'>
                 <Tv className='h-12 w-12 text-primary animate-pulse' />
                 <p className='text-sm font-semibold text-foreground'>Connecting to Mesh Stream...</p>
-                <p className='text-xs text-muted-foreground'>Prefetching video blocks across peer channels</p>
+                <p className='text-xs text-muted-foreground'>
+                  {guestProgress && guestProgress.pct > 0
+                    ? `Preparing stream… ${guestProgress.pct}% (${guestProgress.mb} MB)`
+                    : 'Prefetching video blocks across peer channels'}
+                </p>
               </div>
             )}
 
@@ -1282,36 +1365,7 @@ export function WatchParty() {
 
           {/* Right Sidebar: Party / Chat tabs */}
           <div className='lg:col-span-4 flex flex-col rounded-2xl bg-card border border-border/60 p-5 shadow-sm min-h-[420px]'>
-            {/* Tabs */}
-            <div className='flex items-center gap-1 p-1 rounded-xl bg-background/60 border border-border/40 mb-3'>
-              <button
-                onClick={() => setSidebarTab('party')}
-                className={cn(
-                  'flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-colors',
-                  sidebarTab === 'party' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Users className='h-3.5 w-3.5' />
-                Party
-              </button>
-              <button
-                onClick={() => setSidebarTab('chat')}
-                className={cn(
-                  'flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-colors relative',
-                  sidebarTab === 'chat' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <MessageCircle className='h-3.5 w-3.5' />
-                Chat
-                {unreadCount > 0 && sidebarTab !== 'chat' && (
-                  <span className='absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground px-1'>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {sidebarTab === 'party' ? (
+            
               <div className='flex flex-col gap-4 flex-1 overflow-y-auto'>
                 {/* Room Info */}
                 <div className='flex items-center justify-between border-b border-border/40 pb-3'>
@@ -1510,65 +1564,6 @@ export function WatchParty() {
                   </div>
                 </div>
               </div>
-            ) : (
-              /* Chat Tab */
-              <div className='flex flex-col flex-1 min-h-0'>
-                <div ref={chatScrollRef} className='flex-1 overflow-y-auto flex flex-col gap-2 pr-1'>
-                  {chatMessages.length === 0 ? (
-                    <div className='flex flex-col items-center justify-center flex-1 gap-2 text-muted-foreground'>
-                      <MessageCircle className='h-8 w-8 text-muted-foreground/40' />
-                      <p className='text-xs'>No messages yet. Say hi to the party!</p>
-                    </div>
-                  ) : (
-                    chatMessages.map((m) => {
-                      const mine = identity?.id && m.sender?.id === identity.id
-                      return (
-                        <div key={m.messageId || `${m.timestamp}-${m.sender?.id}`} className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}>
-                          <div className='flex items-center gap-1.5'>
-                            {!mine && <span className='text-[10px] font-semibold text-primary'>{m.sender?.name || 'Peer'}</span>}
-                            <span className='text-[9px] text-muted-foreground'>
-                              {new Date(m.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <div
-                            className={cn(
-                              'max-w-[85%] rounded-xl px-3 py-1.5 text-xs leading-relaxed break-words',
-                              mine ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-background/70 border border-border/40 text-foreground rounded-tl-sm'
-                            )}
-                          >
-                            {m.text}
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-
-                <div className='flex items-center gap-2 mt-3 pt-3 border-t border-border/40'>
-                  <input
-                    type='text'
-                    value={chatDraft}
-                    onChange={(e) => setChatDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendChat()
-                      }
-                    }}
-                    placeholder='Message the party...'
-                    maxLength={1000}
-                    className='flex-1 rounded-lg bg-background border border-border/60 px-3 py-2 text-xs text-foreground focus:outline-none focus:border-primary'
-                  />
-                  <button
-                    onClick={handleSendChat}
-                    disabled={!chatDraft.trim()}
-                    className='flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors'
-                  >
-                    <Send className='h-3.5 w-3.5' />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

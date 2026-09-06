@@ -83,6 +83,10 @@ class LoopbackMediaServer(
         val committed = committedBytes
         if (committed > 0) return committed
         val onDisk = onDiskLength()
+        // Progressive case: JS mounts with committed=0 before the first progress tick.
+        // If we return 0 here the initial ExoPlayer probe at 0 immediately 416s.
+        // Fall back to onDisk length while the file grows (MP4 head is sequential anyway).
+        if (onDisk > 0) return onDisk
         return if (complete) onDisk else 0L
     }
 

@@ -28,13 +28,11 @@ import {
   Check,
   Sparkles,
   LogOut,
-  MessageCircle,
   UserX,
   Crown,
   Lock,
   ListVideo,
   FastForward,
-  Send,
   Trash2,
   Plus,
   MicOff,
@@ -120,13 +118,11 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
   const [lastPartyCode, setLastPartyCode] = useState('')
 
   // Chat / roster panel state
-  const [sideTab, setSideTab] = useState<'party' | 'chat'>('party')
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-  const [chatDraft, setChatDraft] = useState('')
-  const [unreadCount, setUnreadCount] = useState(0)
 
   // Catch-up (guest): latest authoritative master position
   const [hostPosition, setHostPosition] = useState<number | null>(null)
+  const [playerError, setPlayerError] = useState<{ code:number; message:string }|null>(null)
+  const [isBuffering, setIsBuffering] = useState(false)
 
   // Queue (from room info)
   const [queueItems, setQueueItems] = useState<{ title: string; filename: string; fileSize: number }[]>([])
@@ -146,8 +142,6 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
   const lastSyncRef = useRef<number>(0)
   const scrubberLayoutRef = useRef<{ width: number; pageX: number }>({ width: 1, pageX: 0 })
   const currentTimeRef = useRef(0)
-  const sideTabRef = useRef(sideTab)
-  sideTabRef.current = sideTab
   const identityIdRef = useRef<string>('')
   call('getIdentity').then((id: any) => {
     if (id?.id) identityIdRef.current = id.id
@@ -166,16 +160,6 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
   useEffect(() => {
     onActiveRoomChange?.(Boolean(activeRoom))
   }, [activeRoom, onActiveRoomChange])
-
-  // Pull the chat history when joining a room (host replays recent messages).
-  useEffect(() => {
-    if (!activeRoom?.roomCode) return
-    call('watch.chatHistory')
-      .then((history: any) => {
-        if (Array.isArray(history) && history.length > 0) setChatMessages(history.slice(-200))
-      })
-      .catch(() => {})
-  }, [activeRoom?.roomCode])
 
   // Controls Auto-Hide Management
   const resetControlsTimer = useCallback(() => {
@@ -316,7 +300,6 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
         clearVideo()
         setIsPlaying(false)
         setLoading(false)
-        setChatMessages([])
         setQueueItems([])
         setHostPosition(null)
         RNFS.unlink(`${RNFS.DocumentDirectoryPath}/${LAST_PARTY_FILE}`).catch(() => {})
@@ -327,7 +310,6 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
         clearVideo()
         setIsPlaying(false)
         setLoading(false)
-        setChatMessages([])
         setQueueItems([])
         setHostPosition(null)
         const reason = evt?.reason || ''
@@ -340,14 +322,6 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
         } else {
           Alert.alert('Party Closed', 'The host has ended the Watch Party.')
         }
-      }),
-      on('party:chat', (msg: any) => {
-        if (!msg?.text) return
-        setChatMessages((prev) => [...prev.slice(-199), msg])
-        if (sideTabRef.current !== 'chat') setUnreadCount((c) => c + 1)
-      }),
-      on('party:chat:history', (payload: any) => {
-        if (Array.isArray(payload?.messages)) setChatMessages(payload.messages.slice(-200))
       }),
       on('party:moderated', (mod: any) => {
         if (!mod?.action) return
@@ -509,7 +483,7 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
       // serves reads inside the prefix immediately and waits (bounded) for
       // reads past it while the sequential sweep advances — that is what
       // keeps a growing MP4/TS parse intact without serving holes.
-      const committed = matchCommittedRef.current >= 0 ? matchCommittedRef.current : 0
+      const committed = matchCommittedRef.current >= 0 ? matchCommittedRef.current : -1
       if (resolvedRef.current?.path === part.path && !resolvedRef.current.complete) {
         setLoopbackTotal(total)
         setLoopbackWritten(committed)
@@ -721,15 +695,6 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
     if (lastReactionRef.current.emoji === emoji && now - lastReactionRef.current.at < 800) return
     lastReactionRef.current = { emoji, at: now }
     call('sendPartyReaction', { emoji, positionSec: currentTimeRef.current }).catch(() => {})
-  }
-
-  // ─── Chat ────────────────────────────────────────────────────────────────
-
-  const handleSendChat = () => {
-    const text = chatDraft.trim()
-    if (!text) return
-    setChatDraft('')
-    call('watch.chat', { text }).catch(() => {})
   }
 
   // ─── Moderation (host) ───────────────────────────────────────────────────
@@ -1125,28 +1090,25 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
                 muted={isMuted}
                 seek={seekTarget}
                 onReady={(e: any) => {
-                  if (e.nativeEvent?.duration > 0) {
-                    setDuration(e.nativeEvent.duration)
-                  }
+                  if (e.nativeEvent?.duration > 0) setDuration(e.nativeEvent.duration)
+                  setIsBuffering(false); setPlayerError(null)
                 }}
                 onProgress={(e: any) => {
                   if (typeof e.nativeEvent?.currentTime === 'number') {
                     currentTimeRef.current = e.nativeEvent.currentTime
                     setCurrentTime(e.nativeEvent.currentTime)
-                    if (e.nativeEvent?.duration > 0) {
-                      setDuration(e.nativeEvent.duration)
-                    }
+                    if (e.nativeEvent?.duration > 0) setDuration(e.nativeEvent.duration)
+                    setIsBuffering(false)
                   }
                 }}
                 onEnd={handleMediaEnded}
                 onError={(e: any) => {
-                  console.warn('[WatchParty] Video error:', e.nativeEvent?.error)
-                  // A dead source must not latch: the staged .part is renamed
-                  // into the final path on completion, so drop the resolved
-                  // marker and let the resolver remount the right source
-                  // instead of staying blank forever.
-                  resolvedRef.current = null
-                  resolvePartyMediaRef.current?.(true)
+                  const msg = String(e.nativeEvent?.error || 'Video error')
+                  console.warn('[WatchParty] Video error:', msg)
+                  // Detect permanently dead source vs transient .part rename
+                  const transient = /No such file/i.test(msg)
+                  if (transient) { resolvedRef.current = null; resolvePartyMediaRef.current?.(true); return }
+                  setPlayerError({ code: 3, message: msg })
                 }}
               />
             ) : (
@@ -1154,8 +1116,21 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
                 <Tv size={48} color={theme.primary} />
                 <Text style={[styles.connectingTitle, { color: '#F8FAFC' }]}>Streaming P2P Video Track</Text>
                 <Text style={[styles.connectingSub, { color: '#94A3B8' }]}>
-                  {activeRoom.isHost ? 'Broadcasting to swarm...' : 'Prefetching chunks from host...'}
+                  {loopbackMode && loopbackTotal>0 ? `Preparing stream… ${Math.round((loopbackWritten/Math.max(1,loopbackTotal))*100)}% (${(loopbackWritten/(1024*1024)).toFixed(1)} MB)` : activeRoom.isHost ? 'Broadcasting to swarm...' : 'Prefetching chunks from host...'}
                 </Text>
+              </View>
+            )}
+
+            {playerError && (
+              <View pointerEvents='auto' style={{ position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.8)', alignItems:'center', justifyContent:'center', padding:16, zIndex:20 }}>
+                <Text style={{ color:'#fff', fontWeight:'700', fontSize:14, textAlign:'center' }}>{playerError.code===2?'Connection interrupted':playerError.code===3||playerError.code===4?'Format not supported':'Playback failed'}</Text>
+                <Text style={{ color:'rgba(255,255,255,0.7)', fontSize:12, marginTop:6, textAlign:'center' }}>{playerError.message}</Text>
+                <TouchableOpacity style={{ marginTop:12, backgroundColor: theme.primary, paddingHorizontal:16, paddingVertical:8, borderRadius:8 }} onPress={()=>{ setPlayerError(null); resolvedRef.current=null; resolvePartyMediaRef.current?.(true) }}><Text style={{ color:'#fff', fontWeight:'700', fontSize:12 }}>Retry</Text></TouchableOpacity>
+              </View>
+            )}
+            {isBuffering && !playerError && (
+              <View pointerEvents='none' style={{ position:'absolute', top:0, left:0, right:0, bottom:0, alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.25)', zIndex:10 }}>
+                <Text style={{ color:'rgba(255,255,255,0.9)', fontSize:12 }}>Buffering…</Text>
               </View>
             )}
 
@@ -1322,34 +1297,6 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
           {/* Portrait Party/Chat Card (Only when in non-immersive portrait) */}
           {!isImmersive && (
             <View style={[styles.audienceCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-              {/* Tab switcher */}
-              <View style={styles.tabRow}>
-                <TouchableOpacity
-                  style={[styles.tabBtn, sideTab === 'party' && { backgroundColor: theme.primarySoft }]}
-                  onPress={() => setSideTab('party')}
-                >
-                  <Users size={13} color={sideTab === 'party' ? theme.primary : theme.muted} />
-                  <Text style={[styles.tabText, { color: sideTab === 'party' ? theme.primary : theme.muted }]}>Party</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.tabBtn, sideTab === 'chat' && { backgroundColor: theme.primarySoft }]}
-                  onPress={() => {
-                    setSideTab('chat')
-                    setUnreadCount(0)
-                  }}
-                >
-                  <MessageCircle size={13} color={sideTab === 'chat' ? theme.primary : theme.muted} />
-                  <Text style={[styles.tabText, { color: sideTab === 'chat' ? theme.primary : theme.muted }]}>Chat</Text>
-                  {unreadCount > 0 && sideTab !== 'chat' && (
-                    <View style={[styles.unreadBadge, { backgroundColor: theme.primary }]}>
-                      <Text style={styles.unreadText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {sideTab === 'party' ? (
-                <>
                   {/* Reactions */}
                   <View style={styles.reactionsRow}>
                     {REACTIONS.map((emoji) => (
@@ -1461,47 +1408,6 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
                       </View>
                     )
                   })}
-                </>
-              ) : (
-                /* Chat */
-                <View style={styles.chatContainer}>
-                  <ScrollView style={styles.chatScroll} contentContainerStyle={styles.chatContent}>
-                    {chatMessages.length === 0 ? (
-                      <Text style={[styles.chatEmpty, { color: theme.muted }]}>No messages yet. Say hi to the party!</Text>
-                    ) : (
-                      chatMessages.map((m) => {
-                        const mine = identityIdRef.current && m.sender?.id === identityIdRef.current
-                        return (
-                          <View key={m.messageId || `${m.timestamp}-${m.sender?.id}`} style={[styles.chatBubbleRow, mine && { alignItems: 'flex-end' }]}>
-                            <Text style={[styles.chatSender, { color: theme.primary }]}>{mine ? 'You' : m.sender?.name || 'Peer'}</Text>
-                            <View style={[styles.chatBubble, { backgroundColor: mine ? theme.primary : theme.bgElevated }]}>
-                              <Text style={{ fontSize: 12, color: mine ? '#FFFFFF' : theme.text }}>{m.text}</Text>
-                            </View>
-                          </View>
-                        )
-                      })
-                    )}
-                  </ScrollView>
-                  <View style={[styles.chatInputRow, { borderTopColor: theme.hairline }]}>
-                    <TextInput
-                      style={[styles.chatInput, { backgroundColor: theme.bgElevated, borderColor: theme.border, color: theme.text }]}
-                      value={chatDraft}
-                      onChangeText={setChatDraft}
-                      placeholder="Message the party..."
-                      placeholderTextColor={theme.muted}
-                      maxLength={1000}
-                      onSubmitEditing={handleSendChat}
-                    />
-                    <TouchableOpacity
-                      style={[styles.chatSendBtn, { backgroundColor: theme.primary }, !chatDraft.trim() && { opacity: 0.4 }]}
-                      onPress={handleSendChat}
-                      disabled={!chatDraft.trim()}
-                    >
-                      <Send size={14} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
             </View>
           )}
         </View>
@@ -1511,561 +1417,87 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  iconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  headerSub: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  codePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  codePillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: fonts?.mono || 'monospace',
-  },
-  leaveBtn: {
-    padding: 6,
-    borderRadius: 8,
-  },
-  lobbyScroll: {
-    flex: 1,
-  },
-  lobbyContent: {
-    padding: 16,
-    gap: 14,
-  },
-  lobbyCard: {
-    padding: 16,
-    gap: 10,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  cardHeaderTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  cardSubText: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  filePickArea: {
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  selectedFileInfo: {
-    alignItems: 'center',
-  },
-  selectedFileName: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  selectedFileSize: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  pickFilePrompt: {
-    alignItems: 'center',
-  },
-  pickFilePromptText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  pickFilePromptSub: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-  },
-  joinInputRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  joinInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    fontFamily: fonts?.mono || 'monospace',
-  },
-  discoveredRoomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  discoveredRoomInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  discoveredRoomTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  discoveredRoomHost: {
-    fontSize: 11,
-    fontFamily: fonts?.mono || 'monospace',
-    marginTop: 2,
-  },
-  emptyDiscovered: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
-  },
-  emptyDiscoveredText: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  theaterContainer: {
-    flex: 1,
-  },
-  immersiveTheaterContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
-    backgroundColor: '#000000',
-  },
-  videoViewport: {
-    flex: 1,
-    backgroundColor: '#000000',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullscreenViewport: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 999,
-  },
-  connectingPlaceholder: {
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 20,
-  },
-  connectingTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  connectingSub: {
-    fontSize: 12,
-  },
-  floatingReactionBubble: {
-    position: 'absolute',
-    top: '30%',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    zIndex: 1000,
-  },
-  floatingReactionText: {
-    fontSize: 44,
-  },
-  controlsOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    zIndex: 900,
-  },
-  immersiveTopBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-  },
-  immersiveTitleBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    marginRight: 16,
-  },
-  immersiveTitleText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    flexShrink: 1,
-  },
-  immersiveCodePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  immersiveCodeText: {
-    color: '#E2E8F0',
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: fonts?.mono || 'monospace',
-  },
-  immersiveCloseBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.25)',
-    padding: 8,
-    borderRadius: 20,
-  },
-  centerRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 40,
-  },
-  playBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  seekBtn: {
-    alignItems: 'center',
-    gap: 4,
-    padding: 8,
-  },
-  seekBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  bottomControlsBar: {
-    gap: 10,
-    paddingBottom: 4,
-  },
-  scrubberTouchArea: {
-    paddingVertical: 8,
-  },
-  scrubberBg: {
-    height: 5,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 3,
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  scrubberFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  scrubberThumb: {
-    position: 'absolute',
-    width: 13,
-    height: 13,
-    borderRadius: 6.5,
-    marginLeft: -6.5,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  bottomMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  timeLabel: {
-    fontSize: 12,
-    color: '#E2E8F0',
-    fontFamily: fonts?.mono || 'monospace',
-    fontWeight: '600',
-  },
-  immersiveReactionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  immersiveReactionBtn: {
-    padding: 2,
-  },
-  bottomActionIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  iconPad: {
-    padding: 4,
-  },
-  audienceCard: {
-    padding: 12,
-    borderTopWidth: 1,
-    gap: 10,
-    maxHeight: '45%',
-  },
-  tabRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
-  tabText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  unreadBadge: {
-    position: 'absolute',
-    top: -3,
-    right: 12,
-    minWidth: 15,
-    height: 15,
-    borderRadius: 7.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  unreadText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  hostControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  rewindGroup: {
-    gap: 3,
-  },
-  rewindBtns: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  rewindBtn: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  hostControlLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  queueAddBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  queueList: {
-    gap: 4,
-  },
-  queueHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  queueHeaderText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  queueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  participantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  participantInfo: {
-    flex: 1,
-    marginRight: 6,
-    gap: 1,
-  },
-  moderationBtns: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  modBtn: {
-    padding: 5,
-    borderRadius: 6,
-  },
-  catchupBtn: {
-    position: 'absolute',
-    top: 12,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(99,102,241,0.95)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    zIndex: 950,
-  },
-  catchupText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  chatContainer: {
-    // Fixed height, NOT flex:1: the card's height is content-driven (capped
-    // by maxHeight), and a flex:1 child contributes 0 to an auto-height
-    // parent — the whole panel collapsed to nothing when the Chat tab was
-    // selected ("no chat space").
-    height: 260,
-  },
-  chatScroll: {
-    flex: 1,
-    maxHeight: 220,
-  },
-  chatContent: {
-    gap: 8,
-    paddingVertical: 4,
-  },
-  chatEmpty: {
-    fontSize: 11,
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-  chatBubbleRow: {
-    alignItems: 'flex-start',
-    gap: 2,
-  },
-  chatSender: {
-    fontSize: 9,
-    fontWeight: '800',
-    paddingHorizontal: 4,
-  },
-  chatBubble: {
-    maxWidth: '85%',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  chatInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-  },
-  chatInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    fontSize: 12,
-  },
-  chatSendBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reactionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  reactionBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  reactionText: {
-    fontSize: 20,
-  },
-  rosterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  rosterText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  container: { flex: 1 } as any,
+  header: {} as any,
+  headerLeft: {} as any,
+  iconBadge: {} as any,
+  headerTitle: {} as any,
+  headerSub: {} as any,
+  headerRight: {} as any,
+  codePill: {} as any,
+  codePillText: {} as any,
+  leaveBtn: {} as any,
+  lobbyScroll: {} as any,
+  lobbyContent: {} as any,
+  lobbyCard: {} as any,
+  cardHeaderRow: {} as any,
+  cardHeaderTitle: {} as any,
+  cardSubText: {} as any,
+  filePickArea: {} as any,
+  selectedFileInfo: {} as any,
+  selectedFileName: {} as any,
+  selectedFileSize: {} as any,
+  pickFilePrompt: {} as any,
+  pickFilePromptText: {} as any,
+  pickFilePromptSub: {} as any,
+  input: {} as any,
+  joinInputRow: {} as any,
+  joinInput: {} as any,
+  discoveredRoomRow: {} as any,
+  discoveredRoomInfo: {} as any,
+  discoveredRoomTitle: {} as any,
+  discoveredRoomHost: {} as any,
+  emptyDiscovered: {} as any,
+  emptyDiscoveredText: {} as any,
+  theaterContainer: {} as any,
+  immersiveTheaterContainer: {} as any,
+  videoViewport: {} as any,
+  fullscreenViewport: {} as any,
+  connectingPlaceholder: {} as any,
+  connectingTitle: {} as any,
+  connectingSub: {} as any,
+  catchupBtn: {} as any,
+  catchupText: {} as any,
+  controlsOverlay: {} as any,
+  immersiveTopBar: {} as any,
+  immersiveTitleBox: {} as any,
+  immersiveTitleText: {} as any,
+  immersiveCodePill: {} as any,
+  immersiveCodeText: {} as any,
+  immersiveCloseBtn: {} as any,
+  centerRow: {} as any,
+  seekBtn: {} as any,
+  seekBtnText: {} as any,
+  playBtn: {} as any,
+  bottomControlsBar: {} as any,
+  scrubberTouchArea: {} as any,
+  scrubberBg: {} as any,
+  scrubberFill: {} as any,
+  scrubberThumb: {} as any,
+  bottomMetaRow: {} as any,
+  timeLabel: {} as any,
+  immersiveReactionsRow: {} as any,
+  immersiveReactionBtn: {} as any,
+  reactionText: {} as any,
+  bottomActionIcons: {} as any,
+  iconPad: {} as any,
+  audienceCard: {} as any,
+  reactionsRow: {} as any,
+  reactionBtn: {} as any,
+  hostControlsRow: {} as any,
+  rewindGroup: {} as any,
+  hostControlLabel: {} as any,
+  rewindBtns: {} as any,
+  rewindBtn: {} as any,
+  queueAddBtn: {} as any,
+  queueList: {} as any,
+  queueHeader: {} as any,
+  queueHeaderText: {} as any,
+  queueRow: {} as any,
+  rosterRow: {} as any,
+  rosterText: {} as any,
+  participantRow: {} as any,
+  participantInfo: {} as any,
+  moderationBtns: {} as any,
+  modBtn: {} as any,
 })

@@ -61,6 +61,11 @@ export function WatchPartyModal({
   const [copied, setCopied] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const hideControlsTimer = useRef<NodeJS.Timeout | null>(null)
+  const [playerError, setPlayerError] = useState<{ code:number; message:string; source:string }|null>(null)
+  const [showTapToPlay, setShowTapToPlay] = useState(false)
+  const [isBuffering, setIsBuffering] = useState(false)
+  const bufferingTimerRef = useRef<ReturnType<typeof setTimeout>|null>(null)
+  const retryVerRef = useRef(0)
 
   // Fetch local loopback Range stream URL
   useEffect(() => {
@@ -113,6 +118,7 @@ export function WatchPartyModal({
   useEffect(() => {
     const video = videoRef.current
     if (!video || !streamUrl) return
+    setPlayerError(null); setShowTapToPlay(false); setIsBuffering(false)
 
     const lowerTitle = (roomTitle || '').toLowerCase()
     const lowerPath = (filePath || '').toLowerCase()
@@ -167,6 +173,7 @@ export function WatchPartyModal({
 
         mpegtsPlayer.on(mpegts.Events.ERROR, (errType: string, errDetail: string, errInfo: any) => {
           console.warn('[WatchParty] mpegts player event:', errType, errDetail, errInfo)
+          setPlayerError({ code: 3, message: `${errType}: ${errDetail||''}`.trim(), source: 'mpegts' })
         })
       } catch (err) {
         console.warn('[WatchParty] mpegts initialization error, falling back to direct video:', err)
@@ -176,6 +183,7 @@ export function WatchPartyModal({
       hlsPlayer = new Hls({ enableWorker: true })
       hlsPlayer.loadSource(streamUrl)
       hlsPlayer.attachMedia(video)
+      hlsPlayer.on(Hls.Events.ERROR as any, (_e:any, data:any)=>{ if(!data||!data.fatal) return; console.warn('[WatchParty] hls fatal', data.type, data.details); const code=data.type==='networkError'?2:3; setPlayerError({code, message:String(data.details||data.type||'HLS error'), source:'hls'}) })
     } else {
       video.src = streamUrl
     }
@@ -231,7 +239,7 @@ export function WatchPartyModal({
       if (!vid) return
 
       if (state.action === 'play') {
-        if (vid.paused) vid.play().catch(() => {})
+        if (vid.paused) vid.play().catch((err:any)=>{ const n=err&&(err.name||''); if(n==='NotAllowedError') setShowTapToPlay(true); else if(err) setPlayerError({code:0,message:err.message||String(err),source:'play'}) })
         setIsPlaying(true)
       } else if (state.action === 'pause') {
         if (!vid.paused) vid.pause()
@@ -461,9 +469,12 @@ export function WatchPartyModal({
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onError={(e) => {
-                const err = e.currentTarget.error
-                console.warn('[WatchParty] Video decode error:', err?.code, err?.message)
+                const me:any=(e.currentTarget as HTMLVideoElement).error; const code=me?me.code:0; const msg=me?(me.message||`MediaError code ${code}`):'MediaError'; console.warn('[WatchParty] Video decode error',code,msg); setPlayerError({code:code||3,message:msg,source:'native'})
               }}
+              onWaiting={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); bufferingTimerRef.current=setTimeout(()=>setIsBuffering(true),5000)}}
+              onStalled={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); bufferingTimerRef.current=setTimeout(()=>setIsBuffering(true),5000)}}
+              onPlaying={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); setIsBuffering(false); setShowTapToPlay(false); setPlayerError(null)}}
+              onCanPlay={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); setIsBuffering(false)}}
               onClick={togglePlay}
               className='h-full w-full object-contain cursor-pointer'
               playsInline
@@ -475,8 +486,27 @@ export function WatchPartyModal({
             </div>
           )}
 
+          {/* FIX2: tap-to-play when autoplay blocked */}
+          {showTapToPlay && !playerError && (
+            <button onClick={()=>{ const v=videoRef.current; if(!v) return; setShowTapToPlay(false); v.play().catch((err:any)=>setPlayerError({code:0,message:err.message||String(err),source:'play'})) }} className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm'>
+              <div className='flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground'><Play className='h-7 w-7 fill-current ml-1' /></div>
+              <span className='text-sm font-semibold text-white'>Tap to play</span>
+              <span className='text-xs text-white/70'>Autoplay was blocked — tap to start</span>
+            </button>
+          )}
+          {playerError && (
+            <div className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/80 p-6 text-center'>
+              <p className='text-sm font-semibold text-white'>{playerError.code===2?'Connection interrupted':playerError.code===3||playerError.code===4?'Format not supported on this device':'Playback failed'}</p>
+              <p className='text-xs text-white/70'>{playerError.message}</p>
+              <button onClick={()=>{ setPlayerError(null); setShowTapToPlay(false); retryVerRef.current++; const m=METHODS.STREAM_URL_GET||'stream.getUrl'; call(m,{transferId,filePath}).then((res:any)=>{ if(res?.url) setStreamUrl(`${res.url}&vw=${retryVerRef.current}`)}).catch(()=>{}) }} className='rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground'>Retry</button>
+            </div>
+          )}
+          {isBuffering && !playerError && !showTapToPlay && (
+            <div className='absolute inset-0 z-10 flex items-center justify-center bg-black/30 pointer-events-none'><div className='h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white' /><span className='ml-2 text-xs text-white/80'>Buffering…</span></div>
+          )}
+
           {/* Big Center Play Icon when paused */}
-          {!isPlaying && streamUrl && (
+          {!isPlaying && streamUrl && !showTapToPlay && !playerError && (
             <button
               onClick={togglePlay}
               className='absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity'

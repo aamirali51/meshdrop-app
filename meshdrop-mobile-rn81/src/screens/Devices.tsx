@@ -87,17 +87,29 @@ export function Devices({ identity }: { identity?: any }) {
   useEffect(() => {
     refresh()
 
-    const unsubPeers = on('peers', () => {
-      refresh()
-    })
+    // Live peer/device events forwarded by the engine worklet. There is no
+    // 'peers'/'status' event — the engine emits these granular names.
+    const events = [
+      'peer:connected',
+      'peer:disconnected',
+      'trust:paired',
+      'trust:untrusted',
+      'trust:revoked',
+      'device:updated',
+      'device:removed',
+    ]
+    const unsubs = events.map((evt) => on(evt, () => refresh()))
 
-    const unsubStatus = on('status', () => {
-      refresh()
+    // The mount-time refresh above usually races the engine boot (bridge still
+    // starting → 'Bridge not started'), so refetch once the engine reports
+    // ready. The bridge replays the last ready event to late subscribers.
+    const unsubEngine = on('__engine', (msg: any) => {
+      if (msg?.status === 'ready') refresh()
     })
 
     return () => {
-      unsubPeers()
-      unsubStatus()
+      unsubs.forEach((u) => u())
+      unsubEngine()
     }
   }, [refresh])
 

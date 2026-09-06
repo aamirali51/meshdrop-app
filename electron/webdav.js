@@ -298,13 +298,24 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
       return
     }
 
-    const mimeType = getMimeType(localPath)
+    // For transfer routes (.part staging files) derive MIME/container from the
+    // transfer record's ORIGINAL filename (never .part), so a movie.mp4.part
+    // serves as video/mp4. Falls back to localPath when no record exists.
+    let transferRec = null
+    if (transferId && boundEngine) {
+      transferRec = await getTransferRecord(boundEngine, transferId)
+    }
+    const mediaPath = (transferRec && (transferRec.filename || transferRec.filePath))
+      ? (transferRec.filename || transferRec.filePath)
+      : localPath
+    const mimeType = getMimeType(mediaPath)
     const rangeHeader = req.headers['range']
 
     // P4: expose the container/codec sniff so the renderer can decide native
-    // vs MSE without reading the file itself. Only for media extensions.
-    const ext = path.extname(localPath).toLowerCase()
-    const sniff = ['.mp4', '.m4v', '.mkv', '.webm', '.mov', '.ts', '.m2ts'].includes(ext)
+    // vs MSE without reading the file itself. For staging paths use the
+    // ORIGINAL extension (so .mp4.part gets sniffed like .mp4).
+    const mediaExt = path.extname(mediaPath).toLowerCase()
+    const sniff = ['.mp4', '.m4v', '.mkv', '.webm', '.mov', '.ts', '.m2ts'].includes(mediaExt)
       ? await sniffLocalContainer(localPath)
       : null
     const sniffHeader = sniff
