@@ -1,0 +1,162 @@
+name: Build All
+
+# Build every shipped artifact (Windows/macOS/Linux desktop + Android APK) on
+# each push to main and on PRs. Artifacts are attached to the workflow run only
+# — publishing to the public meshdrop-releases repo stays the job of
+# release.yml, which runs on version tags.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    env:
+      # No codesigning certs in CI: don't attempt autodiscovery (macOS).
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout meshdrop-core (sibling)
+        run: git clone --depth 1 https://github.com/aamirali51/meshdrop-core.git ../meshdrop-core
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop bundles (no publish)
+        # Same targets as release.yml but --publish never: artifacts stay local
+        # in dist/ and are uploaded to the workflow run below. The vite build
+        # runs first (electron-builder consumes its output).
+        run: |
+          npm run build
+          npx electron-builder --publish never
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.snap
+            dist/*.rpm
+          if-no-files-found: error
+          retention-days: 14
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout meshdrop-core (sibling)
+        run: git clone --depth 1 https://github.com/aamirali51/meshdrop-core.git ../meshdrop-core
+
+      - name: Free Disk Space (Ubuntu Runner)
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Node 24: the bare-module-lexer prebuild (pulled by bare-pack for the
+          # engine bundle) requires node_api_is_sharedarraybuffer, which Node 20
+          # lacks ("symbol lookup error"). Desktop jobs can stay on 20 — they
+          # never run bare-pack.
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            meshdrop-mobile-rn81/package-lock.json
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install engine dependencies
+        working-directory: ../meshdrop-core
+        run: npm ci
+
+      - name: Install mobile dependencies
+        working-directory: meshdrop-mobile-rn81
+        run: npm ci
+
+      - name: Build engine bundle
+        working-directory: meshdrop-mobile-rn81
+        # bare-pack ships the android-arm64 engine prebuilds into APK assets.
+        run: npm run build:engine
+
+      - name: Configure release signing (keystore from secrets)
+        working-directory: meshdrop-mobile-rn81/android/app
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.MESHDROP_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MESHDROP_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > meshdrop-release.keystore
+            printf 'storeFile=meshdrop-release.keystore\nstorePassword=%s\nkeyAlias=meshdrop\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > keystore.properties
+            echo "::notice::Release signing configured from secrets"
+          else
+            echo "::warning::MESHDROP_KEYSTORE_B64 / MESHDROP_KEYSTORE_PASSWORD not set — APK will be signed with the CI debug key"
+          fi
+
+      - name: Assemble release APK
+        working-directory: meshdrop-mobile-rn81/android
+        # arm64-v8a only: matches the engine prebuilds and keeps CI tractable.
+        run: chmod +x gradlew && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+
+      - name: Verify release APK is signed with the MeshDrop release key
+        working-directory: meshdrop-mobile-rn81/android
+        shell: bash
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name apksigner -type f 2>/dev/null | sort -V | tail -1)
+          if [ -n "$APKSIGNER" ] && "$APKSIGNER" verify --print-certs "$APK" 2>/dev/null \
+             | grep -qF "CN=MeshDrop Mobile"; then
+            echo "APK signed with the MeshDrop release key"
+          else
+            echo "::warning::APK is not signed with the MeshDrop release key (secrets missing?) — artifact won't install over a release-signed install"
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: meshdrop-mobile-rn81/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
