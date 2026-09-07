@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   View,
   Text,
@@ -43,7 +43,7 @@ import {
   StatCard,
   DeviceAvatar,
 } from '../components'
-import { useTheme, fonts, theme } from '../theme'
+import { useTheme, fonts, type ThemeTokens } from '../theme'
 
 interface SyncLibrary {
   id: string
@@ -86,7 +86,7 @@ type SyncTemplateKey = 'camera' | 'docs' | 'media' | 'custom'
 
 const ANDROID_STORAGE_ROOT = '/storage/emulated/0'
 
-const SYNC_TEMPLATES: {
+type SyncTemplate = {
   key: SyncTemplateKey
   title: string
   icon: React.ElementType
@@ -94,7 +94,9 @@ const SYNC_TEMPLATES: {
   path: string
   mode: 'two-way' | 'send-only' | 'receive-only'
   color: string
-}[] = [
+}
+
+const getSyncTemplates = (theme: ThemeTokens): SyncTemplate[] => [
   {
     key: 'camera',
     title: 'Photos / Camera',
@@ -178,6 +180,7 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
   onDelete: (lib: SyncLibrary) => void
 }) {
   const { theme } = useTheme()
+  const styles = useMemo(() => createStyles(theme), [theme])
   const isSyncing = syncingId === lib.id || lib.status === 'syncing'
   const isPaused = lib.paused || lib.status === 'paused'
   const isError = lib.status === 'error'
@@ -232,7 +235,7 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
               {lib.localPath || 'Default Storage Root'}
             </Text>
             {lib.mode && (
-              <View style={{ backgroundColor: theme.primarySoft, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(79, 70, 229, 0.2)' }}>
+              <View style={{ backgroundColor: theme.primarySoft, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, borderWidth: 1, borderColor: theme.primary + '33' }}>
                 <Text style={{ color: theme.primary, fontSize: 9, fontWeight: '800' }}>
                   {lib.mode === 'two-way' ? '2-WAY' : lib.mode === 'receive-only' ? 'MIRROR' : 'BACKUP'}
                 </Text>
@@ -334,6 +337,8 @@ const SyncLibraryCard = React.memo(function SyncLibraryCard({
 
 export function Sync({ identity: _identity }: { identity?: any }) {
   const { theme } = useTheme()
+  const styles = useMemo(() => createStyles(theme), [theme])
+  const syncTemplates = useMemo(() => getSyncTemplates(theme), [theme])
   const [libraries, setLibraries] = useState<SyncLibrary[]>([])
   const [devices, setDevices] = useState<PairedDevice[]>([])
   const [invites, setInvites] = useState<SyncInvite[]>([])
@@ -493,7 +498,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
     }
   }
 
-  const handleApplyTemplate = (tmpl: typeof SYNC_TEMPLATES[0]) => {
+  const handleApplyTemplate = (tmpl: SyncTemplate) => {
     setActiveTemplate(tmpl.key)
     if (tmpl.key !== 'custom') {
       setNewFolderName(tmpl.name)
@@ -822,7 +827,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
           {/* Quick-Select Sync Templates */}
           <Text style={styles.inputLabel}>Quick-Start Template</Text>
           <View style={styles.templateGrid}>
-            {SYNC_TEMPLATES.map((tmpl) => {
+            {syncTemplates.map((tmpl) => {
               const isActive = activeTemplate === tmpl.key
               const IconComp = tmpl.icon
               return (
@@ -1098,7 +1103,10 @@ export function Sync({ identity: _identity }: { identity?: any }) {
   )
 }
 
-const styles = StyleSheet.create({
+// Built per theme (light/dark) so every token follows the active mode —
+// never reference the static `theme` export from '../theme' here.
+const createStyles = (theme: ThemeTokens) =>
+  StyleSheet.create({
   flex1: {
     flex: 1,
   },
@@ -1144,7 +1152,7 @@ const styles = StyleSheet.create({
   },
   libCard: {
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.bgCard,
     borderColor: theme.border,
   },
   libHeader: {
@@ -1161,7 +1169,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
+    borderColor: theme.primary + '33',
   },
   libTitleRow: {
     flexDirection: 'row',
@@ -1263,7 +1271,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 32,
     paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.bgCard,
     borderColor: theme.border,
     borderStyle: 'dashed',
     marginTop: 8,
@@ -1296,7 +1304,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.bgCard,
     borderColor: theme.border,
     borderWidth: 1,
     borderRadius: 10,
@@ -1335,7 +1343,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.bgCard,
     borderColor: theme.border,
     borderWidth: 1,
     borderRadius: 9999,
@@ -1382,7 +1390,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 9,
     borderRadius: theme.radiusSm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.bgCard,
     borderWidth: 1,
     borderColor: theme.border,
     alignItems: 'center',
@@ -1419,7 +1427,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
+    borderColor: theme.primary + '33',
   },
   folderPickerTitle: {
     color: theme.text,
@@ -1441,7 +1449,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.25)',
+    borderColor: theme.primary + '40',
   },
   browseButtonText: {
     color: theme.primary,
@@ -1457,7 +1465,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.15)',
+    borderColor: theme.primary + '26',
   },
   modeHelpText: {
     color: theme.textSecondary,
@@ -1481,7 +1489,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.bgCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
