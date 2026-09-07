@@ -38,6 +38,18 @@ files:
   - renderer/dist/**/*
   - build/**/*
   - package.json
+  - '!**/*.ts'
+  - '!**/*.map'
+  # Full production node_modules: the P2P engine (@mesh/core) and its peers
+  # (blind-relay, hyperswarm, hypercore, …) are runtime dependencies. `!**/node_modules/**/*`
+  # in package.json honours eslint-config-prettier/.gitignore rules that hide
+  # node_modules locally, but electron-builder must ship it; hoisted deps of the
+  # symlinked `file:../meshdrop-core` (blind-relay, …) live in our root
+  # node_modules, not in a nested @mesh/core/node_modules, so without this entry
+  # the packaged app throws `Cannot find module 'blind-relay'` on start.
+  - '!**/node_modules/*/.cache/**/*'
+  - '!**/.bin/**/*'
+  - node_modules/**/*
 
 # The P2P engine (@mesh/core) uses native/prebuilt modules (sodium-native,
 # udx-native) that cannot load from inside asar, so node_modules stays
