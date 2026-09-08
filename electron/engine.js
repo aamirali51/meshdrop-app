@@ -108,6 +108,11 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     engine.on('device:removed', (data) => {
       forward(EVENTS.DEVICE_REMOVED, data)
     })
+    // Local rename (engine.renameDevice) and inbound rename broadcasts from
+    // connected peers both surface here so the device list refreshes.
+    engine.on('device:updated', (data) => {
+      forward(EVENTS.DEVICE_UPDATED, data)
+    })
     engine.on('transfer:offer', (offer) => forward(EVENTS.TRANSFER_OFFER_RECEIVED, offer))
     engine.on('transfer:queued', (t) => forward(EVENTS.TRANSFER_QUEUED, t))
     engine.on('transfer:started', (t) => forward(EVENTS.TRANSFER_STARTED, t))
@@ -129,6 +134,10 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     engine.on('sync:invite:received', (d) => forward(EVENTS.SYNC_INVITE_RECEIVED, d))
     engine.on('sync:phase', (d) => forward(EVENTS.SYNC_PHASE, d))
     engine.on('claim:preview', (d) => forward(EVENTS.CLAIM_PREVIEW_RECEIVED, d))
+    // Host-side drop-share lifecycle: an expiry sweep or a first claim flipped
+    // a pending share — the renderer refreshes its share grid on these.
+    engine.on('pending:share:expired', (share) => forward(EVENTS.PENDING_SHARE_EXPIRED, share))
+    engine.on('pending:share:claimed', (share) => forward(EVENTS.PENDING_SHARE_CLAIMED, share))
     engine.on('watch:state:updated', (d) => forward(EVENTS.WATCH_STATE_CHANGED, d))
     engine.on('party:room:created', (d) => forward(EVENTS.WATCH_ROOM_CREATED, d))
     engine.on('party:room:joined', (d) => forward(EVENTS.WATCH_ROOM_JOINED, d))
@@ -169,6 +178,11 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
       } catch {}
     })
     engine.on('notification:received', (n) => forward(EVENTS.NOTIFICATION_RECEIVED, n))
+    engine.on('tunnel:offer', (d) => forward(EVENTS.TUNNEL_OFFER, d))
+    engine.on('tunnel:opened', (d) => forward(EVENTS.TUNNEL_OPENED, d))
+    engine.on('tunnel:closed', (d) => forward(EVENTS.TUNNEL_CLOSED, d))
+    engine.on('tunnel:error', (d) => forward(EVENTS.TUNNEL_ERROR, d))
+    // Tunnel codes are ephemeral DHT topics — no extra follow-up, offer/opened/closed above is enough for UI refresh
     engine.on('error', (err) => {
       if (err && err.code && err.code !== 'claim_rejected') {
         console.error(`[Main:${getLabel()}] Engine error:`, err.message || err)

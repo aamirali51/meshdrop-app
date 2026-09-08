@@ -122,7 +122,10 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
   const emit = (event, data) => {
     try {
       const isSync = !!(data && (data.isSync || data.source === 'sync'))
-      if (isSync && (event === EVENTS.TRANSFER_OFFER || event === EVENTS.TRANSFER_OFFER_RECEIVED || event === EVENTS.TRANSFER_QUEUED || event === EVENTS.TRANSFER_COMPLETED || event === EVENTS.TRANSFER_STARTED)) {
+      // EVENTS.TRANSFER_OFFER does not exist in the app protocol (offers are
+      // TRANSFER_OFFER_RECEIVED) — the set below mirrors engine.js's live
+      // sync-suppression list so sync-origin offers/completions stay silent.
+      if (isSync && (event === EVENTS.TRANSFER_OFFER_RECEIVED || event === EVENTS.TRANSFER_QUEUED || event === EVENTS.TRANSFER_STARTED || event === EVENTS.TRANSFER_COMPLETED)) {
         return
       }
       sendToAll('pear:worker:ipc:' + WORKER_SPECIFIER, Buffer.from(createEvent(event, data)))
@@ -295,22 +298,7 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
     return device || null
   }
 
-  handlers[METHODS.DEVICES_SPEED_TEST] = async () => {
-    // No fabricated numbers. A real speed test ships with the transfer engine
-    // (Phase 1+); until then this endpoint honestly reports unavailability.
-    throw new Error('Speed test is not available in this build')
-  }
-
-  // ─── Presence / diagnostics / notifications ───────────────────────────────
-
-  handlers[METHODS.PRESENCE_SET] = async () => {
-    // Presence is derived from live connections; nothing to set in this build.
-    return { success: true }
-  }
-
-  handlers[METHODS.PRESENCE_GET] = async () => {
-    return { status: engine.connectionCount > 0 ? 'Online' : 'Offline' }
-  }
+  // ─── Diagnostics / notifications ──────────────────────────────────────────
 
   handlers[METHODS.DIAGNOSTICS_GET] = async () => {
     return engine.getDiagnostics()
@@ -407,10 +395,6 @@ function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }
   handlers['relay.stats'] = async () => {
     if (engine.getRelayStats) return engine.getRelayStats()
     return { active: 0, sessions: [] }
-  }
-
-  handlers[METHODS.STORAGE_STATS] = async () => {
-    return { storageUsed: 0, storageTotal: 0 }
   }
 
   handlers[METHODS.STORAGE_CLEAR] = async () => {
@@ -668,49 +652,6 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
     return { success: true }
   }
 
-  // ─── Clipboard / updates / LAN (legacy surface) ───────────────────────────
-
-  handlers[METHODS.CLIPBOARD_SEND] = async (params) => {
-    console.log(
-      '[Main] CLIPBOARD_SEND broadcasting content:',
-      typeof params?.content === 'string' ? params.content.slice(0, 30) : 'image payload'
-    )
-    const payload = {
-      type: 'CLIPBOARD_SYNC',
-      content: params.content,
-      contentType: params.contentType || 'text',
-      timestamp: Date.now()
-    }
-    let sentCount = 0
-    for (const [, peerObj] of engine.peers.entries()) {
-      if (peerObj.signaling && peerObj.device?.isOnline !== false) {
-        try {
-          peerObj.signaling.send(payload)
-          sentCount++
-        } catch (err) {
-          console.warn(`[Main] Failed sending clipboard to peer:`, err.message)
-        }
-      }
-    }
-    return { success: true, count: sentCount }
-  }
-
-  handlers[METHODS.CHECK_FOR_UPDATES] = async () => {
-    return { status: 'up_to_date', message: 'Application is already up to date.' }
-  }
-
-  handlers[METHODS.LAN_DISCOVERY_PEER] = async (params) => {
-    // LAN discovery now runs inside the engine; accept legacy announcements
-    // for compatibility with old mains that forwarded them.
-    let added = false
-    try {
-      if (engine.lanDiscovery && params?.key) {
-        added = engine.lanDiscovery.handleAnnouncement(params.key)
-      }
-    } catch {}
-    return { success: true, added }
-  }
-
   handlers[METHODS.WATCH_STATE_BROADCAST] = async (params) => {
     if (!engine) return { success: false }
     const res = engine.broadcastWatchState ? engine.broadcastWatchState(params) : { success: true }
@@ -827,28 +768,51 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
     } catch { return { fileSize: 0, coveredBytes: 0, complete: false } }
   }
 
+  // Watch Party guest seeks: steer the scheduler's range priority toward the
+  // playhead byte so the jumped-to region downloads next. The renderer call
+  // site is fire-and-forget (.catch(() => {})) — never throw into the UI.
+  handlers[METHODS.SET_PLAYHEAD_BYTE] = async (params) => {
+    const transferId = params && params.transferId
+    const byteOffset = params && (Number.isFinite(params.byteOffset) ? params.byteOffset : params.byte)
+    if (!transferId || !Number.isFinite(byteOffset) || !engine || typeof engine.setPlayheadByte !== 'function') {
+      return { ok: false }
+    }
+    try {
+      engine.setPlayheadByte(transferId, byteOffset)
+      return { ok: true }
+    } catch { return { ok: false } }
+  }
+
   handlers[METHODS.STREAM_URL_GET] = async (params) => {
-    const { startWebDAVServer, setWebDAVEngine, getDriveStatus, resolveTransferStreamPath } = require('./webdav')
+    const { startWebDAVServer, setWebDAVEngine, getDriveStatus, getWebDAVToken, resolveTransferStreamPath } = require('./webdav')
     setWebDAVEngine(engine)
     await startWebDAVServer().catch(() => {})
     const status = getDriveStatus()
     const port = status.port || 41983
+    // The stream server is token-gated (X-MeshDrop-Token header or ?t=); a
+    // media element cannot attach headers, so every minted URL carries the
+    // token as a query param.
+    const token = getWebDAVToken()
+    const withToken = (baseUrl) => {
+      const sep = baseUrl.includes('?') ? '&' : '?'
+      return `${baseUrl}${sep}t=${token}`
+    }
     if (params?.transferId) {
       // With an explicit filePath the player is expected to have the file
       // locally (host side / claim playback) — keep the URL unconditional.
       if (params?.filePath) {
-        return { url: `http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}&path=${encodeURIComponent(params.filePath)}` }
+        return { url: withToken(`http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}&path=${encodeURIComponent(params.filePath)}`) }
       }
       // Otherwise (e.g. watch party guest) only hand out a URL when something
       // is actually resolvable — never a guaranteed 404.
       const resolvable = await resolveTransferStreamPath(engine, params.transferId)
       if (!resolvable) return { url: null }
-      return { url: `http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}` }
+      return { url: withToken(`http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}`) }
     }
     if (params?.filePath) {
-      return { url: `http://127.0.0.1:${port}/stream/file?path=${encodeURIComponent(params.filePath)}` }
+      return { url: withToken(`http://127.0.0.1:${port}/stream/file?path=${encodeURIComponent(params.filePath)}`) }
     }
-    return { url: `http://127.0.0.1:${port}/p2p/` }
+    return { url: withToken(`http://127.0.0.1:${port}/p2p/`) }
   }
 
   // ─── MeshDrop Sites ──────────────────────────────────────────────────────
@@ -909,6 +873,17 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
   }
   handlers[METHODS.SITES_MKDIR] = async (params) => engine.mkdirSitePath(params?.path, params?.siteId)
   handlers[METHODS.SITES_DELETE] = async (params) => engine.deleteSitePath(params?.path, params?.siteId)
+  // ─── Tunnel (Holesail-style: paired + ephemeral TUNNEL-XXXX) ──────────
+  handlers[METHODS.TUNNEL_CREATE] = async (params) => engine.createTunnel({ peerId: params?.peerId, port: params?.port, host: params?.host || '127.0.0.1', name: params?.name || '', udp: !!params?.udp })
+  handlers[METHODS.TUNNEL_ACCEPT] = async (params) => engine.acceptTunnel(params?.tunnelId, { localPort: params?.localPort, localHost: params?.localHost || '127.0.0.1' })
+  handlers[METHODS.TUNNEL_REJECT] = async (params) => engine.rejectTunnel(params?.tunnelId, params?.reason || 'rejected')
+  handlers[METHODS.TUNNEL_CLOSE] = async (params) => engine.closeTunnel(params?.tunnelId, params?.reason || 'closed-by-user')
+  handlers[METHODS.TUNNEL_LIST] = async () => engine.listTunnels()
+  handlers[METHODS.TUNNEL_CREATE_CODE] = async (params) => engine.createTunnelCode({ port: params?.port, host: params?.host || '127.0.0.1', name: params?.name || '', udp: !!params?.udp, expirationPreset: params?.expirationPreset || '30m', maxUses: params?.maxUses || 0 })
+  handlers[METHODS.TUNNEL_JOIN_CODE] = async (params) => engine.joinTunnelCode(params?.code)
+  handlers[METHODS.TUNNEL_CANCEL_CODE] = async (params) => engine.cancelTunnelCode(params?.code || params?.id)
+  handlers[METHODS.TUNNEL_LIST_CODES] = async () => engine.listTunnelCodes()
+
   handlers[METHODS.SITES_GET_URL] = async (params) => {
     // The gateway serves ANY open visit (or hosted site) via ?siteId=, so the
     // base URL is valid whenever the gateway is up and there is at least one

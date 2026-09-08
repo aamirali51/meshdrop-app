@@ -402,12 +402,7 @@ function setupPortableUpdater({ sendToAll, enabled, getAutoUpdate }) {
   ipcMain.handle('updater:restartAndInstall', () => {
     runInstallerAndQuit()
   })
-  ipcMain.handle('app:afterUpdate', () => {
-    runInstallerAndQuit()
-  })
 
-  // Channels are an electron-updater (NSIS) concept; report a stable default.
-  ipcMain.handle('updater:getChannel', () => 'stable')
   ipcMain.handle('updater:setChannel', (evt, channel) => channel)
 
   // Auto flow on startup: detect, download in the background, then let the
@@ -604,8 +599,6 @@ function setupUpdater({ sendToAll, version: appVersion, appName, enabled = true,
     runInstallerAndQuit()
   })
 
-  ipcMain.handle('updater:getChannel', () => updateChannel)
-
   ipcMain.handle('updater:setChannel', (evt, channel) => {
     if (['stable', 'dev', 'beta', 'nightly'].includes(channel)) {
       updateChannel = channel
@@ -624,10 +617,6 @@ function setupUpdater({ sendToAll, version: appVersion, appName, enabled = true,
       }
     }
     return updateChannel
-  })
-
-  ipcMain.handle('app:afterUpdate', () => {
-    runInstallerAndQuit()
   })
 }
 

@@ -93,77 +93,24 @@ function registerIpcHandlers({ storageDir, getMainWindow, getLabel }) {
     shell.showItemInFolder(filePath)
   })
 
-  ipcMain.handle('file:saveTemp', async (evt, filename, buffer) => {
-    const tempDir = path.join(storageDir, 'p2p-temp')
-    fs.mkdirSync(tempDir, { recursive: true })
-    const safeName = Date.now() + '-' + filename.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const dest = path.join(tempDir, safeName)
-    console.log('[Main] file:saveTemp writing', { filename, byteLength: buffer.byteLength, dest })
-    fs.writeFileSync(dest, Buffer.from(buffer))
-    const stat = fs.statSync(dest)
-    console.log('[Main] file:saveTemp done', { filePath: dest, fileSize: stat.size })
-    return { filePath: dest, filename, fileSize: stat.size }
-  })
-
   // ─── Clipboard ───────────────────────────────────────────────────────────
-
-  let lastClipboardHash = ''
-  let isSelfClipboardWrite = false
-
-  ipcMain.handle('clipboard:read', () => {
-    try {
-      const text = clipboard.readText()
-      const img = clipboard.readImage()
-      const image = !img.isEmpty() ? img.toDataURL() : null
-      return { text, image }
-    } catch (err) {
-      return { text: '', image: null }
-    }
-  })
 
   ipcMain.handle('clipboard:write', (evt, data) => {
     if (!data) return false
-    isSelfClipboardWrite = true
     try {
       if (data.image) {
         const img = nativeImage.createFromDataURL(data.image)
         clipboard.writeImage(img)
-        lastClipboardHash = data.image
       } else if (data.text) {
         clipboard.writeText(data.text)
-        lastClipboardHash = data.text
       }
     } catch (err) {
       console.warn('[Main] Clipboard write error:', err.message)
     }
-    setTimeout(() => {
-      isSelfClipboardWrite = false
-    }, 2500)
     return true
   })
 
-  setInterval(() => {
-    if (isSelfClipboardWrite) return
-    try {
-      const text = clipboard.readText()
-      if (text && text.trim() && text !== lastClipboardHash) {
-        lastClipboardHash = text
-        const win = getMainWindow()
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('clipboard:changed', { type: 'text', content: text })
-        }
-      }
-    } catch {}
-  }, 2000)
-
   // ─── Native Explorer Context Menu ───────────────────────────────────────
-
-  ipcMain.handle('contextMenu:getStatus', () => {
-    return {
-      supported: process.platform === 'win32' || process.platform === 'linux',
-      platform: process.platform
-    }
-  })
 
   ipcMain.handle('contextMenu:setEnabled', async (evt, enabled) => {
     const { registerWindowsContextMenu, unregisterWindowsContextMenu, registerLinuxContextMenu, unregisterLinuxContextMenu } = require('./contextMenu')

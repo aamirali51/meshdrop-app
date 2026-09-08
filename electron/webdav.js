@@ -3,9 +3,76 @@ const fs = require('fs')
 const fsp = fs.promises
 const path = require('path')
 const os = require('os')
+const crypto = require('crypto')
 const { exec } = require('child_process')
 const util = require('util')
 const execAsync = util.promisify(exec)
+
+// ─── Loopback lockdown ─────────────────────────────────────────────────────
+// This server binds 127.0.0.1 but is reachable from ANY local process, so it
+// is gated like the sites gateway (sites-gateway.js): a 24-byte random hex
+// token, minted lazily here in main-process memory, required on every request.
+// Media elements (<video>/mpegts XHR) cannot attach custom headers, so the
+// token is accepted either via the X-MeshDrop-Token header or the ?t= query
+// param that stream.getUrl appends to every minted URL.
+
+let activeToken = null
+
+function getWebDAVToken() {
+  if (!activeToken) activeToken = crypto.randomBytes(24).toString('hex')
+  return activeToken
+}
+
+// Constant-time token compare (timingSafeEqual). Hex tokens have a fixed
+// length, so a length mismatch is an immediate reject before the compare.
+function tokenMatches(...values) {
+  if (!activeToken) return false
+  const a = Buffer.from(activeToken, 'utf8')
+  for (const v of values) {
+    if (typeof v !== 'string' || !v) continue
+    const b = Buffer.from(v, 'utf8')
+    if (a.length !== b.length) continue
+    if (crypto.timingSafeEqual(a, b)) return true
+  }
+  return false
+}
+
+// DNS-rebinding protection: never answer a request whose Host header names
+// anything but this machine's loopback. A malicious webpage can force a
+// browser to call 127.0.0.1 with a hostile Host header; refusing it here (403,
+// no crash) closes that class of attack.
+function isLoopbackHost(hostHeader) {
+  if (typeof hostHeader !== 'string') return false
+  const host = hostHeader.trim().toLowerCase()
+  if (!host || host.includes(',')) return false // folded/duplicate Host — reject
+  const name = host.split(':')[0]
+  return name === '127.0.0.1' || name === 'localhost'
+}
+
+// CORS is pinned to the exact origins the renderer can be served from — never
+// '*' (any website could otherwise read loopback responses). Electron prod
+// loads the UI from file:// (opaque origin "null" over CORS); the Vite dev
+// server is fixed at localhost:5173.
+const ALLOWED_RENDERER_ORIGINS = new Set([
+  'null',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+])
+
+function isAllowedRendererOrigin(origin) {
+  return typeof origin === 'string' && ALLOWED_RENDERER_ORIGINS.has(origin)
+}
+
+function pinCorsHeaders(res, origin) {
+  if (origin && isAllowedRendererOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader(
+      'Access-Control-Expose-Headers',
+      'X-MeshDrop-Container, Content-Range, Accept-Ranges, ETag'
+    )
+  }
+}
 
 // P4: container sniffing for the media gateway. The sniff helper lives in the
 // shared core (meshdrop-core) so desktop and mobile agree; here we only read
@@ -113,7 +180,10 @@ function generatePropfindXml(href, isFolder, size = 0, modified = new Date()) {
 
 function resolveLocalPath(urlPath) {
   const syncRoot = getSyncRootDir()
-  const decoded = decodeURIComponent(urlPath || '/').replace(/\/+/g, '/')
+  // Strip any ?t=<token> query (or hash) a minted URL may carry before the
+  // path is mapped onto disk — the token is auth, not part of the filename.
+  const cleanUrlPath = String(urlPath || '/').split('?')[0].split('#')[0]
+  const decoded = decodeURIComponent(cleanUrlPath).replace(/\/+/g, '/')
   let cleanRel = decoded
   if (cleanRel.startsWith('/p2p')) {
     cleanRel = cleanRel.slice('/p2p'.length)
@@ -132,7 +202,7 @@ async function handlePropfind(req, res, targetUrlPath) {
     'MS-Author-Via': 'DAV'
   })
 
-  const decoded = decodeURIComponent(targetUrlPath).replace(/\/+/g, '/')
+  const decoded = decodeURIComponent(targetUrlPath.split('?')[0]).replace(/\/+/g, '/')
   const localTarget = resolveLocalPath(targetUrlPath)
   let responsesXml = ''
 
@@ -285,7 +355,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
   }
 
   if (!fs.existsSync(localPath)) {
-    res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' })
+    res.writeHead(404, { 'Content-Type': 'text/plain' })
     res.end('File Not Found')
     return
   }
@@ -293,7 +363,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
   try {
     const stat = await fsp.stat(localPath)
     if (stat.isDirectory()) {
-      res.writeHead(405, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' })
+      res.writeHead(405, { 'Content-Type': 'text/plain' })
       res.end('Cannot GET directory')
       return
     }
@@ -357,7 +427,6 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
       if (isNaN(start) || isNaN(end) || start > end || start >= total) {
         res.writeHead(416, {
           'Content-Range': `bytes */${total}`,
-          'Access-Control-Allow-Origin': '*'
         })
         res.end()
         return
@@ -386,8 +455,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
         if (typeof boundEngine.coveredThrough !== 'function') {
           res.writeHead(416, {
             'Content-Range': `bytes */${total}`,
-            'Access-Control-Allow-Origin': '*'
-          })
+            })
           res.end()
           return
         }
@@ -401,7 +469,6 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
           if (isHead) {
             res.writeHead(416, {
               'Content-Range': `bytes */${total}`,
-              'Access-Control-Allow-Origin': '*'
             })
             res.end()
             return
@@ -409,8 +476,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
           const held = heldRangeWaits.get(transferId) || 0
           if (held >= MAX_HELD_RANGE_WAITS) {
             res.writeHead(416, {
-              'Content-Range': `bytes */${total}`,
-              'Access-Control-Allow-Origin': '*'
+            'Content-Range': `bytes */${total}`,
             })
             res.end()
             return
@@ -431,7 +497,6 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
             if (through === null || through < start) {
               res.writeHead(416, {
                 'Content-Range': `bytes */${total}`,
-                'Access-Control-Allow-Origin': '*'
               })
               res.end()
               return
@@ -450,7 +515,6 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
       const chunkSize = servedEnd - start + 1
       const commonHeaders = {
         'Content-Type': mimeType,
-        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
         DAV: '1, 2'
@@ -484,7 +548,6 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
         'Content-Type': mimeType,
         'Content-Length': stat.size,
         'Accept-Ranges': 'bytes',
-        'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
         DAV: '1, 2'
@@ -504,7 +567,7 @@ async function handleGetOrHead(req, res, targetUrlPath, isHead = false) {
       }
     }
   } catch (err) {
-    res.writeHead(500, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' })
+    res.writeHead(500, { 'Content-Type': 'text/plain' })
     res.end(`Read Error: ${err.message}`)
   }
 }
@@ -618,23 +681,52 @@ function startWebDAVServer(options = {}) {
   return new Promise((resolve, reject) => {
     function tryPort(p) {
       const s = http.createServer(async (req, res) => {
-        res.setHeader('Access-Control-Allow-Origin', '*')
-        res.setHeader(
-          'Access-Control-Allow-Methods',
-          'GET, HEAD, PROPFIND, OPTIONS, PUT, DELETE, MKCOL, MOVE'
-        )
+        // ─── Loopback lockdown (order matters) ───────────────────────────
+        // 1. Host validation: this server binds 127.0.0.1 and only answers
+        //    requests that name the loopback (DNS-rebinding protection).
+        if (!isLoopbackHost(req.headers.host)) {
+          res.writeHead(403, { 'Content-Type': 'text/plain' })
+          res.end('Forbidden')
+          return
+        }
+        const origin = req.headers.origin
+        const urlObj = new URL(req.url || '/', `http://127.0.0.1:${p}`)
 
-        const urlPath = req.url || '/'
-
+        // 2. CORS preflight. A preflight can never carry the X-MeshDrop-Token
+        //    header (browsers send only the CORS request headers), so OPTIONS
+        //    is answered here — Host-checked, CORS pinned to the renderer's
+        //    own origin (never *), and it carries no data.
         if (req.method === 'OPTIONS') {
-          res.writeHead(200, {
+          const preflightHeaders = {
             DAV: '1, 2',
             'MS-Author-Via': 'DAV',
-            Allow: 'GET, HEAD, PROPFIND, OPTIONS, PUT, DELETE, MKCOL, MOVE'
-          })
+            Allow: 'GET, HEAD, PROPFIND, OPTIONS, PUT, DELETE, MKCOL, MOVE',
+            'Access-Control-Allow-Methods': 'GET, HEAD, PROPFIND, OPTIONS, PUT, DELETE, MKCOL, MOVE',
+            'Access-Control-Allow-Headers': 'Range, If-None-Match, Content-Type, Destination, X-MeshDrop-Token'
+          }
+          if (origin && isAllowedRendererOrigin(origin)) {
+            preflightHeaders['Access-Control-Allow-Origin'] = origin
+            preflightHeaders['Vary'] = 'Origin'
+          }
+          res.writeHead(204, preflightHeaders)
           res.end()
           return
         }
+
+        // 3. Token gate: header X-MeshDrop-Token or ?t= (media elements can't
+        //    set headers). Constant-time compare, 403 on mismatch.
+        const queryToken = urlObj.searchParams.get('t')
+        const headerToken = req.headers['x-meshdrop-token']
+        if (!tokenMatches(headerToken, queryToken)) {
+          res.writeHead(403, { 'Content-Type': 'text/plain' })
+          res.end('Forbidden — missing or invalid token. Open media through the MeshDrop app.')
+          return
+        }
+
+        // 4. CORS pinning for the (token-authenticated) response itself.
+        pinCorsHeaders(res, origin)
+
+        const urlPath = req.url || '/'
 
         if (req.method === 'PROPFIND') {
           await handlePropfind(req, res, urlPath)
@@ -696,6 +788,7 @@ function stopWebDAVServer() {
   if (server) {
     server.close()
     server = null
+    activeToken = null // next start mints a fresh token
     console.log('[WebDAV] Server stopped')
   }
 }
@@ -806,6 +899,7 @@ module.exports = {
   mountWindowsDrive,
   unmountWindowsDrive,
   getDriveStatus,
+  getWebDAVToken,
   updateDrivePermissions,
   updateCatalogData,
   setFileCreatedCallback,

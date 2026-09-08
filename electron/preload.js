@@ -25,7 +25,6 @@ contextBridge.exposeInMainWorld('bridge', {
   portableStatus: () => ipcRenderer.invoke('portable:status'),
   portableInstall: (options) => ipcRenderer.invoke('portable:install', options),
   portablePickFolder: () => ipcRenderer.invoke('portable:pickFolder'),
-  getUpdateChannel: () => ipcRenderer.invoke('updater:getChannel'),
   setUpdateChannel: (channel) => ipcRenderer.invoke('updater:setChannel', channel),
   onUpdateStatus: (callback) => {
     const wrap = (evt, data) => callback(data)
@@ -42,28 +41,11 @@ contextBridge.exposeInMainWorld('bridge', {
   restartAndInstall: () => {
     return ipcRenderer.invoke('updater:restartAndInstall')
   },
-  applyUpdate: () => ipcRenderer.invoke('updater:quitAndInstall'),
-  appAfterUpdate: () => ipcRenderer.invoke('app:afterUpdate'),
   startWorker: (specifier) => ipcRenderer.invoke('pear:startWorker', specifier),
-  onWorkerStdout: (specifier, listener) => {
-    const wrap = (evt, data) => listener(toBuffer(data))
-    ipcRenderer.on('pear:worker:stdout:' + specifier, wrap)
-    return () => ipcRenderer.removeListener('pear:worker:stdout:' + specifier, wrap)
-  },
-  onWorkerStderr: (specifier, listener) => {
-    const wrap = (evt, data) => listener(toBuffer(data))
-    ipcRenderer.on('pear:worker:stderr:' + specifier, wrap)
-    return () => ipcRenderer.removeListener('pear:worker:stderr:' + specifier, wrap)
-  },
   onWorkerIPC: (specifier, listener) => {
     const wrap = (evt, data) => listener(toBuffer(data))
     ipcRenderer.on('pear:worker:ipc:' + specifier, wrap)
     return () => ipcRenderer.removeListener('pear:worker:ipc:' + specifier, wrap)
-  },
-  onWorkerExit: (specifier, listener) => {
-    const wrap = (evt, code) => listener(code)
-    ipcRenderer.on('pear:worker:exit:' + specifier, wrap)
-    return () => ipcRenderer.removeListener('pear:worker:exit:' + specifier, wrap)
   },
   writeWorkerIPC: (specifier, data) => {
     return ipcRenderer.invoke('pear:worker:writeIPC:' + specifier, data)
@@ -80,9 +62,6 @@ contextBridge.exposeInMainWorld('bridge', {
   openFolderDialog: () => {
     return ipcRenderer.invoke('dialog:openFolder')
   },
-  saveTempFile: (filename, buffer) => {
-    return ipcRenderer.invoke('file:saveTemp', filename, buffer)
-  },
   openPath: (filePath) => {
     return ipcRenderer.invoke('shell:openPath', filePath)
   },
@@ -92,13 +71,7 @@ contextBridge.exposeInMainWorld('bridge', {
   showItemInFolder: (filePath) => {
     return ipcRenderer.invoke('shell:showItemInFolder', filePath)
   },
-  readClipboard: () => ipcRenderer.invoke('clipboard:read'),
   writeClipboard: (data) => ipcRenderer.invoke('clipboard:write', data),
-  onClipboardChanged: (callback) => {
-    const wrap = (evt, data) => callback(data)
-    ipcRenderer.on('clipboard:changed', wrap)
-    return () => ipcRenderer.removeListener('clipboard:changed', wrap)
-  },
   onTrayHidden: (callback) => {
     const wrap = () => callback()
     ipcRenderer.on('app:tray-hidden', wrap)
@@ -114,7 +87,6 @@ contextBridge.exposeInMainWorld('bridge', {
     ipcRenderer.on('app:quick-send', wrap)
     return () => ipcRenderer.removeListener('app:quick-send', wrap)
   },
-  setContextMenuEnabled: (enabled) => ipcRenderer.invoke('contextMenu:setEnabled', enabled),
-  getContextMenuStatus: () => ipcRenderer.invoke('contextMenu:getStatus')
+  setContextMenuEnabled: (enabled) => ipcRenderer.invoke('contextMenu:setEnabled', enabled)
 })
 

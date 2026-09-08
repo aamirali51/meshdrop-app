@@ -3,6 +3,7 @@ import { NavigationProvider } from '@/hooks/useNavigation'
 import { DataProviders } from '@/hooks/DataProviders'
 import { SyncProvider } from '@/hooks/useSync'
 import { SharedFoldersProvider } from '@/hooks/useSharedFolders'
+import { TunnelsProvider } from '@/hooks/useTunnels'
 import { ToastProvider } from '@/hooks/useToast'
 import { ToastContainer } from '@/components/Toast'
 import { UpdateToaster } from '@/components/UpdateToaster'
@@ -22,7 +23,9 @@ export default function App() {
             <DataProviders>
               <SyncProvider>
                 <SharedFoldersProvider>
-                  <MainLayout />
+                  <TunnelsProvider>
+                    <MainLayout />
+                  </TunnelsProvider>
                   <WelcomeModal />
                   <QuickSendModal />
                   <LanPairPrompt />

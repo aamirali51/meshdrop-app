@@ -112,6 +112,11 @@ export function Sidebar() {
       icon: <Globe className='h-4 w-4' />
     },
     {
+      label: 'Tunnels',
+      route: '/tunnels',
+      icon: <Network className='h-4 w-4' />
+    },
+    {
       label: 'Settings',
       route: '/settings',
       icon: <Shield className='h-4 w-4' />

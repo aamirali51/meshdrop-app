@@ -10,6 +10,7 @@ export type NavRoute =
   | '/diagnostics'
   | '/settings'
   | '/about'
+  | '/tunnels'
 
 export interface NavItem {
   label: string

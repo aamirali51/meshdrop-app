@@ -52,36 +52,28 @@ interface Bridge {
   portableStatus: () => Promise<PortableStatus>
   portableInstall: (options?: PortableInstallOptions) => Promise<PortableInstallResult>
   portablePickFolder: () => Promise<string | null>
-  getUpdateChannel: () => Promise<string>
   setUpdateChannel: (channel: 'stable' | 'beta' | 'nightly' | 'dev') => Promise<string>
   onUpdateStatus: (callback: (data: UpdateStatusData) => void) => () => void
   onUpdateDownloaded: (
     callback: (data: { version?: string; message?: string }) => void
   ) => () => void
   restartAndInstall: () => Promise<void>
-  applyUpdate: () => Promise<void>
-  appAfterUpdate: () => Promise<void>
   minimizeWindow: () => void
   toggleMaximizeWindow: () => void
   closeWindow: () => void
   isWindowMaximized: () => Promise<boolean>
   onWindowMaximized: (callback: (maximized: boolean) => void) => () => void
   startWorker: (specifier: string) => Promise<void>
-  onWorkerStdout: (specifier: string, listener: (data: unknown) => void) => () => void
-  onWorkerStderr: (specifier: string, listener: (data: unknown) => void) => () => void
   onWorkerIPC: (specifier: string, listener: (data: unknown) => void) => () => void
-  onWorkerExit: (specifier: string, listener: (code: number) => void) => () => void
   writeWorkerIPC: (specifier: string, data: Uint8Array) => Promise<unknown>
   getPathForFile?: (file: File) => string
   openFileDialog: () => Promise<DialogResult | null>
   openFilesDialog: () => Promise<DialogResult[] | null>
   openFolderDialog: () => Promise<string | null>
-  saveTempFile: (filename: string, buffer: ArrayBuffer) => Promise<DialogResult | null>
   openPath: (filePath: string) => Promise<{ error?: string; success?: boolean }>
   openExternal: (url: string) => Promise<void>
   showItemInFolder: (filePath: string) => void
   writeClipboard: (data: { text: string }) => Promise<void>
-  onClipboardChanged: (callback: (data: { type: string; content: string }) => void) => () => void
   onTrayHidden?: (callback: () => void) => () => void
   onDeepLink: (callback: (data: { url: string; code?: string | null; kind?: string }) => void) => () => void
   onQuickSend?: (
@@ -91,7 +83,6 @@ interface Bridge {
     }) => void
   ) => () => void
   setContextMenuEnabled?: (enabled: boolean) => Promise<boolean>
-  getContextMenuStatus?: () => Promise<{ supported: boolean; platform: string }>
 }
 
 declare global {
