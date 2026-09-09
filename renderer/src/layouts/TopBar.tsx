@@ -8,10 +8,8 @@ import { ContextMenu } from '@/components/ContextMenu'
 import { WindowControls } from '@/components/WindowControls'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { isElectron, isMac } from '@/lib/capabilities'
 import type { NavRoute } from '@/types'
-
-const isElectron = typeof window !== 'undefined' && Boolean(window.bridge)
-const isMac = isElectron && window.bridge?.platform === 'darwin'
 
 export function TopBar() {
   const { currentRoute, navigate } = useNavigation()

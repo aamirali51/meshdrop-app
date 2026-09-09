@@ -1,5 +1,6 @@
 import { EVENTS, PROTOCOL_VERSION, isProtocolCompatible } from '@/types/protocol'
 import type { MethodName, EventName, WireMessage, RequestMessage } from '@/types/protocol'
+import { HttpTransport, consumeUrlToken, locationBaseUrl } from './httpTransport'
 
 const WORKER_SPECIFIER = '/workers/main.js'
 
@@ -76,11 +77,27 @@ function encodeMessage(msg: RequestMessage): Uint8Array {
 function processQueue(): void {
   while (queue.length > 0) {
     const item = queue.shift()!
-    doCall(item.method, item.params).then(item.resolve).catch(item.reject)
+    bridgeCall(item.method, item.params).then(item.resolve).catch(item.reject)
   }
 }
 
 const isBridgeAvailable = typeof window !== 'undefined' && Boolean(window.bridge)
+
+// ─── Web-mode transport (no window.bridge) ─────────────────────────────────
+// The host serves this UI and hands the session over as ?t= in the launch
+// URL; the token is consumed, persisted for the tab's lifetime and stripped
+// from the address bar by consumeUrlToken().
+
+let webTransport: HttpTransport | null = null
+function getWebTransport(): HttpTransport {
+  if (!webTransport) {
+    webTransport = new HttpTransport({
+      baseUrl: locationBaseUrl(),
+      token: consumeUrlToken()
+    })
+  }
+  return webTransport
+}
 
 const NOISY_METHODS = new Set([
   'diagnostics.get',
@@ -120,7 +137,7 @@ function formatLogArg(v: unknown): string {
   return String(v)
 }
 
-async function doCall(method: MethodName, params?: unknown): Promise<unknown> {
+async function bridgeCall(method: MethodName, params?: unknown): Promise<unknown> {
   if (!method || typeof method !== 'string') {
     return Promise.reject(new Error(`Invalid IPC method: ${String(method)}`))
   }
@@ -212,7 +229,7 @@ async function doCall(method: MethodName, params?: unknown): Promise<unknown> {
   })
 }
 
-async function ensureReady(): Promise<void> {
+async function bridgeEnsureReady(): Promise<void> {
   if (started) return
   started = true
 
@@ -227,7 +244,7 @@ async function ensureReady(): Promise<void> {
     await window.bridge.startWorker(WORKER_SPECIFIER)
   } catch (err) {
     // Never leave queued calls hanging: mark ready and flush. Each call's
-    // doCall() will surface the transport failure (or time out) instead of
+    // bridgeCall() will surface the transport failure (or time out) instead of
     // waiting on a queue that never drains.
     console.warn(
       `[IPC ${new Date().toISOString().slice(11, 23)}] startWorker failed:`,
@@ -312,45 +329,63 @@ function startBridge(): void {
 }
 
 export async function call(method: MethodName, params?: unknown): Promise<unknown> {
-  if (!ready) {
-    return new Promise((resolve, reject) => {
-      queue.push({ method, params, resolve, reject })
-      ensureReady()
-    })
+  if (isBridgeAvailable) {
+    if (!ready) {
+      return new Promise((resolve, reject) => {
+        queue.push({ method, params, resolve, reject })
+        bridgeEnsureReady()
+      })
+    }
+    return bridgeCall(method, params)
   }
-  return doCall(method, params)
+  return getWebTransport().call(method, params)
 }
 
 export function on(event: EventName, callback: (data: unknown) => void): () => void {
-  startBridge()
+  if (isBridgeAvailable) {
+    startBridge()
 
-  if (!eventListeners.has(event)) {
-    eventListeners.set(event, new Set())
+    if (!eventListeners.has(event)) {
+      eventListeners.set(event, new Set())
+    }
+
+    eventListeners.get(event)!.add(callback)
+
+    return () => {
+      eventListeners.get(event)?.delete(callback)
+    }
   }
-
-  eventListeners.get(event)!.add(callback)
-
-  return () => {
-    eventListeners.get(event)?.delete(callback)
-  }
+  return getWebTransport().on(event, callback)
 }
 
 export function off(event: EventName, callback: (data: unknown) => void): void {
-  eventListeners.get(event)?.delete(callback)
+  if (isBridgeAvailable) {
+    eventListeners.get(event)?.delete(callback)
+    return
+  }
+  getWebTransport().off(event, callback)
+}
+
+export function ensureReady(): Promise<void> {
+  return isBridgeAvailable ? bridgeEnsureReady() : getWebTransport().ensureReady()
 }
 
 export function destroy(): void {
-  for (const [, req] of pending) {
-    clearTimeout(req.timer)
-    req.reject(new Error('Bridge destroyed'))
+  if (isBridgeAvailable) {
+    for (const [, req] of pending) {
+      clearTimeout(req.timer)
+      req.reject(new Error('Bridge destroyed'))
+    }
+    pending.clear()
+    eventListeners.clear()
+    queue.length = 0
+    if (cleanup) {
+      cleanup()
+      cleanup = null
+    }
+    started = false
+    ready = false
+    return
   }
-  pending.clear()
-  eventListeners.clear()
-  queue.length = 0
-  if (cleanup) {
-    cleanup()
-    cleanup = null
-  }
-  started = false
-  ready = false
+  getWebTransport().destroy()
 }

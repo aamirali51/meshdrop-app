@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useToast } from '@/hooks/useToast'
+import { onUpdateDownloaded, restartAndInstall } from '@/lib/capabilities'
 
 // Surfaces update lifecycle events from the main process (background auto
 // check + auto download) as toasts with a "Restart Now" action, no matter
@@ -9,7 +10,7 @@ export function UpdateToaster() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const unsubDownloaded = window.bridge?.onUpdateDownloaded?.((data) => {
+    const unsubDownloaded = onUpdateDownloaded((data) => {
       toast.success(
         'Update Ready',
         data?.message || 'Restart the app to finish installing the update.',
@@ -18,7 +19,7 @@ export function UpdateToaster() {
             {
               label: 'Restart Now',
               onClick: () => {
-                window.bridge?.restartAndInstall?.().catch(() => {})
+                restartAndInstall().catch(() => {})
               }
             }
           ],
@@ -26,7 +27,7 @@ export function UpdateToaster() {
         }
       )
     })
-    return () => unsubDownloaded?.()
+    return () => unsubDownloaded()
   }, [toast])
 
   return null

@@ -21,6 +21,7 @@ import QRCode from 'qrcode'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/useToast'
+import { appVersion, hostVersionInfo, isWeb, openExternal, writeClipboard } from '@/lib/capabilities'
 
 const BITCOIN_ADDRESS = '12bNXZEg6vDtJZUMdauhkvUqg92UPeWJfs'
 
@@ -100,37 +101,31 @@ const HOLEPUNCH_STACK: { name: string; version: string; blurb: string; icon: Rea
 ]
 
 function openHolepunch() {
-  if (window.bridge?.openExternal) {
-    window.bridge.openExternal('https://holepunch.io')
-  }
+  openExternal('https://holepunch.io')
 }
 
 function openGithub() {
   const url = 'https://github.com/aamirali51/meshdrop-app'
-  if (window.bridge?.openExternal) {
-    window.bridge.openExternal(url)
-  } else if (typeof window !== 'undefined') {
-    window.open(url, '_blank')
-  }
+  openExternal(url)
 }
 
 // Read the live app version from the packaged build (window.bridge.pkg returns
 // the real package.json) so the About page never goes stale between releases.
 // Falls back to a plain "Open Source" badge in a bare browser (no Electron).
-const APP_VERSION = (() => {
-  try {
-    const v = typeof window !== 'undefined' && window.bridge?.pkg?.()?.version
-    return typeof v === 'string' && v ? v : ''
-  } catch {
-    return ''
-  }
-})()
+const APP_VERSION = appVersion()
 
 export function About() {
   const { toast } = useToast()
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  // Web mode has no package.json — the About badge shows the HOST's engine
+  // version (/version) instead, fetched live.
+  const [hostInfo, setHostInfo] = useState<{ engineVersion?: string; protocolVersion?: string } | null>(null)
+
+  useEffect(() => {
+    if (isWeb) hostVersionInfo().then(setHostInfo).catch(() => {})
+  }, [])
 
   useEffect(() => {
     QRCode.toDataURL(BITCOIN_ADDRESS, {
@@ -147,11 +142,7 @@ export function About() {
 
   const handleCopyBtc = async () => {
     try {
-      if (window.bridge?.writeClipboard) {
-        await window.bridge.writeClipboard({ text: BITCOIN_ADDRESS })
-      } else if (navigator?.clipboard) {
-        await navigator.clipboard.writeText(BITCOIN_ADDRESS)
-      }
+      await writeClipboard(BITCOIN_ADDRESS)
       setCopied(true)
       toast.success('Address Copied', 'Bitcoin donation address copied to clipboard!')
       setTimeout(() => setCopied(false), 2500)
@@ -173,7 +164,13 @@ export function About() {
             <div className='flex flex-wrap items-center justify-center md:justify-start gap-2'>
               <h2 className='text-2xl font-black text-foreground'>MeshDrop</h2>
               <span className='rounded-md bg-primary/20 px-2 py-0.5 text-xs font-mono font-bold text-primary border border-primary/30'>
-                {APP_VERSION ? `v${APP_VERSION}` : 'Open Source'}
+                {isWeb
+                  ? hostInfo?.engineVersion
+                    ? `v${hostInfo.engineVersion}`
+                    : 'Open Source'
+                  : APP_VERSION
+                    ? `v${APP_VERSION}`
+                    : 'Open Source'}
               </span>
               <button
                 onClick={openGithub}

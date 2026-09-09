@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react'
 import { FolderDown, X } from 'lucide-react'
 import { PortableInstallModal } from '@/components/PortableInstallModal'
-import type { PortableStatus } from '@/types/bridge'
+import { portableStatus } from '@/lib/capabilities'
 
 // Tier 2a entry point: the single-file portable is running. Offer a one-time
 // "install to a folder" — the copied folder boots directly (no per-run
 // extraction) and gets file-level updates (Tier 3).
 export function PortableBanner() {
-  const [status, setStatus] = useState<PortableStatus | null>(null)
+  const [status, setStatus] = useState<Awaited<ReturnType<typeof portableStatus>>>(null)
   const [dismissed, setDismissed] = useState(false)
   const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
-    window.bridge?.portableStatus?.().then(setStatus).catch(() => {})
+    portableStatus().then(setStatus).catch(() => {})
   }, [])
 
   if (!status?.installAvailable || dismissed) return null

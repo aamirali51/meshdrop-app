@@ -9,6 +9,12 @@ import { Modal, ConfirmDialog } from '@/components/Modal'
 import { FolderBrowser, type SiteEntry } from '@/components/FolderBrowser'
 import { FilePreviewModal, type PreviewFile } from '@/components/FilePreviewModal'
 import { cn } from '@/lib/utils'
+import {
+  isWeb,
+  openExternal as capOpenExternal,
+  openPath as capOpenPath,
+  pickFolder as capPickFolder
+} from '@/lib/capabilities'
 
 type Tab = 'host' | 'visit'
 
@@ -106,9 +112,12 @@ export function SharedFolders() {
     setGatewayBase(null)
   }
   const handleOpenInBrowser = async () => {
-    try { const url = await getGatewayUrl(); if (!url) { toast.error('Not Ready', 'Open a shared folder first.'); return } if (window.bridge?.openExternal) window.bridge.openExternal(url); else window.open(url, '_blank') } catch { toast.error('Open Failed', 'Could not start gateway.') }
+    try { const url = await getGatewayUrl(); if (!url) { toast.error('Not Ready', 'Open a shared folder first.'); return } capOpenExternal(url) } catch { toast.error('Open Failed', 'Could not start gateway.') }
   }
-  const openPath = (p: string) => { if (window.bridge?.openPath) window.bridge.openPath(p) }
+  const openPath = (p: string) => {
+    if (isWeb) { toast.info('Desktop Only', 'Open the folder in the MeshDrop desktop app to reveal it here.'); return }
+    capOpenPath(p)
+  }
   const navigateInBrowser = useCallback(async (p: string) => listFiles(p, browsing?.siteId), [listFiles, browsing?.siteId])
   const closeBrowse = () => setBrowsing(null)
 
@@ -148,7 +157,7 @@ export function SharedFolders() {
         file={previewFile}
         rawUrl={buildRawUrl}
         onDownload={(f) => { const u = buildRawUrl(f.path); if (u) window.open(u.replace('/raw?', '/download?'), '_blank') }}
-        onOpenExternal={(f) => { const u = buildRawUrl(f.path); if (u) { if (window.bridge?.openExternal) window.bridge.openExternal(u); else window.open(u, '_blank') } }}
+        onOpenExternal={(f) => { const u = buildRawUrl(f.path); if (u) capOpenExternal(u) }}
         onClose={() => setPreviewFile(null)}
       />
 
@@ -462,8 +471,7 @@ function PublishForm({ busy, onSubmit, onCancel }: { busy: boolean; onSubmit: (f
   const [expirationPreset, setExpirationPreset] = useState<string>(() => localStorage.getItem('meshdrop:sites_expiry') || 'never')
   const { toast } = useToast()
   const pickFolder = async () => {
-    if (!window.bridge?.openFolderDialog) { toast.error('Unavailable', 'Desktop only'); return }
-    try { const picked = await window.bridge.openFolderDialog(); if (picked) { setFolderPath(picked); if (!name) setName(picked.split(/[\\/]/).filter(Boolean).pop() || 'My Drive') } } catch { toast.error('Pick Failed', 'Could not open picker.') }
+    try { const picked = await capPickFolder(); if (picked) { setFolderPath(picked); if (!name) setName(picked.split(/[\\/]/).filter(Boolean).pop() || 'My Drive') } } catch { toast.error('Pick Failed', 'Could not open picker.') }
   }
   useEffect(() => { localStorage.setItem('meshdrop:sites_expiry', expirationPreset) }, [expirationPreset])
   return (

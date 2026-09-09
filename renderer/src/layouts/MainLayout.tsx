@@ -33,6 +33,7 @@ import { WhatsNewModal } from '@/components/WhatsNewModal'
 import { WatchPartyModal } from '@/components/WatchPartyModal'
 import { useDevices } from '@/hooks/useDevices'
 import { useTransfers } from '@/hooks/useTransfers'
+import { resolveDrop } from '@/lib/capabilities'
 
 const pages: Record<string, React.FC> = {
   '/dashboard': Dashboard,
@@ -65,18 +66,16 @@ export function MainLayout() {
     e.preventDefault()
     const files = Array.from(e.dataTransfer?.files || [])
     if (!files.length) return
-    const picked = files
-      .map((f) => ({
-        filePath: window.bridge?.getPathForFile?.(f) || '',
-        filename: f.name,
-        fileSize: f.size
-      }))
-      .filter((f) => f.filePath)
-    if (!picked.length) {
+    try {
+      const picked = await resolveDrop(files)
+      if (!picked.length) {
+        toast.error('Drop Failed', 'Could not resolve the dropped file path.')
+        return
+      }
+      openShareWith({ files: picked })
+    } catch {
       toast.error('Drop Failed', 'Could not resolve the dropped file path.')
-      return
     }
-    openShareWith({ files: picked })
   }
 
   return (

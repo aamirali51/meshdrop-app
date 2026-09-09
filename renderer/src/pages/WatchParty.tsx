@@ -41,6 +41,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/hooks/useToast'
 import { useDevices } from '@/hooks/useDevices'
 import { call, on } from '@/lib/ipc'
+import { pickFile } from '@/lib/capabilities'
 import { cn } from '@/lib/utils'
 import { WatchVoice } from '@/lib/watchVoice'
 import { EVENTS, METHODS } from '@/types/protocol'
@@ -582,7 +583,7 @@ export function WatchParty() {
   // File Picker
   const handlePickFile = async () => {
     try {
-      const res = await window.bridge.openFileDialog()
+      const res = await pickFile()
       if (res && res.filePath) {
         setSelectedFile({
           path: res.filePath,
@@ -682,7 +683,7 @@ export function WatchParty() {
 
   const handleAddToQueue = async () => {
     try {
-      const res = await window.bridge.openFileDialog()
+      const res = await pickFile()
       if (!res?.filePath) return
       const room = (await call(METHODS.WATCH_PARTY_QUEUE_ADD, {
         filePath: res.filePath,
@@ -742,7 +743,7 @@ export function WatchParty() {
 
   const handlePickSubtitle = async () => {
     try {
-      const res = await window.bridge.openFileDialog()
+      const res = await pickFile()
       if (!res?.filePath) return
       await call(METHODS.WATCH_PARTY_SUBTITLE_SET, { subtitlePath: res.filePath })
       refreshSubtitleTrack()

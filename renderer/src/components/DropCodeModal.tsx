@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/Modal'
 import { WatchPartyModal } from '@/components/WatchPartyModal'
 import { formatBytes } from '@/lib/format'
+import { pickFiles, pickFolder } from '@/lib/capabilities'
 import { buildShareLink, shareLinkMeta } from '@/lib/shareLinks'
 import type { PendingShare, PendingShareStatus } from '@/types'
 
@@ -223,13 +224,9 @@ export function DropCodeModal() {
   }
 
   const handleChooseFiles = async () => {
-    if (!window.bridge?.openFilesDialog) {
-      toast.error('Unavailable', 'File dialogs are only available in the desktop app')
-      return
-    }
     setError('')
     try {
-      const picked = await window.bridge.openFilesDialog()
+      const picked = await pickFiles()
       if (picked && picked.length > 0) {
         setSource({ kind: 'files', files: picked })
         setShare(null)
@@ -241,13 +238,9 @@ export function DropCodeModal() {
   }
 
   const handleChooseFolder = async () => {
-    if (!window.bridge?.openFolderDialog) {
-      toast.error('Unavailable', 'Folder dialogs are only available in the desktop app')
-      return
-    }
     setError('')
     try {
-      const picked = await window.bridge.openFolderDialog()
+      const picked = await pickFolder()
       if (picked) {
         setSource({ kind: 'folder', folderPath: picked, name: picked.split(/[\\/]/).pop() || picked })
         setShare(null)

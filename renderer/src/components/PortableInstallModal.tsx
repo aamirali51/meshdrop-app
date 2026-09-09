@@ -3,7 +3,7 @@ import { FolderDown, FolderOpen, Loader2, Monitor, PlaySquare, Sparkles } from '
 import { Modal } from '@/components/Modal'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/useToast'
-import type { PortableInstallOptions } from '@/types/bridge'
+import { portableInstall, portablePickFolder } from '@/lib/capabilities'
 
 interface PortableInstallModalProps {
   open: boolean
@@ -20,7 +20,7 @@ export function PortableInstallModal({ open, onOpenChange }: PortableInstallModa
 
   const handleBrowse = async () => {
     try {
-      const picked = await window.bridge?.portablePickFolder?.()
+      const picked = await portablePickFolder()
       if (picked) setTargetDir(picked)
     } catch (err: any) {
       console.warn('Failed to pick folder:', err?.message)
@@ -30,13 +30,12 @@ export function PortableInstallModal({ open, onOpenChange }: PortableInstallModa
   const handleInstall = async () => {
     setBusy(true)
     try {
-      const opts: PortableInstallOptions = {
+      const res = await portableInstall({
         targetDir: targetDir.trim() || undefined,
         desktopShortcut,
         startMenuShortcut,
         autoStart
-      }
-      const res = await window.bridge?.portableInstall?.(opts)
+      })
       if (res?.canceled) {
         setBusy(false)
       } else if (!res?.ok) {

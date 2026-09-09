@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Copy, Minus, Square, X } from 'lucide-react'
-
-const isElectron = typeof window !== 'undefined' && Boolean(window.bridge)
-const isMac = isElectron && window.bridge?.platform === 'darwin'
+import {
+  isElectron,
+  isMac,
+  isWindowMaximized,
+  onWindowMaximized,
+  windowClose,
+  windowMinimize,
+  windowToggleMaximize
+} from '@/lib/capabilities'
 
 const baseBtn =
   'no-drag flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
@@ -16,15 +22,13 @@ export function WindowControls() {
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
-    if (!window.bridge?.onWindowMaximized) return
     let mounted = true
-    window.bridge
-      .isWindowMaximized()
+    isWindowMaximized()
       .then((v) => {
         if (mounted) setMaximized(v)
       })
       .catch(() => {})
-    const unsub = window.bridge.onWindowMaximized(setMaximized)
+    const unsub = onWindowMaximized(setMaximized)
     return () => {
       mounted = false
       unsub()
@@ -37,7 +41,7 @@ export function WindowControls() {
     <div className='no-drag flex items-center gap-0.5 border-l border-border/40 pl-2'>
       <button
         className={baseBtn}
-        onClick={() => window.bridge?.minimizeWindow?.()}
+        onClick={() => windowMinimize()}
         title='Minimize'
         aria-label='Minimize window'
       >
@@ -45,7 +49,7 @@ export function WindowControls() {
       </button>
       <button
         className={baseBtn}
-        onClick={() => window.bridge?.toggleMaximizeWindow?.()}
+        onClick={() => windowToggleMaximize()}
         title={maximized ? 'Restore' : 'Maximize'}
         aria-label={maximized ? 'Restore window' : 'Maximize window'}
       >
@@ -53,7 +57,7 @@ export function WindowControls() {
       </button>
       <button
         className='no-drag ml-1 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive hover:text-white'
-        onClick={() => window.bridge?.closeWindow?.()}
+        onClick={() => windowClose()}
         title='Close'
         aria-label='Close window'
       >

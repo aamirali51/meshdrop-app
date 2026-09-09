@@ -26,6 +26,11 @@ import { ConfirmDialog } from '@/components/Modal'
 import { formatBytes, formatTime } from '@/lib/format'
 import { buildShareLink, shareLinkMeta } from '@/lib/shareLinks'
 import { cn } from '@/lib/utils'
+import {
+  pickFiles as pickFilesCap,
+  pickFolder as pickFolderCap,
+  resolveDrop
+} from '@/lib/capabilities'
 import type { Device, PendingShare } from '@/types'
 
 function formatRemaining(expiresAt: number): string {
@@ -80,12 +85,8 @@ export function Dashboard() {
   const meshOnline = diagnostics.connected !== false
 
   const pickFiles = async () => {
-    if (!window.bridge?.openFilesDialog) {
-      toast.error('Unavailable', 'File dialogs are only available in the desktop app')
-      return
-    }
     try {
-      const picked = await window.bridge.openFilesDialog()
+      const picked = await pickFilesCap()
       if (picked && picked.length > 0) openShareWith({ files: picked })
     } catch {
       toast.error('File Pick Failed', 'Could not open the file picker.')
@@ -93,13 +94,9 @@ export function Dashboard() {
   }
 
   const pickFolder = async () => {
-    if (!window.bridge?.openFolderDialog) {
-      toast.error('Unavailable', 'Folder dialogs are only available in the desktop app')
-      return
-    }
     setFolderBusy(true)
     try {
-      const folderPath = await window.bridge.openFolderDialog()
+      const folderPath = await pickFolderCap()
       if (folderPath) {
         openShareWith({
           folderPath,
@@ -113,21 +110,19 @@ export function Dashboard() {
     }
   }
 
-  const resolveDroppedFiles = (e: React.DragEvent) => {
+  const resolveDroppedFiles = async (e: React.DragEvent) => {
     const files = Array.from(e.dataTransfer?.files || [])
     if (!files.length) return
-    const picked = files
-      .map((f) => ({
-        filePath: window.bridge?.getPathForFile?.(f) || '',
-        filename: f.name,
-        fileSize: f.size
-      }))
-      .filter((f) => f.filePath)
-    if (!picked.length) {
+    try {
+      const picked = await resolveDrop(files)
+      if (!picked.length) {
+        toast.error('Drop Failed', 'Could not resolve the dropped file path.')
+        return
+      }
+      openShareWith({ files: picked })
+    } catch {
       toast.error('Drop Failed', 'Could not resolve the dropped file path.')
-      return
     }
-    openShareWith({ files: picked })
   }
 
   const handleSendDrop = (dev: Device, file: File) => sendFilePath(dev, file)

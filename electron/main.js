@@ -257,11 +257,43 @@ const engineBridge = createEngineBridge({
   getLabel
 })
 
+// handlers.js emits protocol events through an injected sink (it has no
+// Electron imports of its own). Frame each event exactly like engine.js does:
+// a Buffer of JSON over the legacy worker channel.
+const { createEvent } = require('../src/shared/protocol.js')
+const eventSink = {
+  send(event, data) {
+    sendToAll('pear:worker:ipc:' + WORKER_SPECIFIER, Buffer.from(createEvent(event, data)))
+  }
+}
+
+// stream.getUrl / sites.getUrl are backed by the shared loopback servers
+// (src/shared/localservers/stream-server.js + sites-gateway.js — Phase 1b
+// re-homed them out of electron/). The resolvers are injected into the shared
+// handler table so it stays host-agnostic; both the Electron app and the
+// headless host mint URLs from the SAME shared modules.
+async function getStreamUrl(engine, params) {
+  // The electron/webdav.js facade binds this process's engine to its server
+  // instance and delegates to the shared mintStreamUrl helper.
+  const { mintStreamUrl } = require('./webdav')
+  return mintStreamUrl(engine, params)
+}
+
+async function getSitesUrl(engine, params) {
+  // The gateway serves ANY open visit (or hosted site) via ?siteId=, so the
+  // base URL is valid whenever the gateway is up and there is at least one
+  // share to read. Renderers append /raw?t=<token>&siteId=<id>&path=<p>.
+  const { mintSitesUrl } = require('./sites-gateway')
+  return mintSitesUrl(engine, params)
+}
+
 const engineHandlers = registerEngineHandlers({
   engine: engineBridge.engine,
-  sendToAll,
+  eventSink,
   getLabel,
-  updateAutoStart
+  updateAutoStart,
+  getStreamUrl,
+  getSitesUrl
 })
 
 // WebDAV ("Drive") file creations broadcast to paired peers through the

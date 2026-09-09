@@ -6,13 +6,18 @@
 // Every method in src/shared/protocol.js METHODS maps to either a MeshEngine
 // method or a thin Hyperbee-backed store operation (engine.getBee). Events
 // are re-emitted with the worker-protocol names the renderer subscribes to.
+//
+// This module is deliberately free of Electron imports so the SAME dispatch
+// table drives the desktop app (electron/main.js) and the headless host
+// (meshdrop-host): anything transport- or platform-specific (event framing,
+// WebDAV/sites-gateway URL servers) is injected at registration time.
 
 const fs = require('fs')
 const path = require('path')
 const fsp = require('fs/promises')
-const { METHODS, EVENTS, createEvent } = require('../src/shared/protocol.js')
+const { METHODS, EVENTS } = require('../src/shared/protocol.js')
+const { shouldForwardProtocolEvent } = require('../src/shared/engine-events.js')
 const { normalizePairingCode, deriveDeviceId } = require('@mesh/core/crypto.js')
-const { WORKER_SPECIFIER } = require('./engine.js')
 
 // ─── Pure helpers (ported from workers/helpers.js) ──────────────────────────
 
@@ -116,19 +121,26 @@ async function cleanupDuplicateDevices(engine) {
 }
 
 // ─── Device store helpers ──────────────────────────────────────────────────
-function registerEngineHandlers({ engine, sendToAll, getLabel, updateAutoStart }) {
+function registerEngineHandlers({
+  engine,
+  eventSink,
+  getLabel,
+  updateAutoStart,
+  getStreamUrl,
+  getSitesUrl
+}) {
   const handlers = {}
+
+  // Sink contract: { send(event, data) } — Electron wires it to
+  // webContents.send with the legacy worker framing; the headless host wires
+  // it to its WebSocket broadcaster. The sync-origin suppression gate lives
+  // in the shared engine-events module so no caller can skip it.
+  const sink = eventSink || { send() {} }
 
   const emit = (event, data) => {
     try {
-      const isSync = !!(data && (data.isSync || data.source === 'sync'))
-      // EVENTS.TRANSFER_OFFER does not exist in the app protocol (offers are
-      // TRANSFER_OFFER_RECEIVED) — the set below mirrors engine.js's live
-      // sync-suppression list so sync-origin offers/completions stay silent.
-      if (isSync && (event === EVENTS.TRANSFER_OFFER_RECEIVED || event === EVENTS.TRANSFER_QUEUED || event === EVENTS.TRANSFER_STARTED || event === EVENTS.TRANSFER_COMPLETED)) {
-        return
-      }
-      sendToAll('pear:worker:ipc:' + WORKER_SPECIFIER, Buffer.from(createEvent(event, data)))
+      if (!shouldForwardProtocolEvent(event, data)) return
+      sink.send(event, data)
     } catch (err) {
       console.error('[Main] Failed to emit event:', err.message)
     }
@@ -784,35 +796,13 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
   }
 
   handlers[METHODS.STREAM_URL_GET] = async (params) => {
-    const { startWebDAVServer, setWebDAVEngine, getDriveStatus, getWebDAVToken, resolveTransferStreamPath } = require('./webdav')
-    setWebDAVEngine(engine)
-    await startWebDAVServer().catch(() => {})
-    const status = getDriveStatus()
-    const port = status.port || 41983
-    // The stream server is token-gated (X-MeshDrop-Token header or ?t=); a
-    // media element cannot attach headers, so every minted URL carries the
-    // token as a query param.
-    const token = getWebDAVToken()
-    const withToken = (baseUrl) => {
-      const sep = baseUrl.includes('?') ? '&' : '?'
-      return `${baseUrl}${sep}t=${token}`
+    // Backed by the Electron WebDAV stream server (electron/webdav.js). The
+    // resolver is injected so this dispatch table stays host-agnostic; the
+    // standalone host excludes the method until Phase 1b re-homes that server.
+    if (typeof getStreamUrl !== 'function') {
+      throw new Error('stream.getUrl is unavailable in this host (no stream server loaded)')
     }
-    if (params?.transferId) {
-      // With an explicit filePath the player is expected to have the file
-      // locally (host side / claim playback) — keep the URL unconditional.
-      if (params?.filePath) {
-        return { url: withToken(`http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}&path=${encodeURIComponent(params.filePath)}`) }
-      }
-      // Otherwise (e.g. watch party guest) only hand out a URL when something
-      // is actually resolvable — never a guaranteed 404.
-      const resolvable = await resolveTransferStreamPath(engine, params.transferId)
-      if (!resolvable) return { url: null }
-      return { url: withToken(`http://127.0.0.1:${port}/stream/transfer?id=${encodeURIComponent(params.transferId)}`) }
-    }
-    if (params?.filePath) {
-      return { url: withToken(`http://127.0.0.1:${port}/stream/file?path=${encodeURIComponent(params.filePath)}`) }
-    }
-    return { url: withToken(`http://127.0.0.1:${port}/p2p/`) }
+    return getStreamUrl(engine, params)
   }
 
   // ─── MeshDrop Sites ──────────────────────────────────────────────────────
@@ -885,19 +875,13 @@ handlers[METHODS.FILES_CANCEL_CLAIM] = async (params) => {
   handlers[METHODS.TUNNEL_LIST_CODES] = async () => engine.listTunnelCodes()
 
   handlers[METHODS.SITES_GET_URL] = async (params) => {
-    // The gateway serves ANY open visit (or hosted site) via ?siteId=, so the
-    // base URL is valid whenever the gateway is up and there is at least one
-    // share to read. Renderers append /raw?t=<token>&siteId=<id>&path=<p>.
-    const visits = (engine.getActiveVisits ? engine.getActiveVisits() : []) || []
-    const activeVisit = engine.getActiveVisit ? engine.getActiveVisit() : null
-    const hosting = engine.siteServer && engine.siteServer._sites && engine.siteServer._sites.size > 0
-    if (visits.length === 0 && !activeVisit && !hosting) return { url: null }
-    const { startSitesGateway, setSitesGatewayEngine, getSitesGatewayUrl } = require('./sites-gateway')
-    setSitesGatewayEngine(engine)
-    await startSitesGateway().catch(() => {})
-    const base = getSitesGatewayUrl()
-    if (!base) return { url: null }
-    return { url: base }
+    // Backed by the Electron sites gateway (electron/sites-gateway.js), which
+    // serves live visits/hosted sites over HTTP. Injected resolver — same
+    // rationale as stream.getUrl above.
+    if (typeof getSitesUrl !== 'function') {
+      throw new Error('sites.getUrl is unavailable in this host (no sites gateway loaded)')
+    }
+    return getSitesUrl(engine, params)
   }
 
   return handlers

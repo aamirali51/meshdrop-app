@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
+import { isWeb, onDeepLink } from '@/lib/capabilities'
 import { useToast } from '@/hooks/useToast'
 import type { PendingShare, ClaimPreview } from '@/types'
 
@@ -134,9 +135,12 @@ export function SharesProvider({ children }: { children: ReactNode }) {
 
     refreshPendingShares()
 
-    const unsubDeepLink = window.bridge?.onDeepLink?.((data) => {
+    const unsubDeepLink = onDeepLink((data) => {
       const code = data.code?.trim().toUpperCase() || ''
       if (!code) return
+      // Web launch links (?code=) only ever carry share codes; an OS-pairing
+      // code arriving in the browser has no pairing channel, so no toast.
+      if (isWeb && !code.startsWith('DROP')) return
       if (code.startsWith('DROP')) {
         // A WeTransfer-style link: open the receive modal pre-filled with the
         // code. The claim itself is user-confirmed in the modal.

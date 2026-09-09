@@ -21,6 +21,7 @@ import { useDevices } from '@/hooks/useDevices'
 import { useShares } from '@/hooks/useShares'
 import { useToast } from '@/hooks/useToast'
 import { formatBytes, formatSpeed, formatEta, formatTime } from '@/lib/format'
+import { downloadUrl, isWeb, showItemInFolder } from '@/lib/capabilities'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ContextMenu } from '@/components/ContextMenu'
@@ -276,18 +277,31 @@ export function Transfers() {
               <Film className='mr-1 h-3 w-3' /> Watch
             </Button>
           )}
-          {localPath && (
-            <Button
-              size='sm'
-              variant='outline'
-              className='h-7 px-2 text-[10px] font-bold'
-              title='Reveal the file in your system file manager'
-              onClick={() => {
-                if (window.bridge?.showItemInFolder) window.bridge.showItemInFolder(localPath)
-              }}
-            >
-              <FolderOpen className='mr-1 h-3 w-3' /> Show in Folder
-            </Button>
+          {isWeb ? (
+            // The browser cannot open the host's file manager: received files
+            // are offered for download over /files/download instead.
+            t.direction === 'receive' ? (
+              <a
+                href={downloadUrl(t.id)}
+                download={t.filename}
+                className='inline-flex h-7 items-center rounded-md border border-border/60 px-2 text-[10px] font-bold text-foreground hover:bg-accent transition-colors'
+                title='Save the received file'
+              >
+                <Download className='mr-1 h-3 w-3' /> Save
+              </a>
+            ) : null
+          ) : (
+            localPath && (
+              <Button
+                size='sm'
+                variant='outline'
+                className='h-7 px-2 text-[10px] font-bold'
+                title='Reveal the file in your system file manager'
+                onClick={() => showItemInFolder(localPath)}
+              >
+                <FolderOpen className='mr-1 h-3 w-3' /> Show in Folder
+              </Button>
+            )
           )}
           <Button
             size='sm'

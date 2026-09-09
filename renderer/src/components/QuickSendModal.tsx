@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/useToast'
 import { useNavigation } from '@/hooks/useNavigation'
 import { METHODS } from '@/types/protocol'
 import { call } from '@/lib/ipc'
+import { onQuickSend } from '@/lib/capabilities'
 import type { Device } from '@/types'
 
 interface QuickSendFileItem {
@@ -89,9 +90,7 @@ export function QuickSendModal() {
   )
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.bridge?.onQuickSend) return
-
-    const unsub = window.bridge.onQuickSend((payload) => {
+    const unsub = onQuickSend((payload) => {
       if (!payload || !payload.files?.length) return
 
       // Direct send to pre-targeted peer (from cascading submenu)
@@ -110,7 +109,7 @@ export function QuickSendModal() {
       setSuccessPeer(null)
     })
 
-    return () => unsub?.()
+    return () => unsub()
   }, [devices, dispatchFilesToPeer])
 
   if (!isOpen || files.length === 0) return null

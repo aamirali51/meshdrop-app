@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { EVENTS, METHODS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
+import { pickFolder } from '@/lib/capabilities'
 import { useToast } from '@/hooks/useToast'
 import { Folder, FolderPlus, X, Check, ShieldCheck, ArrowLeftRight, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -43,12 +44,8 @@ export function SyncInviteModal() {
   const totalInvites = invites.length
 
   const handlePickFolder = async () => {
-    if (!window.bridge?.openFolderDialog) {
-      toast.error('Unavailable', 'Folder picker is only available in the desktop app.')
-      return
-    }
     try {
-      const picked = await window.bridge.openFolderDialog()
+      const picked = await pickFolder(invite.defaultPath)
       if (picked) {
         setCustomPath(picked)
       }

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
+import { onTrayHidden, onUpdateDownloaded, restartAndInstall } from '@/lib/capabilities'
 import { useToast } from '@/hooks/useToast'
 import type { NetworkDiagnostics } from '@/types'
 
@@ -55,7 +56,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener('keydown', handleKeyDown)
 
-    const unsubTray = window.bridge?.onTrayHidden?.(() => {
+    const unsubTray = onTrayHidden(() => {
       toast.info(
         'MeshDrop is Still Running',
         'The app stays active in the system tray. Click the tray icon to restore it.'
@@ -63,12 +64,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
     // A new version finished downloading in the background: non-intrusive
     // toast with a one-click restart to apply it.
-    const unsubUpdateDownloaded = window.bridge?.onUpdateDownloaded?.((d: any) => {
+    const unsubUpdateDownloaded = onUpdateDownloaded((d) => {
       toast.info(
         'New update ready',
         d?.message || `Version ${d?.version || ''} has been downloaded and is ready to install.`,
         {
-          actions: [{ label: 'Restart Now', onClick: () => window.bridge?.restartAndInstall?.() }],
+          actions: [{ label: 'Restart Now', onClick: () => restartAndInstall() }],
           durationMs: 60000
         }
       )

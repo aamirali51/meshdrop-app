@@ -29,6 +29,7 @@ import { ConfirmDialog } from '@/components/Modal'
 import { cn } from '@/lib/utils'
 import { EVENTS, METHODS } from '@/types/protocol'
 import { on, call } from '@/lib/ipc'
+import { isWeb, openPath, pickFolder as pickFolderCap } from '@/lib/capabilities'
 
 const STATUS_LABEL: Record<string, string> = {
   idle: 'Synchronized',
@@ -305,12 +306,8 @@ export function Sync() {
   }, [])
 
   const pickFolder = async () => {
-    if (!window.bridge?.openFolderDialog) {
-      toast.error('Unavailable', 'Folder dialogs are only available in the desktop app')
-      return
-    }
     try {
-      const picked = await window.bridge.openFolderDialog()
+      const picked = await pickFolderCap()
       if (picked) setFolderPath(picked)
     } catch {
       toast.error('Pick Failed', 'Could not open the folder picker.')
@@ -388,20 +385,22 @@ export function Sync() {
   }
 
   const handleOpenFolder = async (path: string) => {
-    if (window.bridge?.openPath) {
-      const res = await window.bridge.openPath(path)
-      if (res?.error) {
-        toast.error('Cannot Open Folder', res.error)
-      }
-    } else {
-      toast.error('Unavailable', 'Opening folders is only available in desktop app.')
+    if (isWeb) {
+      // The browser cannot open the host's file manager — the folder lives on
+      // this machine and the user can reveal it from there.
+      toast.info('Desktop Only', 'Open the folder in the MeshDrop desktop app to reveal it here.')
+      return
+    }
+    const res = await openPath(path)
+    if (res?.error) {
+      toast.error('Cannot Open Folder', res.error)
     }
   }
 
   const handleOpenTrash = async (localPath: string) => {
-    if (!window.bridge?.openPath) return
+    if (isWeb) return
     const trashPath = `${localPath.replace(/[\\/]+$/, '')}/.meshdrop-trash`
-    const res = await window.bridge.openPath(trashPath)
+    const res = await openPath(trashPath)
     if (res?.error) {
       toast.info('Trash Empty', 'No archived files have been moved to safety trash yet.')
     }

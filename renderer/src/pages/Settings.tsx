@@ -26,6 +26,17 @@ import { useDevices } from '@/hooks/useDevices'
 import { call, on } from '@/lib/ipc'
 import { METHODS, EVENTS } from '@/types/protocol'
 import { formatBytes } from '@/lib/format'
+import {
+  capabilities,
+  checkForUpdates as capCheckForUpdates,
+  downloadUpdate as capDownloadUpdate,
+  onUpdateStatus,
+  pickFolder as pickFolderCap,
+  portableStatus,
+  quitAndInstall,
+  setContextMenuEnabled,
+  setUpdateChannel
+} from '@/lib/capabilities'
 import type { PortableStatus, UpdateStatusData } from '@/types/bridge'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/Modal'
@@ -169,38 +180,34 @@ export function Settings() {
       // credential): in dev builds it applies directly.
       if (!isDevBuild) return
       set('releaseChannel', 'dev')
-      window.bridge?.setUpdateChannel?.('dev')
+      setUpdateChannel('dev')
       toast.success('Dev Channel Enabled', 'Switched to Developer pre-release updates.')
       return
     }
     set('releaseChannel', newChannel)
-    window.bridge?.setUpdateChannel?.(newChannel)
+    setUpdateChannel(newChannel)
     toast.success('Channel Switched', `Switched update channel to ${newChannel}.`)
   }
 
   useEffect(() => {
-    window.bridge?.portableStatus?.().then(setPortableInfo).catch(() => {})
+    portableStatus().then(setPortableInfo).catch(() => {})
   }, [])
 
   // Live updater progress/state pushed from the main process.
   useEffect(() => {
-    const unsub = window.bridge?.onUpdateStatus?.((data) => {
+    const unsub = onUpdateStatus((data) => {
       setUpdateStatus(data)
       if (data.status === 'error' && data.message) {
         toast.error('Update Failed', data.message)
       }
     })
-    return () => unsub?.()
+    return () => unsub()
   }, [toast])
 
   const handleCheckForUpdates = async () => {
-    if (!window.bridge?.checkForUpdates) {
-      toast.error('Unavailable', 'Update checks are only available in the desktop app')
-      return
-    }
     setChecking(true)
     try {
-      const res = await window.bridge.checkForUpdates()
+      const res = await capCheckForUpdates()
       setUpdateStatus(res as UpdateStatusData)
       if (res?.status === 'unconfigured') {
         toast.info(
@@ -217,7 +224,7 @@ export function Settings() {
 
   const handleDownloadUpdate = async () => {
     try {
-      await window.bridge?.downloadUpdate()
+      await capDownloadUpdate()
     } catch (err: any) {
       toast.error('Download Failed', err?.message || 'Could not start the update download.')
     }
@@ -225,7 +232,7 @@ export function Settings() {
 
   const handleQuitAndInstall = async () => {
     try {
-      await window.bridge?.quitAndInstall()
+      await quitAndInstall()
     } catch (err: any) {
       toast.error('Install Failed', err?.message || 'Could not restart to install the update.')
     }
@@ -247,12 +254,8 @@ export function Settings() {
   }
 
   const handleChangeDirectory = async () => {
-    if (!window.bridge?.openFolderDialog) {
-      toast.error('Unavailable', 'Folder pickers are only available in the desktop app')
-      return
-    }
     try {
-      const dir = await window.bridge.openFolderDialog()
+      const dir = await pickFolderCap()
       if (dir) await persistDownloadDir(dir)
     } catch (err: any) {
       toast.error('Folder Pick Failed', err?.message || 'Could not open the folder picker.')
@@ -337,9 +340,11 @@ export function Settings() {
             <TabsTrigger value='security' className='gap-2'>
               <Shield className='h-3.5 w-3.5' /> Security
             </TabsTrigger>
-            <TabsTrigger value='updates' className='gap-2'>
-              <RefreshCw className='h-3.5 w-3.5' /> Updates
-            </TabsTrigger>
+            {capabilities.updates && (
+              <TabsTrigger value='updates' className='gap-2'>
+                <RefreshCw className='h-3.5 w-3.5' /> Updates
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Network Tab */}
@@ -461,6 +466,7 @@ export function Settings() {
                   </div>
 
                   <div className='space-y-4 text-xs'>
+                    {capabilities.autostart && (
                     <div className='flex items-center justify-between'>
                       <div>
                         <p className='font-bold text-foreground'>Launch MeshDrop on system startup</p>
@@ -474,7 +480,9 @@ export function Settings() {
                         aria-label='Launch MeshDrop on system startup'
                       />
                     </div>
+                    )}
 
+                    {capabilities.tray && (
                     <div className='flex items-center justify-between border-t border-border/40 pt-3'>
                       <div>
                         <p className='font-bold text-foreground'>Start minimized to system tray</p>
@@ -488,7 +496,9 @@ export function Settings() {
                         aria-label='Start minimized to system tray'
                       />
                     </div>
+                    )}
 
+                    {capabilities.contextMenu && (
                     <div className='flex items-center justify-between border-t border-border/40 pt-3'>
                       <div>
                         <p className='font-bold text-foreground'>Explorer Context Menu Integration</p>
@@ -500,11 +510,12 @@ export function Settings() {
                         checked={settings.contextMenu !== false}
                         onCheckedChange={(v) => {
                           set('contextMenu', v)
-                          window.bridge?.setContextMenuEnabled?.(v)
+                          void setContextMenuEnabled(v)
                         }}
                         aria-label='Explorer Context Menu Integration'
                       />
                     </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -697,7 +708,9 @@ export function Settings() {
             </Card>
           </TabsContent>
 
-          {/* Updates Tab */}
+          {/* Updates Tab (desktop only — the browser host app refreshes by
+              relaunching, see PHASE2 report) */}
+          {capabilities.updates && (
           <TabsContent value='updates' className='space-y-4 pt-4'>
             <Card className='glass-card border-hairline/10'>
               <CardContent className='p-6 space-y-4 text-xs'>
@@ -857,6 +870,7 @@ export function Settings() {
 
             <PortableInstallModal open={showPortableModal} onOpenChange={setShowPortableModal} />
           </TabsContent>
+          )}
         </Tabs>
       )}
     </div>

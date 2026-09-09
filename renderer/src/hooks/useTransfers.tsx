@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
 import { call, on } from '@/lib/ipc'
+import { fileToPath, pickFile } from '@/lib/capabilities'
 import { useToast } from '@/hooks/useToast'
 import { useNavigation } from '@/hooks/useNavigation'
 import type { Device, IncomingOffer, NavRoute, TransferRecord } from '@/types'
@@ -182,10 +183,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
 
   const sendFileToDevice = useCallback(
     async (device: Device) => {
-      if (typeof window === 'undefined' || !window.bridge?.openFileDialog) {
-        throw new Error('File dialogs are only available in the desktop app')
-      }
-      const file = await window.bridge.openFileDialog()
+      const file = await pickFile()
       if (!file) return null
       const result = await call(METHODS.TRANSFERS_START, {
         filename: file.filename,
@@ -207,11 +205,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
 
   const sendFilePath = useCallback(
     async (device: Device, file: File) => {
-      if (!window.bridge?.getPathForFile) {
-        throw new Error('File drag & drop is only available in the desktop app')
-      }
-      const filePath = window.bridge.getPathForFile(file)
-      if (!filePath) throw new Error('Could not resolve the dropped file path')
+      const filePath = await fileToPath(file)
       const result = await call(METHODS.TRANSFERS_START, {
         filename: file.name,
         filePath,

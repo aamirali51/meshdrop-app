@@ -13,6 +13,7 @@
 const { MeshEngine } = require('@mesh/core')
 const os = require('os')
 const { EVENTS, createEvent } = require('../src/shared/protocol.js')
+const { subscribeEngineEvents } = require('../src/shared/engine-events.js')
 
 // The renderer's IPC client (renderer/src/lib/ipc.ts) addresses the engine
 // through this identifier. It is only a channel name now — no worker exists.
@@ -60,140 +61,52 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
   let startPromise = null
   let networkPollStarted = false
 
-  function forward(event, data) {
-    const isSync = !!(data && (data.isSync || data.source === 'sync'))
-    if (
-      isSync &&
-      (event === EVENTS.TRANSFER_OFFER_RECEIVED ||
-        event === EVENTS.TRANSFER_QUEUED ||
-        event === EVENTS.TRANSFER_STARTED ||
-        event === EVENTS.TRANSFER_COMPLETED)
-    ) {
-      return
+  // Final framing for this transport: a protocol event becomes a Buffer of
+  // JSON pushed over the legacy worker channel. The translation table and its
+  // sync-suppression gate live in ../src/shared/engine-events.js (shared with
+  // the standalone host), so this sink is the only Electron-specific piece.
+  const sink = {
+    send(event, data) {
+      sendToAll('pear:worker:ipc:' + WORKER_SPECIFIER, Buffer.from(createEvent(event, data)))
     }
-    sendToAll('pear:worker:ipc:' + WORKER_SPECIFIER, Buffer.from(createEvent(event, data)))
   }
 
   // Map @mesh/core events to the worker-protocol events the renderer consumes.
+  // Site-visit side effects (gateway token rotation, persisted notification)
+  // stay Electron-specific and are injected as hooks.
   function wireEvents() {
-    engine.on('peer:connected', (device) => {
-      forward(EVENTS.DEVICE_PAIRED, device)
-      forward(EVENTS.PEER_CONNECTED, device)
-      forward(EVENTS.DEVICE_ONLINE, device)
-      forward(EVENTS.DEVICE_UPDATED, device)
-      forward(EVENTS.CONNECTION_CHANGED, engine.getStatus())
-    })
-    engine.on('peer:disconnected', ({ id }) => {
-      forward(EVENTS.PEER_DISCONNECTED, { id })
-      forward(EVENTS.DEVICE_OFFLINE, { id })
-      forward(EVENTS.DEVICE_UPDATED, { id })
-      forward(EVENTS.CONNECTION_CHANGED, engine.getStatus())
-    })
-    engine.on('trust:paired', ({ peer }) => {
-      forward(EVENTS.DEVICE_PAIRED, peer)
-      forward(EVENTS.DEVICE_UPDATED, peer)
-    })
-    // Two-tier trust: a LAN peer was recognized at the 'lan' level. Surface
-    // the one-tap "pair?" prompt and refresh the device list (the lan-level
-    // identity row is display-only).
-    engine.on('device:detected:lan', (data) => {
-      forward(EVENTS.DEVICE_DISCOVERED, data)
-      forward(EVENTS.DEVICE_UPDATED, data)
-    })
-    engine.on('trust:revoked', (data) => {
-      // A remote host deleted this device. Forward so the renderer can surface
-      // "you were removed" instead of the peer discovering it on next reconnect.
-      forward(EVENTS.DEVICE_REMOVED, data)
-    })
-    engine.on('device:removed', (data) => {
-      forward(EVENTS.DEVICE_REMOVED, data)
-    })
-    // Local rename (engine.renameDevice) and inbound rename broadcasts from
-    // connected peers both surface here so the device list refreshes.
-    engine.on('device:updated', (data) => {
-      forward(EVENTS.DEVICE_UPDATED, data)
-    })
-    engine.on('transfer:offer', (offer) => forward(EVENTS.TRANSFER_OFFER_RECEIVED, offer))
-    engine.on('transfer:queued', (t) => forward(EVENTS.TRANSFER_QUEUED, t))
-    engine.on('transfer:started', (t) => forward(EVENTS.TRANSFER_STARTED, t))
-    engine.on('transfer:progress', (d) => forward(EVENTS.TRANSFER_PROGRESS, d))
-    engine.on('transfer:paused', (t) => forward(EVENTS.TRANSFER_PAUSED, t))
-    engine.on('transfer:resumed', (t) => forward(EVENTS.TRANSFER_RESUMED, t))
-    engine.on('transfer:cancelled', (t) => forward(EVENTS.TRANSFER_CANCELLED, t))
-    engine.on('transfer:completed', (t) => forward(EVENTS.TRANSFER_COMPLETED, t))
-    engine.on('transfer:failed', (t) => forward(EVENTS.TRANSFER_FAILED, t))
-    engine.on('sync:library:added', (d) => forward(EVENTS.SYNC_LIBRARY_ADDED, d))
-    engine.on('sync:library:removed', (d) => forward(EVENTS.SYNC_LIBRARY_REMOVED, d))
-    engine.on('sync:scan', (d) => forward(EVENTS.SYNC_SCAN, d))
-    engine.on('sync:up_to_date', (d) => forward(EVENTS.SYNC_UP_TO_DATE, d))
-    engine.on('sync:completed', (d) => forward(EVENTS.SYNC_COMPLETED, d))
-    engine.on('sync:deleted', (d) => forward(EVENTS.SYNC_DELETED, d))
-    engine.on('sync:conflict', (d) => forward(EVENTS.SYNC_CONFLICT, d))
-    engine.on('sync:error', (d) => forward(EVENTS.SYNC_ERROR, d))
-    engine.on('sync:denied', (d) => forward(EVENTS.SYNC_DENIED, d))
-    engine.on('sync:invite:received', (d) => forward(EVENTS.SYNC_INVITE_RECEIVED, d))
-    engine.on('sync:phase', (d) => forward(EVENTS.SYNC_PHASE, d))
-    engine.on('claim:preview', (d) => forward(EVENTS.CLAIM_PREVIEW_RECEIVED, d))
-    // Host-side drop-share lifecycle: an expiry sweep or a first claim flipped
-    // a pending share — the renderer refreshes its share grid on these.
-    engine.on('pending:share:expired', (share) => forward(EVENTS.PENDING_SHARE_EXPIRED, share))
-    engine.on('pending:share:claimed', (share) => forward(EVENTS.PENDING_SHARE_CLAIMED, share))
-    engine.on('watch:state:updated', (d) => forward(EVENTS.WATCH_STATE_CHANGED, d))
-    engine.on('party:room:created', (d) => forward(EVENTS.WATCH_ROOM_CREATED, d))
-    engine.on('party:room:joined', (d) => forward(EVENTS.WATCH_ROOM_JOINED, d))
-    engine.on('party:room:updated', (d) => forward(EVENTS.WATCH_ROOM_UPDATED, d))
-    engine.on('party:room:left', (d) => forward(EVENTS.WATCH_ROOM_LEFT, d))
-    engine.on('party:room:closed', (d) => forward(EVENTS.WATCH_ROOM_CLOSED, d))
-    engine.on('party:peer:joined', (d) => forward(EVENTS.WATCH_PEER_JOINED, d))
-    engine.on('party:peer:left', (d) => forward(EVENTS.WATCH_PEER_LEFT, d))
-    engine.on('party:peer:status', (d) => forward(EVENTS.WATCH_PEER_STATUS, d))
-    engine.on('party:state:sync', (d) => forward(EVENTS.WATCH_STATE_SYNC, d))
-    engine.on('party:reaction', (d) => forward(EVENTS.WATCH_REACTION, d))
-    engine.on('party:rooms:discovered', (d) => forward(EVENTS.WATCH_ROOMS_DISCOVERED, d))
-    engine.on('party:media:offer', (d) => forward(EVENTS.WATCH_MEDIA_OFFER, d))
-    engine.on('party:media:ready', (d) => forward(EVENTS.WATCH_MEDIA_READY, d))
-    engine.on('party:media:error', (d) => forward(EVENTS.WATCH_MEDIA_ERROR, d))
-    engine.on('party:chat', (d) => forward(EVENTS.WATCH_CHAT_MESSAGE, d))
-    engine.on('party:chat:history', (d) => forward(EVENTS.WATCH_CHAT_HISTORY, d))
-    engine.on('party:voice', (d) => forward(EVENTS.WATCH_VOICE_CHUNK, d))
-    engine.on('party:moderated', (d) => forward(EVENTS.WATCH_MODERATED, d))
-    engine.on('site:visitor:added', (d) => forward(EVENTS.SITE_VISITOR_ADDED, d))
-    engine.on('site:invite:received', (d) => forward(EVENTS.SITE_INVITE_RECEIVED, d))
-    engine.on('site:visitor:removed', (d) => forward(EVENTS.SITE_VISITOR_REMOVED, d))
-    engine.on('site:visitor:failed', (d) => forward(EVENTS.SITE_VISITOR_FAILED, d))
-    engine.on('site:visit:started', (d) => {
-      forward(EVENTS.SITE_VISIT_STARTED, d)
-      try {
-        const { resetToken } = require('./sites-gateway')
-        resetToken()
-      } catch {}
-      // Also persist as notification so Visit tab shows it after restart
-      try { if (engine.notificationStore) engine.notificationStore.addNotification('Shared Folder', `"${d.name || d.code || 'A folder'}" is now available`, 'info') } catch {}
-    })
-    engine.on('site:visit:stopped', (d) => {
-      forward(EVENTS.SITE_VISIT_STOPPED, d)
-      try {
-        const { resetToken } = require('./sites-gateway')
-        resetToken()
-      } catch {}
-    })
-    engine.on('notification:received', (n) => forward(EVENTS.NOTIFICATION_RECEIVED, n))
-    engine.on('tunnel:offer', (d) => forward(EVENTS.TUNNEL_OFFER, d))
-    engine.on('tunnel:opened', (d) => forward(EVENTS.TUNNEL_OPENED, d))
-    engine.on('tunnel:closed', (d) => forward(EVENTS.TUNNEL_CLOSED, d))
-    engine.on('tunnel:error', (d) => forward(EVENTS.TUNNEL_ERROR, d))
-    // Tunnel codes are ephemeral DHT topics — no extra follow-up, offer/opened/closed above is enough for UI refresh
-    engine.on('error', (err) => {
-      if (err && err.code && err.code !== 'claim_rejected') {
-        console.error(`[Main:${getLabel()}] Engine error:`, err.message || err)
-        return
+    subscribeEngineEvents({
+      engine,
+      sink,
+      hooks: {
+        onVisitStarted: (data) => {
+          try {
+            const { resetToken } = require('./sites-gateway')
+            resetToken()
+          } catch {}
+          try {
+            if (engine.notificationStore) {
+              engine.notificationStore.addNotification(
+                'Shared Folder',
+                `"${data.name || data.code || 'A folder'}" is now available`,
+                'info'
+              )
+            }
+          } catch {}
+        },
+        onVisitStopped: () => {
+          try {
+            const { resetToken } = require('./sites-gateway')
+            resetToken()
+          } catch {}
+        },
+        onEngineError: (err, kind) => {
+          console.error(
+            `[Main:${getLabel()}] Engine error:`,
+            kind === 'coded' ? err.message || err : err
+          )
+        }
       }
-      if (err && err.code === 'claim_rejected') {
-        // The renderer toasts drop-claim failures (expired / already used).
-        forward(EVENTS.PENDING_SHARE_CLAIM_FAILED, err)
-        return
-      }
-      console.error(`[Main:${getLabel()}] Engine error:`, err)
     })
   }
 
@@ -208,7 +121,7 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
       console.log(
         `[Main:${getLabel()}] Engine ready (${identity.deviceId} code ${identity.pairingCode})`
       )
-      forward(EVENTS.WORKER_READY, {
+      sink.send(EVENTS.WORKER_READY, {
         identity: { ...engine.deviceIdentity, pairingCode: identity.pairingCode }
       })
       // Watch for interface changes (Wi-Fi → ethernet, router swap, VPN):
