@@ -18,7 +18,7 @@ import { useShares } from '@/hooks/useShares'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useToast } from '@/hooks/useToast'
 import { Modal } from '@/components/Modal'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/ui/primitives/Button'
 import { formatBytes } from '@/lib/format'
 
 function getFileIcon(filename: string) {

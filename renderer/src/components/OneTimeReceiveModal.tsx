@@ -3,7 +3,7 @@ import { Download, ShieldCheck, ArrowRight, XCircle } from 'lucide-react'
 import { useShares } from '@/hooks/useShares'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useToast } from '@/hooks/useToast'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/ui/primitives/Button'
 import { Modal } from '@/components/Modal'
 
 function normalizeCode(raw: string): string | null {
