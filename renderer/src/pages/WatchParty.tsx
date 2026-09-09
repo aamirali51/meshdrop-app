@@ -1000,6 +1000,7 @@ export function WatchParty() {
 
             <button
               disabled={!selectedFile || loading}
+              title={!selectedFile && !loading ? 'Pick a video file first — click the picker above to choose one' : undefined}
               onClick={handleCreateRoom}
               className='mt-3 flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-md hover:bg-primary/90 disabled:opacity-50 transition-all text-sm'
             >

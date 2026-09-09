@@ -2,7 +2,6 @@ import {
   Activity,
   ShieldCheck,
   Wifi,
-  Clock,
   ArrowDownToLine,
   ArrowUpFromLine,
   Network,
@@ -39,14 +38,14 @@ export function Diagnostics() {
 
       {!isOnline && (
         <div className='rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs'>
-          <p className='font-bold text-amber-600 dark:text-amber-400'>Mesh is connecting…</p>
+          <p className='font-bold text-amber-600 dark:text-amber-400'>You're not connected yet</p>
           <p className='text-muted-foreground mt-1'>Pair a device or check your network. Metrics below populate once peers connect.</p>
         </div>
       )}
       {!hasPeers && isOnline && (
         <div className='rounded-xl border border-border/40 bg-card/40 p-4 text-xs'>
-          <p className='font-bold text-foreground'>No peers connected yet</p>
-          <p className='text-muted-foreground mt-1'>Latency, packet loss and throughput appear once a device links.</p>
+          <p className='font-bold text-foreground'>No devices connected yet</p>
+          <p className='text-muted-foreground mt-1'>Latency, packet loss and transfer speed appear once a device links.</p>
         </div>
       )}
 
@@ -67,7 +66,7 @@ export function Diagnostics() {
         <Card className='glass-card border-border/60'>
           <CardContent className='p-4 space-y-2'>
             <div className='flex items-center justify-between'>
-              <span className='text-xs font-semibold text-muted-foreground'>Connected Peers</span>
+              <span className='text-xs font-semibold text-muted-foreground'>Connected Devices</span>
               <Wifi className='h-4 w-4 text-primary' />
             </div>
             <p className='text-xl font-mono font-bold text-primary'>
@@ -81,7 +80,7 @@ export function Diagnostics() {
           <CardContent className='p-4 space-y-2'>
             <div className='flex items-center justify-between'>
               <span className='text-xs font-semibold text-muted-foreground'>
-                Encryption Protocol
+                Encryption
               </span>
               <Activity className='h-4 w-4 text-accent' />
             </div>
@@ -108,7 +107,7 @@ export function Diagnostics() {
             </span>
           </div>
           <div className='rounded-xl border border-border/40 bg-card/40 p-4 flex items-center justify-between'>
-            <span className='text-muted-foreground'>Throughput</span>
+            <span className='text-muted-foreground'>Transfer Speed</span>
             <span className='font-mono font-bold text-foreground'>
               {diagnostics.bandwidthMbps != null ? `${diagnostics.bandwidthMbps} Mbps` : '—'}
             </span>
@@ -117,7 +116,7 @@ export function Diagnostics() {
             <span className='flex items-center gap-1 text-muted-foreground'>
               Packet Loss
               <span
-                title='Approximated from PING/PONG success rate over the signaling channel'
+                title='Estimated from how often devices answer network check-ins'
                 className='cursor-help rounded-full bg-muted/40 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60'
               >
                 approx.
@@ -128,7 +127,7 @@ export function Diagnostics() {
             </span>
           </div>
           <div className='rounded-xl border border-border/40 bg-card/40 p-4 flex items-center justify-between'>
-            <span className='text-muted-foreground'>DHT Nodes</span>
+            <span className='text-muted-foreground'>Known Devices</span>
             <span className='font-mono font-bold text-foreground flex items-center gap-1'>
               <Network className='h-3.5 w-3.5 text-purple-400' />
               {diagnostics.dhtNodes != null ? diagnostics.dhtNodes : '—'}
@@ -149,7 +148,7 @@ export function Diagnostics() {
             </span>
           </div>
           <div className='rounded-xl border border-border/40 bg-card/40 p-4 flex items-center justify-between'>
-            <span className='text-muted-foreground'>Node Uptime</span>
+            <span className='text-muted-foreground'>Running Time</span>
             <span className='font-mono font-bold text-foreground'>{uptime}</span>
           </div>
           <div className='rounded-xl border border-border/40 bg-card/40 p-4 flex items-center justify-between'>
@@ -164,13 +163,6 @@ export function Diagnostics() {
             <span className='font-mono font-bold text-foreground flex items-center gap-1'>
               <ArrowUpFromLine className='h-3.5 w-3.5 text-purple-400' />
               {diagnostics.bytesSent != null ? formatBytes(diagnostics.bytesSent) : '—'}
-            </span>
-          </div>
-          <div className='rounded-xl border border-border/40 bg-card/40 p-4 flex items-center justify-between'>
-            <span className='text-muted-foreground'>DHT Nodes</span>
-            <span className='font-mono font-bold text-foreground flex items-center gap-1'>
-              <Clock className='h-3.5 w-3.5' />
-              {diagnostics.dhtNodes != null ? diagnostics.dhtNodes : '—'}
             </span>
           </div>
         </div>
