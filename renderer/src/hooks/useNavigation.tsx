@@ -19,6 +19,23 @@ const ROUTE_ORDER: NavRoute[] = [
   '/about'
 ]
 
+// Human page names, kept next to ROUTE_ORDER so a route's shortcut, sidebar
+// label and window title can't drift apart. TopBar renders these as headings.
+export const PAGE_TITLES: Record<NavRoute, string> = {
+  '/dashboard': 'Share',
+  '/devices': 'My Devices',
+  '/sync': 'Sync Folders',
+  '/party': 'Watch Party',
+  '/shared-folders': 'Shared Folders',
+  '/tunnels': 'Tunnels',
+  '/transfers': 'Transfers',
+  '/activity': 'Activity',
+  '/history': 'History',
+  '/diagnostics': 'Diagnostics',
+  '/settings': 'Settings',
+  '/about': 'About'
+}
+
 /** Position-based shortcut number (Ctrl+1..9); null when the route has no
  * shortcut. Ten and beyond are unreachable on real keyboards (Ctrl+10 is not
  * typable), so they are deliberately not advertised. */
@@ -55,6 +72,12 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     setCurrentRoute(route)
     if (typeof window !== 'undefined') window.location.hash = route
   }, [])
+
+  // F22: hash-only navigation left the window/tab title stuck on the static
+  // "MeshDrop" from index.html — follow the current page instead.
+  useEffect(() => {
+    document.title = currentRoute ? `${PAGE_TITLES[currentRoute]} — MeshDrop` : 'MeshDrop'
+  }, [currentRoute])
 
   useEffect(() => {
     const onHash = () => {

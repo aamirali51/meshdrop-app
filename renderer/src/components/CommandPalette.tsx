@@ -209,7 +209,7 @@ export function CommandPalette() {
                 setActiveIndex(0)
               }}
               onKeyDown={handleKeyDown}
-              placeholder='Type a command or search devices...'
+              placeholder='Search pages, actions, devices…'
               className='flex-1 bg-transparent text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground'
               autoFocus
             />

@@ -109,9 +109,9 @@ function openGithub() {
   openExternal(url)
 }
 
-// Read the live app version from the packaged build (window.bridge.pkg returns
-// the real package.json) so the About page never goes stale between releases.
-// Falls back to a plain "Open Source" badge in a bare browser (no Electron).
+// Electron: read the live app version from the packaged build (window.bridge
+// pkg reports the real package.json) so the badge never goes stale between
+// releases. Web mode has no package.json — see hostInfo below.
 const APP_VERSION = appVersion()
 
 export function About() {
@@ -166,7 +166,7 @@ export function About() {
               <span className='rounded-md bg-primary/20 px-2 py-0.5 text-xs font-mono font-bold text-primary border border-primary/30'>
                 {isWeb
                   ? hostInfo?.engineVersion
-                    ? `v${hostInfo.engineVersion}`
+                    ? `Engine v${hostInfo.engineVersion}`
                     : 'Open Source'
                   : APP_VERSION
                     ? `v${APP_VERSION}`

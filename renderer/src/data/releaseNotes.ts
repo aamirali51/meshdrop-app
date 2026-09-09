@@ -10,9 +10,9 @@ export interface ReleaseNoteItem {
 }
 
 export const LATEST_RELEASE_NOTES: ReleaseNoteItem = {
-  version: '1.0.38',
+  version: '1.0.63',
   title: "What's New in MeshDrop",
-  date: 'August 2026',
+  date: 'September 2026',
   features: [
     {
       icon: 'folder',

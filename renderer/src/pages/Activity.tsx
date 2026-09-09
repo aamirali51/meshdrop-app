@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { History as HistoryIcon, ArrowLeftRight, Tv, Bell } from 'lucide-react'
 import { useActivity } from '@/hooks/useActivity'
 import { Card, CardContent } from '@/components/ui/card'
-import { formatTime } from '@/lib/format'
+import { formatFullTimestamp } from '@/lib/format'
 import type { ActivityType } from '@/types'
 
 type Filter = 'all' | ActivityType
@@ -48,7 +48,7 @@ export function Activity() {
       <div>
         <h2 className='text-xl font-black text-foreground'>Activity</h2>
         <p className='text-xs text-muted-foreground'>
-          Transfers, sessions, and notifications — a live timeline.
+          Live timeline of what's happening.
         </p>
       </div>
 
@@ -100,7 +100,7 @@ export function Activity() {
                     <div className='flex items-center justify-between gap-2'>
                       <p className='text-sm font-bold text-foreground truncate'>{item.title}</p>
                       <span className='text-[10px] font-mono text-muted-foreground shrink-0'>
-                        {formatTime(item.timestamp)}
+                        {formatFullTimestamp(item.timestamp)}
                       </span>
                     </div>
                     {item.description && (

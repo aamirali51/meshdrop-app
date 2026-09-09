@@ -38,6 +38,25 @@ export function formatTime(date: Date | string | number | undefined | null): str
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/** Full timestamp for event rows: relative when recent (<7d), otherwise an
+ * unambiguous absolute stamp ("9 Jul 2026, 03:54"). Shared by the Activity
+ * and History timelines. */
+export function formatFullTimestamp(date: Date | string | number | undefined | null): string {
+  if (!date) return '—'
+  const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date
+  if (!d || isNaN(d.getTime())) return '—'
+  const diff = Date.now() - d.getTime()
+  if (diff >= 0 && diff < 7 * 86400000) return formatTime(d)
+  return d.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+}
+
 export function formatDate(date: Date | string | number | undefined | null): string {
   if (!date) return '—'
   const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date

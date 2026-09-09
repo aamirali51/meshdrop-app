@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { History as HistoryIcon, Search, ArrowLeftRight, Tv, Trash2 } from 'lucide-react'
 import { useActivity } from '@/hooks/useActivity'
 import { Card } from '@/components/ui/card'
+import { formatFullTimestamp } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/Modal'
 import type { ActivityType } from '@/types'
@@ -46,7 +47,7 @@ export function History() {
       <div>
         <h2 className='text-xl font-black text-foreground'>History</h2>
         <p className='text-xs text-muted-foreground'>
-          A searchable record of transfers and remote sessions.
+          Searchable record of everything.
         </p>
       </div>
 
@@ -125,7 +126,7 @@ export function History() {
                     )}
                   </td>
                   <td className='p-3.5 font-mono text-muted-foreground'>
-                    {new Date(item.timestamp).toLocaleString()}
+                    {formatFullTimestamp(item.timestamp)}
                   </td>
                   <td className='p-3.5 font-mono text-[10px] text-muted-foreground'>
                     {item.transferMethod || '—'}

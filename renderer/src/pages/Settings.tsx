@@ -308,7 +308,7 @@ export function Settings() {
       {/* Header */}
       <div className='flex flex-col md:flex-row md:items-center justify-between gap-4'>
         <div>
-          <h2 className='text-xl font-black text-foreground'>Security & Settings</h2>
+          <h2 className='text-xl font-black text-foreground'>Settings</h2>
           <p className='text-xs text-muted-foreground'>
             Changes save automatically as you make them.
           </p>
