@@ -81,6 +81,9 @@ export function MainLayout() {
   }
 
   return (
+    // Outer guard: the global overlays below (modals, pill) render OUTSIDE the
+    // per-page boundary, so an error there used to unmount the whole app root.
+    <ErrorBoundary>
     <div
       className='relative flex h-screen overflow-hidden bg-background'
       onDragEnter={(e) => {
@@ -184,5 +187,6 @@ export function MainLayout() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   )
 }

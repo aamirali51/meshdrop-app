@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react'
 import { AlertCircle, RefreshCw, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { debugLog } from '@/lib/debugLog'
 
 interface Props {
   children: ReactNode
@@ -22,6 +23,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    debugLog('[ErrorBoundary] Uncaught UI error — page content replaced', {
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack
+    })
     console.error('[ErrorBoundary] Uncaught error:', error, errorInfo)
   }
 
@@ -33,10 +39,9 @@ export class ErrorBoundary extends Component<Props, State> {
             <AlertCircle className='h-6 w-6' />
           </div>
           <div className='space-y-1 max-w-md'>
-            <h3 className='text-base font-bold text-foreground'>Something went wrong</h3>
+            <h3 className='text-base font-bold text-foreground'>Something broke on this page</h3>
             <p className='text-xs text-muted-foreground'>
-              An unhandled UI error occurred. You can safely reload the view without losing active
-              background transfers.
+              Reload to continue — active background transfers are not affected.
             </p>
             {this.state.error && (
               <p className='font-mono text-[10px] text-destructive/80 bg-muted/40 p-2 rounded-xl mt-2 border border-border/40 text-left overflow-x-auto'>
@@ -57,11 +62,11 @@ export class ErrorBoundary extends Component<Props, State> {
             </Button>
             <Button
               size='sm'
-              onClick={() => this.setState({ hasError: false, error: null })}
+              onClick={() => window.location.reload()}
               className='gap-2 rounded-xl font-bold'
             >
               <RefreshCw className='h-4 w-4' />
-              Reload Component
+              Reload
             </Button>
           </div>
         </div>

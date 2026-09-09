@@ -117,8 +117,19 @@ export function Transfers() {
   }, [hasWaitingPeer])
 
   const waitTimeoutMs = waitingTimeoutMs()
+  // Engine records carry createdAt as an ISO string; some events use epoch ms.
+  // NaN-safe parse — Number('2026-09-09T…') is NaN → 0, which made every
+  // waiting row look instantly timed out and the countdown never ran.
+  const createdAtMs = (t: TransferRecord) => {
+    if (!t.createdAt) return 0
+    const ts =
+      typeof t.createdAt === 'string'
+        ? Date.parse(t.createdAt)
+        : new Date(t.createdAt).getTime()
+    return Number.isFinite(ts) && ts > 0 ? ts : 0
+  }
   const waitingElapsedMs = (t: TransferRecord) =>
-    nowTick - Math.max(Number(t.createdAt) || 0, retriedAt[t.id] || 0)
+    nowTick - Math.max(createdAtMs(t), retriedAt[t.id] || 0)
   const waitingTimedOut = (t: TransferRecord) =>
     t.status === 'waiting_peer' && waitingElapsedMs(t) >= waitTimeoutMs
 

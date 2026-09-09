@@ -58,9 +58,12 @@ export function DropPreviewModal() {
     }
   }, [claimPreview])
 
-  if (!claimPreview) return null
-
-  const files = claimPreview.files || []
+  // Rules of Hooks: this modal stays mounted for the app's lifetime while
+  // claimPreview flips null -> preview, so every hook must run on each render.
+  // (P0: the two memos below used to sit AFTER the early return, so the first
+  // arriving claim preview ran an 8th hook on an existing fiber — React error
+  // #310 unmounted the whole UI.)
+  const files = claimPreview?.files || []
 
   const filteredFiles = useMemo(() => {
     if (!filterQuery.trim()) return files
@@ -73,6 +76,8 @@ export function DropPreviewModal() {
       .filter((f) => selectedIndices.has(f.index))
       .reduce((sum, f) => sum + (f.fileSize || 0), 0)
   }, [files, selectedIndices])
+
+  if (!claimPreview) return null
 
   const toggleSelectAll = () => {
     if (selectedIndices.size === files.length) {
