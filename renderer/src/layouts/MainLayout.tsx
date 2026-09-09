@@ -17,7 +17,7 @@ import { Tunnels } from '@/pages/Tunnels'
 import { About } from '@/pages/About'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Upload } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { CommandPalette } from '@/components/CommandPalette'
 import { NotificationDrawer } from '@/components/NotificationDrawer'
@@ -35,6 +35,8 @@ import { useApp } from '@/hooks/useAppState'
 import { useDevices } from '@/hooks/useDevices'
 import { useTransfers } from '@/hooks/useTransfers'
 import { resolveDrop } from '@/lib/capabilities'
+
+const DesignPreview = lazy(() => import('@/ui/DesignPreview').then((m) => ({ default: m.DesignPreview })))
 
 const pages: Record<string, React.FC> = {
   '/dashboard': Dashboard,
@@ -60,6 +62,13 @@ export function MainLayout() {
   const { toast } = useToast()
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0)
+  const [hash, setHash] = useState(() => (typeof window !== 'undefined' ? window.location.hash : ''))
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash)
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+  const isDesignPreview = import.meta.env.DEV && hash === '#/_design'
   const Page = pages[currentRoute] || Dashboard
 
   // Files dropped anywhere on the window start a share — the app's primary
@@ -118,19 +127,25 @@ export function MainLayout() {
         )}
         <main className='flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6'>
           <div className='w-full pb-6'>
-            <AnimatePresence mode='wait'>
-              <motion.div
-                key={currentRoute}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.15, ease: 'easeOut' }}
-              >
-                <ErrorBoundary>
-                  <Page />
-                </ErrorBoundary>
-              </motion.div>
-            </AnimatePresence>
+            {isDesignPreview ? (
+              <Suspense fallback={<div className='p-8 text-sm text-muted-foreground'>Loading design preview…</div>}>
+                <DesignPreview />
+              </Suspense>
+            ) : (
+              <AnimatePresence mode='wait'>
+                <motion.div
+                  key={currentRoute}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                >
+                  <ErrorBoundary>
+                    <Page />
+                  </ErrorBoundary>
+                </motion.div>
+              </AnimatePresence>
+            )}
           </div>
         </main>
       </div>
