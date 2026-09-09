@@ -366,14 +366,14 @@ export function WatchParty() {
       setGuestProgress({ pct, mb })
       if (d.playable) setPlayerError(null)
     })
-    call('transfers.list' as any).then((list: any) => {
+    call(METHODS.TRANSFERS_LIST, null).then((list: any) => {
       const hit = Array.isArray(list) ? list.find((x: any) => x.id === sid) : null
       if (hit && typeof hit.progress === 'number') {
         const pct = hit.progress
         const bytes = fileSize > 0 ? Math.round((fileSize * pct) / 100) : 0
         setGuestProgress({ pct, mb: (bytes / (1024 * 1024)).toFixed(1) })
       }
-    }).catch(() => {})
+    }).catch((err: Error) => toast.error('Progress Refresh Failed', err?.message || 'Could not refresh the playback progress.'))
     return () => { try { (unsub as any)?.() } catch {} }
   }, [activeRoom])
 
@@ -490,7 +490,9 @@ export function WatchParty() {
       const maxSec = Math.max(0, (covered / fileSize) * dur - marginSec)
       if (targetSec > maxSec) {
         const byteOff = Math.max(0, Math.floor((targetSec / Math.max(1, dur)) * fileSize))
-        call('setPlayheadByte' as any, { transferId: sid, byteOffset: byteOff }).catch(() => {})
+        call(METHODS.SET_PLAYHEAD_BYTE as any, { transferId: sid, byteOffset: byteOff }).catch((err: Error) =>
+          toast.error('Playback Sync Failed', err?.message || 'Could not sync the playback position.')
+        )
         return maxSec
       }
     } catch {}
@@ -566,7 +568,6 @@ export function WatchParty() {
   }, [activeRoom, isPlaying])
 
   const triggerReactionAnimation = (emoji: string) => {
-    console.log('[WatchParty] triggerReactionAnimation:', emoji)
     const id = Date.now() + Math.random()
     const x = Math.random() * 80 + 10
     setFloatingReactions((prev) => [...prev, { id, emoji, x }])
@@ -829,10 +830,6 @@ export function WatchParty() {
 
   const handleTimestampedReaction = (reaction: any) => {
     const pos = typeof reaction.positionSec === 'number' ? reaction.positionSec : null
-    console.log(
-      '[WatchParty] reaction received:', reaction?.emoji,
-      'pos:', pos, 'local:', currentTimeRef.current, 'playing:', isPlayingRef.current
-    )
     if (pos == null) {
       triggerReactionAnimation(reaction.emoji)
       return

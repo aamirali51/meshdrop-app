@@ -65,13 +65,13 @@ const MODE_META: Record<string, { label: string; icon: typeof ArrowLeftRight; de
   'push': {
     label: 'Send-Only (Backup)',
     icon: ArrowUpRight,
-    desc: 'Local folder is master. Remote device is a read-only mirror.',
+    desc: 'One-way sync: this folder is the source. Files are copied to the remote device only.',
     badge: 'bg-meshdrop-cyan/15 text-meshdrop-cyan border-meshdrop-cyan/30'
   },
   'receive_only': {
-    label: 'Receive-Only (Mirror)',
+    label: 'Receive-Only',
     icon: ArrowDownLeft,
-    desc: 'Remote device is master. Local changes will never be pushed.',
+    desc: 'One-way sync: the remote device is the source. Nothing on this device is ever uploaded.',
     badge: 'bg-purple-500/15 text-purple-400 border-purple-500/30'
   }
 }
@@ -487,7 +487,7 @@ export function Sync() {
         <div className='relative z-10 p-6 md:p-7 space-y-5'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
             <span className='rounded-full border border-meshdrop-cyan/30 bg-meshdrop-cyan/10 px-3 py-1 text-[11px] font-bold text-meshdrop-cyan flex items-center gap-1.5 w-fit'>
-              <ArrowLeftRight className='h-3.5 w-3.5' /> 3-Way Baseline Sync Engine
+              <ArrowLeftRight className='h-3.5 w-3.5' /> Continuous Folder Sync
             </span>
             <span className='flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground'>
               <ShieldCheck className='h-3.5 w-3.5 text-status-online' /> P2P Encrypted · No Cloud Intermediaries
@@ -889,7 +889,7 @@ export function Sync() {
       {/* ── Continuous Sync Guarantee Footer ───────────────────────────── */}
       <div className='flex items-center gap-2 rounded-xl border border-border/40 bg-card/40 p-3 text-[11px] text-muted-foreground'>
         <CheckCircle2 className='h-3.5 w-3.5 shrink-0 text-status-online' />
-        MeshDrop uses a 3-Way Baseline Snapshot Engine. Files stream directly between your devices with end-to-end encryption.
+        MeshDrop keeps folders in sync directly between your devices with end-to-end encryption.
         Deleted files are safely moved to the local <code className='text-foreground font-mono'>.meshdrop-trash</code> archive, never permanently deleted without warning.
       </div>
 

@@ -1,6 +1,7 @@
 import { EVENTS, PROTOCOL_VERSION, isProtocolCompatible } from '@/types/protocol'
 import type { MethodName, EventName, WireMessage, RequestMessage } from '@/types/protocol'
 import { HttpTransport, consumeUrlToken, locationBaseUrl } from './httpTransport'
+import { debugLog } from './debugLog'
 
 const WORKER_SPECIFIER = '/workers/main.js'
 
@@ -210,7 +211,7 @@ async function bridgeCall(method: MethodName, params?: unknown): Promise<unknown
   const isNoisy = NOISY_METHODS.has(method)
   const ts = new Date().toISOString().slice(11, 23)
   if (!isNoisy) {
-    console.log(`[IPC ${ts}] >> ${id} ${method}`, formatLogArg(params))
+    debugLog(`[IPC ${ts}] >> ${id} ${method}`, formatLogArg(params))
   }
 
   if (!isBridgeAvailable) {
@@ -240,7 +241,7 @@ async function bridgeCall(method: MethodName, params?: unknown): Promise<unknown
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       pending.delete(id)
-      console.log(`[IPC ${new Date().toISOString().slice(11, 23)}] !! ${id} TIMEOUT ${method}`)
+      debugLog(`[IPC ${new Date().toISOString().slice(11, 23)}] !! ${id} TIMEOUT ${method}`)
       reject(new Error(`Request timed out: ${method}`))
     }, timeoutMs)
 
@@ -248,12 +249,12 @@ async function bridgeCall(method: MethodName, params?: unknown): Promise<unknown
       resolve: (result: unknown) => {
         if (!isNoisy) {
           const ts2 = new Date().toISOString().slice(11, 23)
-          console.log(`[IPC ${ts2}] << ${id} ${method}`, result !== undefined ? result : '')
+          debugLog(`[IPC ${ts2}] << ${id} ${method}`, result !== undefined ? result : '')
         }
         resolve(result)
       },
       reject: (error: Error) => {
-        console.log(
+        debugLog(
           `[IPC ${new Date().toISOString().slice(11, 23)}] !! ${id} ERROR ${method}: ${error.message}`
         )
         reject(error)
@@ -286,7 +287,7 @@ async function bridgeCall(method: MethodName, params?: unknown): Promise<unknown
       .catch((err) => {
         pending.delete(id)
         clearTimeout(timer)
-        console.log(
+        debugLog(
           `[IPC ${new Date().toISOString().slice(11, 23)}] !! ${id} WRITE FAILED ${method}: ${err.message}`
         )
         reject(err)
@@ -352,7 +353,7 @@ function startBridge(): void {
     const ts = new Date().toISOString().slice(11, 23)
     const msg = parseMessage(raw)
     if (!msg) {
-      console.log(`[IPC ${ts}] ?? UNPARSEABLE`, raw)
+      debugLog(`[IPC ${ts}] ?? UNPARSEABLE`, raw)
       return
     }
     if (!isProtocolCompatible(msg)) {
@@ -366,14 +367,14 @@ function startBridge(): void {
       pending.delete(msg.id)
       clearTimeout(req.timer)
       if (msg.error) {
-        console.log(`[IPC ${ts}] !! ${msg.id} ERROR`, msg.error)
+        debugLog(`[IPC ${ts}] !! ${msg.id} ERROR`, msg.error)
         req.reject(new Error(msg.error))
       } else {
         req.resolve(msg.result)
       }
     } else if (msg.type === 'event') {
       if (!NOISY_EVENTS.has(msg.event)) {
-        console.log(`[IPC ${ts}] >> EVENT ${msg.event}`, formatLogArg(msg.data))
+        debugLog(`[IPC ${ts}] >> EVENT ${msg.event}`, formatLogArg(msg.data))
       }
       if ((msg.event as string) === (EVENTS.WORKER_READY as string) && !ready) {
         ready = true

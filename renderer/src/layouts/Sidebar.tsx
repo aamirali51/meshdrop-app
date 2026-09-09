@@ -207,7 +207,7 @@ export function Sidebar() {
           <button
             onClick={() => setIsCollapsed(true)}
             className='no-drag rounded-lg p-1 text-muted-foreground transition-all hover:bg-accent hover:text-foreground'
-            title='Collapse Sidebar (⌘B)'
+            title={isMac ? 'Collapse Sidebar (⌘B)' : isElectron ? 'Collapse Sidebar (Ctrl B)' : 'Collapse Sidebar'}
           >
             <ChevronLeft className='h-4 w-4' />
           </button>
@@ -250,7 +250,7 @@ export function Sidebar() {
           <button
             onClick={() => setIsCollapsed(false)}
             className='rounded-lg p-2 text-muted-foreground transition-all hover:bg-accent hover:text-foreground'
-            title='Expand Sidebar (⌘B)'
+            title={isMac ? 'Expand Sidebar (⌘B)' : isElectron ? 'Expand Sidebar (Ctrl B)' : 'Expand Sidebar'}
           >
             <ChevronRight className='h-4 w-4' />
           </button>

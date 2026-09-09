@@ -5,7 +5,8 @@ const s = ((shared as any)?.default || shared) as typeof shared
 export const METHODS = {
   ...(s.METHODS || {}),
   WATCH_STATE_BROADCAST: s.METHODS?.WATCH_STATE_BROADCAST || 'watch.stateBroadcast',
-  STREAM_URL_GET: s.METHODS?.STREAM_URL_GET || 'stream.getUrl'
+  STREAM_URL_GET: s.METHODS?.STREAM_URL_GET || 'stream.getUrl',
+  RELAY_STATS: (s.METHODS as Record<string, string> | undefined)?.RELAY_STATS || 'relay.stats'
 } as typeof s.METHODS
 
 export const EVENTS = {

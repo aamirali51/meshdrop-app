@@ -76,7 +76,7 @@ export function TopBar() {
         </div>
       </div>
 
-      {/* Global Command Palette Trigger (Cmd+K) — hidden on small screens (⌘K still works) */}
+      {/* Global Command Palette Trigger — hidden on small screens */}
       <div className='no-drag hidden md:block mx-auto max-w-md flex-1'>
         <button
           onClick={toggleCommandPalette}
@@ -85,7 +85,7 @@ export function TopBar() {
           <Search className='h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground' />
           <span className='flex-1 text-left'>Search nodes, transfers, actions...</span>
           <span className='rounded-md border border-hairline/10 bg-muted/60 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground'>
-            ⌘K
+            {isMac ? '⌘K' : isElectron ? 'Ctrl K' : 'Click to search'}
           </span>
         </button>
       </div>

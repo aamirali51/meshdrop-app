@@ -142,7 +142,7 @@ export function SharedFoldersProvider({ children }: { children: ReactNode }) {
     // WS resync (web): re-pull sites/visits once the transport reopens.
     const unsubResync = onSessionResynced(refresh)
     // A share just landed — surface a toast so it's not silent
-    const unsubInvite = on('site.invite_received' as string, (data: unknown) => {
+    const unsubInvite = on((EVENTS as unknown as Record<string, string>).SITE_INVITE_RECEIVED || 'site.invite_received', (data: unknown) => {
       const d = data as { name?: string; code?: string } | null
       if (d && (d.name || d.code)) toast.success('Shared Folder Received', `"${d.name || d.code}" — tap Visit to open`)
     })

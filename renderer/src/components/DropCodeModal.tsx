@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Link2,
   Copy,
@@ -118,6 +118,9 @@ export function DropCodeModal() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [share, setShare] = useState<DropShare | null>(null)
+  // When the code was just created, its success toast is still visible —
+  // don't stack the "Code Still Active" close toast on top of it (F30).
+  const createdAtRef = useRef(0)
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
@@ -212,7 +215,12 @@ export function DropCodeModal() {
     // Closing the dialog does NOT stop the share: the code keeps advertising
     // in the worker until claimed, revoked, or expired. Say so explicitly so
     // the sender knows they can close the window and share the code later.
-    if (share && (shareStatus === 'waiting' || shareStatus === 'claimed') && !isExpired) {
+    if (
+      share &&
+      (shareStatus === 'waiting' || shareStatus === 'claimed') &&
+      !isExpired &&
+      Date.now() - createdAtRef.current > 12000
+    ) {
       const remaining = formatRemaining(liveShare?.expiresAt || share.expiresAt)
       toast.success(
         'Code Still Active',
@@ -276,6 +284,7 @@ export function DropCodeModal() {
       else params.folderPath = source.folderPath
       const result = (await createDropCode(params)) as DropShare
       setShare(result)
+      createdAtRef.current = Date.now()
       // The whole point of a drop is the link — copy it immediately so there
       // is nothing left to do after clicking "Generate".
       try {
@@ -394,7 +403,7 @@ export function DropCodeModal() {
 
               <p className='flex items-center gap-1.5 text-[11px] text-muted-foreground'>
                 <FileText className='h-3 w-3 shrink-0' />
-                <span className='truncate'>{shareLabel(share)} · {formatBytes(share.fileSize)}</span>
+                <span className='min-w-0 flex-1 truncate' title={shareLabel(share)}>{shareLabel(share)} · {formatBytes(share.fileSize)}</span>
               </p>
 
               <div className='rounded-xl border border-border/40 bg-card/40 p-2.5 text-xs space-y-1'>

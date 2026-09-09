@@ -19,9 +19,11 @@ import { useApp } from '@/hooks/useAppState'
 import { useShares } from '@/hooks/useShares'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useToast } from '@/hooks/useToast'
+import { useFirstRun } from '@/hooks/useFirstRun'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DeviceCard } from '@/components/DeviceCard'
+import { FirstRunGuide } from '@/components/FirstRunGuide'
 import { ConfirmDialog } from '@/components/Modal'
 import { formatBytes, formatTime } from '@/lib/format'
 import { buildShareLink, shareLinkMeta } from '@/lib/shareLinks'
@@ -68,6 +70,9 @@ export function Dashboard() {
   } = useShares()
   const { navigate } = useNavigation()
   const { toast } = useToast()
+  const { firstRun, dismissFirstRun } = useFirstRun(
+    devices.some((d) => d.isTrusted) || transfers.length > 0 || pendingShares.length > 0
+  )
 
   const [removeTarget, setRemoveTarget] = useState<Device | null>(null)
   const [zoneDragging, setZoneDragging] = useState(false)
@@ -266,6 +271,9 @@ const copyLink = async (s: PendingShare) => {
       </div>
 
       {/* ── Compact stats strip (user-meaningful only) ────────────────── */}
+      {firstRun ? (
+        <FirstRunGuide onShare={pickFiles} onDismiss={dismissFirstRun} />
+      ) : (
       <div className='grid grid-cols-3 gap-4'>
         <button
           onClick={() => navigate('/transfers')}
@@ -306,6 +314,7 @@ const copyLink = async (s: PendingShare) => {
           </p>
         </button>
       </div>
+      )}
 
       {/* ── Active one-time shares ────────────────────────────────────── */}
       <div className='space-y-3'>
@@ -338,10 +347,10 @@ const copyLink = async (s: PendingShare) => {
                 className='flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-card/40 px-3 py-2.5'
               >
                 <div className='min-w-0 flex-1'>
-                  <p className='truncate font-mono text-sm font-black tracking-wider text-primary'>
+                  <p className='truncate font-mono text-sm font-black tracking-wider text-primary' title={s.code}>
                     {s.code}
                   </p>
-                  <p className='truncate text-[11px] text-muted-foreground'>
+                  <p className='truncate text-[11px] text-muted-foreground' title={shareLabel(s)}>
                     {shareLabel(s)} · {formatBytes(s.fileSize)}
                   </p>
                 </div>

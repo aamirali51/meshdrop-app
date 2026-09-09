@@ -310,13 +310,13 @@ export function Settings() {
         <div>
           <h2 className='text-xl font-black text-foreground'>Security & Settings</h2>
           <p className='text-xs text-muted-foreground'>
-            Changes save automatically. Use Save to flush any pending edits.
+            Changes save automatically as you make them.
           </p>
         </div>
 
         <Button onClick={handleSave} disabled={loading || !isDirty} className='font-bold text-xs gap-2'>
           <Check className='h-4 w-4' />
-          {isDirty ? 'Save Changes •' : 'All Saved'}
+          {isDirty ? 'Save Changes' : 'Up to date'}
         </Button>
       </div>
 
@@ -879,16 +879,23 @@ export function Settings() {
 
 function RelayStats() {
   const [stats, setStats] = React.useState<any>(null)
+  const [unavailable, setUnavailable] = React.useState(false)
   React.useEffect(() => {
     let alive = true
     const fetch = () => {
-      call('relay.stats', null).then((s: any) => { if (alive) setStats(s) }).catch(() => {})
+      call((METHODS as unknown as Record<string, string>).RELAY_STATS || 'relay.stats', null)
+        .then((s: any) => { if (alive) { setStats(s); setUnavailable(false) } })
+        .catch(() => { if (alive && stats === null) setUnavailable(true) })
     }
     fetch()
     const id = setInterval(fetch, 4000)
     return () => { alive = false; clearInterval(id) }
   }, [])
-  if (!stats) return null
+  if (!stats) return unavailable ? (
+    <p className='mt-1 text-[10px] text-muted-foreground'>
+      Relay statistics are not available on this device.
+    </p>
+  ) : null
   return (
     <div className='mt-2 text-[11px] text-muted-foreground'>
       <span className='font-mono'>{stats.active || 0} relay session(s)</span>

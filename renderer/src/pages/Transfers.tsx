@@ -20,6 +20,7 @@ import { useTransfers } from '@/hooks/useTransfers'
 import { useDevices } from '@/hooks/useDevices'
 import { useShares } from '@/hooks/useShares'
 import { useToast } from '@/hooks/useToast'
+import { useFirstRun } from '@/hooks/useFirstRun'
 import { formatBytes, formatSpeed, formatEta, formatTime } from '@/lib/format'
 import { downloadUrl, isWeb, showItemInFolder } from '@/lib/capabilities'
 import { Card, CardContent } from '@/components/ui/card'
@@ -27,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { ContextMenu } from '@/components/ContextMenu'
 import { ConfirmDialog } from '@/components/Modal'
 import { WatchPartyModal } from '@/components/WatchPartyModal'
+import { FirstRunGuide } from '@/components/FirstRunGuide'
 import type { TransferRecord, TransferStatus } from '@/types'
 
 const STATUS_LABEL: Record<TransferStatus, string> = {
@@ -92,8 +94,11 @@ export function Transfers() {
     sendFileToDevice
   } = useTransfers()
   const { devices } = useDevices()
-  const { toggleDropCodeModal, openWatchParty, claimFileWithCode } = useShares()
+  const { pendingShares, toggleDropCodeModal, openWatchParty, claimFileWithCode } = useShares()
   const { toast } = useToast()
+  const { firstRun, dismissFirstRun } = useFirstRun(
+    devices.some((d) => d.isTrusted) || transfers.length > 0 || pendingShares.length > 0
+  )
   const [targetId, setTargetId] = useState('')
   const [sending, setSending] = useState(false)
   const [clearMode, setClearMode] = useState<'finished' | 'all' | null>(null)
@@ -449,6 +454,9 @@ export function Transfers() {
       </div>
 
       {/* Summary Stats */}
+      {firstRun ? (
+        <FirstRunGuide onShare={toggleDropCodeModal} onDismiss={dismissFirstRun} />
+      ) : (
       <div className='grid grid-cols-3 gap-4'>
         <Card className='glass-card border-border/60'>
           <CardContent className='p-4 flex items-center justify-between'>
@@ -488,6 +496,7 @@ export function Transfers() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Transfer List */}
       <Card className='glass-card border-border/60'>

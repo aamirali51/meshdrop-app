@@ -1,5 +1,6 @@
 import { EVENTS, PROTOCOL_VERSION, isProtocolCompatible } from '@/types/protocol'
 import type { EventName, MethodName, WireMessage } from '@/types/protocol'
+import { debugLog } from './debugLog'
 
 // HTTP/WS transport for the standalone meshdrop-host (Phase 2 web mode).
 //
@@ -210,7 +211,7 @@ export class HttpTransport {
     this.token = opts.token
     this.fetchImpl = opts.fetchImpl ?? defaultFetch()
     this.socketFactory = opts.socketFactory ?? defaultSocketFactory
-    this.log = opts.log ?? ((...args: unknown[]) => console.log(...args))
+    this.log = opts.log ?? ((...args: unknown[]) => debugLog(...args))
     this.onStatusChange = opts.onStatusChange
   }
 

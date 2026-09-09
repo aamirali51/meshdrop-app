@@ -47,7 +47,12 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
 
 const DEFAULT_DURATION = 5000
+const SUCCESS_DURATION = 4000
 const MAX_TOASTS = 5
+
+function toastKey(t: Pick<ToastItem, 'type' | 'title' | 'message'>): string {
+  return `${t.type}|${t.title}|${t.message ?? ''}`
+}
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -76,12 +81,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback(
     (item: Omit<ToastItem, 'id'>) => {
+      const key = toastKey(item)
+      // Deduplicate by content (F30): repeating the same message replaces the
+      // still-visible toast instead of stacking another copy on top.
+      const dup = toasts.find((x) => toastKey(x) === key)
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-      const durationMs = item.durationMs ?? DEFAULT_DURATION
-      setToasts((prev) => [...prev.slice(-(MAX_TOASTS - 1)), { ...item, id }])
+      const durationMs = item.durationMs ?? (item.type === 'success' ? SUCCESS_DURATION : DEFAULT_DURATION)
+      if (dup) {
+        const t = timers.current.get(dup.id)
+        if (t) {
+          clearTimeout(t)
+          timers.current.delete(dup.id)
+        }
+        setToasts((prev) => [
+          ...prev.filter((x) => x.id !== dup.id).slice(-(MAX_TOASTS - 1)),
+          { ...item, id }
+        ])
+      } else {
+        setToasts((prev) => [...prev.slice(-(MAX_TOASTS - 1)), { ...item, id }])
+      }
       scheduleDismiss(id, durationMs)
     },
-    [scheduleDismiss]
+    [scheduleDismiss, toasts]
   )
 
   const pauseToast = useCallback((id: string) => {
