@@ -462,8 +462,8 @@ const copyLink = async (s: PendingShare) => {
                   className='flex w-full items-center justify-between p-2.5 rounded-xl border border-hairline/10 bg-card/30 hover:bg-card/60 transition-all text-xs text-left'
                 >
                   <div className='space-y-0.5 min-w-0'>
-                    <p className='font-bold text-foreground truncate'>{item.title}</p>
-                    <p className='text-[10px] text-muted-foreground truncate'>
+                    <p className='font-bold text-foreground truncate' title={item.title}>{item.title}</p>
+                    <p className='text-[10px] text-muted-foreground truncate' title={item.description || formatTime(item.timestamp)}>
                       {item.description || formatTime(item.timestamp)}
                     </p>
                   </div>

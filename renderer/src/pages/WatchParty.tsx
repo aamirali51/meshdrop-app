@@ -490,7 +490,7 @@ export function WatchParty() {
       const maxSec = Math.max(0, (covered / fileSize) * dur - marginSec)
       if (targetSec > maxSec) {
         const byteOff = Math.max(0, Math.floor((targetSec / Math.max(1, dur)) * fileSize))
-        call(METHODS.SET_PLAYHEAD_BYTE as any, { transferId: sid, byteOffset: byteOff }).catch((err: Error) =>
+        call(METHODS.SET_PLAYHEAD_BYTE, { transferId: sid, byteOffset: byteOff }).catch((err: Error) =>
           toast.error('Playback Sync Failed', err?.message || 'Could not sync the playback position.')
         )
         return maxSec
@@ -947,8 +947,8 @@ export function WatchParty() {
                 <Film className='h-6 w-6' />
               </div>
               {selectedFile ? (
-                <div className='text-center'>
-                  <p className='text-sm font-semibold text-foreground'>{selectedFile.name}</p>
+                <div className='w-full text-center'>
+                  <p className='truncate text-sm font-semibold text-foreground' title={selectedFile.name}>{selectedFile.name}</p>
                   <p className='text-xs text-muted-foreground mt-0.5'>{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB · Ready to Stream</p>
                 </div>
               ) : (

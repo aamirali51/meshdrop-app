@@ -24,9 +24,9 @@ export function SyncInviteModal() {
   const [busy, setBusy] = useState<boolean>(false)
 
   useEffect(() => {
-    call(METHODS.SYNC_LIST_INVITES || 'sync.listInvites')
+    call(METHODS.SYNC_LIST_INVITES)
       .then((res: unknown) => { if (Array.isArray(res)) setInvites(res as SyncInvite[]) })
-      .catch(() => {})
+      .catch(() => toast.error('Sync Invites', 'Could not load incoming sync invitations.'))
     const onInvite = (data: unknown) => {
       const d = data as SyncInvite | null
       if (d && d.id) setInvites((prev) => (prev.some((x) => x.id === d.id) ? prev : [...prev, d]))
@@ -98,7 +98,7 @@ export function SyncInviteModal() {
                 {invite.mode && (
                   <span className='rounded-full border border-primary/30 bg-primary/15 px-2 py-0.5 text-[9px] font-extrabold uppercase text-primary'>
                     {invite.mode === 'push'
-                      ? 'Receive Mirror'
+                      ? 'Receive Copy'
                       : invite.mode === 'receive_only'
                       ? 'Send Backup'
                       : 'Two-Way Sync'}
@@ -141,7 +141,7 @@ export function SyncInviteModal() {
           {invite.mode === 'push' ? (
             <>
               <ArrowDownLeft className='h-3.5 w-3.5 shrink-0 text-purple-400' />
-              <span>Receive-Only Mirror · Direct encrypted incoming stream</span>
+              <span>Receive-Only Copy · Direct encrypted incoming stream</span>
             </>
           ) : invite.mode === 'receive_only' ? (
             <>

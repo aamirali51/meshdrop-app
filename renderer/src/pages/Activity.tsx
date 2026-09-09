@@ -98,13 +98,13 @@ export function Activity() {
 
                   <div className='flex-1 min-w-0'>
                     <div className='flex items-center justify-between gap-2'>
-                      <p className='text-sm font-bold text-foreground truncate'>{item.title}</p>
+                      <p className='text-sm font-bold text-foreground truncate' title={item.title}>{item.title}</p>
                       <span className='text-[10px] font-mono text-muted-foreground shrink-0'>
                         {formatFullTimestamp(item.timestamp)}
                       </span>
                     </div>
                     {item.description && (
-                      <p className='text-[11px] text-muted-foreground truncate'>
+                      <p className='text-[11px] text-muted-foreground truncate' title={item.description}>
                         {item.description}
                       </p>
                     )}

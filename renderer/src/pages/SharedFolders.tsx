@@ -200,7 +200,7 @@ function HostView({ sites, activeSites, onPublish, onUpdateSite, onAddVisitor, o
         <div className='mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary'><Globe className='h-7 w-7' /></div>
         <h3 className='text-base font-black'>Share a private folder</h3>
         <p className='mt-1 max-w-sm text-xs text-muted-foreground'>Pick a folder — allowed peers browse it right in their browser. No cloud copy, no open ports, host must stay online.</p>
-        <p className='mt-2 text-[11px] text-muted-foreground'>How it's different from Sync: Sync copies everything locally and keeps it mirrored. Shared Folders stream — no local copy, browse-only unless you allow edits, expires when you say so.</p>
+        <p className='mt-2 text-[11px] text-muted-foreground'>How it's different from Sync: Sync keeps a full local copy on this device, updated automatically. Shared Folders stream — no local copy, browse-only unless you allow edits, expires when you say so.</p>
         <Button onClick={onPublish} className='mt-5 gap-2 font-bold'><FolderPlus className='h-4 w-4' /> Share a Folder</Button>
       </Card>
     )

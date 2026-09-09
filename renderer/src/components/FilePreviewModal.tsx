@@ -353,7 +353,7 @@ export function FilePreviewModal({ open, file, rawUrl, onDownload, onOpenExterna
               <div className='flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-white/70'><File className='h-8 w-8' /></div>
               <p className='text-sm font-bold text-white'>Can't play this format in-app</p>
               <p className='text-xs leading-relaxed text-white/50'>
-                <span className='font-mono'>{file.name}</span> uses a container Chromium can't decode natively. Download it to play locally, or open it in your system browser/player.
+                <span className='break-all font-mono' title={file.name}>{file.name}</span> uses a container Chromium can't decode natively. Download it to play locally, or open it in your system browser/player.
               </p>
               <div className='mt-2 flex flex-wrap justify-center gap-2'>
                 {onDownload && (

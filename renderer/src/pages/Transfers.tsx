@@ -551,7 +551,7 @@ export function Transfers() {
                   <div className='flex-1 min-w-0 space-y-1.5'>
                     <div className='flex items-center justify-between gap-2'>
                       <div className='min-w-0'>
-                        <p className='text-sm font-bold text-foreground truncate'>{t.filename}</p>
+                        <p className='text-sm font-bold text-foreground truncate' title={t.filename}>{t.filename}</p>
                         {t.status === 'waiting_peer' ? (
                           waitingTimedOut(t) ? (
                             <p className='text-[11px] font-semibold text-destructive'>

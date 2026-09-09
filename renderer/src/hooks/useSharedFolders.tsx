@@ -130,19 +130,19 @@ export function SharedFoldersProvider({ children }: { children: ReactNode }) {
       debounce = setTimeout(() => refresh(), 250)
     }
     const events = [
-      EVENTS.SITE_UPDATED || 'site.updated',
-      EVENTS.SITE_VISITOR_ADDED || 'site.visitor_added',
-      EVENTS.SITE_VISITOR_REMOVED || 'site.visitor_removed',
-      EVENTS.SITE_VISITOR_FAILED || 'site.visitor_failed',
-      EVENTS.SITE_VISIT_STARTED || 'site.visit_started',
-      EVENTS.SITE_VISIT_STOPPED || 'site.visit_stopped',
-      EVENTS.SITE_INVITE_RECEIVED || 'site.invite_received'
+      EVENTS.SITE_UPDATED,
+      EVENTS.SITE_VISITOR_ADDED,
+      EVENTS.SITE_VISITOR_REMOVED,
+      EVENTS.SITE_VISITOR_FAILED,
+      EVENTS.SITE_VISIT_STARTED,
+      EVENTS.SITE_VISIT_STOPPED,
+      EVENTS.SITE_INVITE_RECEIVED
     ]
     const unsubs = events.map((e) => on(e, debouncedRefresh))
     // WS resync (web): re-pull sites/visits once the transport reopens.
     const unsubResync = onSessionResynced(refresh)
     // A share just landed — surface a toast so it's not silent
-    const unsubInvite = on((EVENTS as unknown as Record<string, string>).SITE_INVITE_RECEIVED || 'site.invite_received', (data: unknown) => {
+    const unsubInvite = on(EVENTS.SITE_INVITE_RECEIVED, (data: unknown) => {
       const d = data as { name?: string; code?: string } | null
       if (d && (d.name || d.code)) toast.success('Shared Folder Received', `"${d.name || d.code}" — tap Visit to open`)
     })

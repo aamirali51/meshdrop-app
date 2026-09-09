@@ -202,7 +202,7 @@ export function DropPreviewModal() {
 
                 <div className='shrink-0'>{getFileIcon(file.filename)}</div>
 
-                <span className='min-w-0 flex-1 truncate font-medium text-foreground'>
+                <span className='min-w-0 flex-1 truncate font-medium text-foreground' title={file.filename}>
                   {file.filename}
                 </span>
 

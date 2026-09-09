@@ -690,6 +690,7 @@ export function Sync() {
                       <p
                         onClick={() => handleOpenFolder(lib.localPath)}
                         className='truncate text-sm font-bold text-foreground hover:text-primary cursor-pointer transition-colors'
+                        title={lib.name}
                       >
                         {lib.name}
                       </p>

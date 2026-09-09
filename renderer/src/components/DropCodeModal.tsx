@@ -548,7 +548,9 @@ export function DropCodeModal() {
                           .then(() =>
                             toast.success('Code Revoked', `${s.code} is no longer valid.`)
                           )
-                          .catch(() => {})
+                          .catch(() =>
+                            toast.error('Revoke Failed', `Could not revoke ${s.code} — try again.`)
+                          )
                       }}
                     >
                       Revoke
@@ -572,7 +574,7 @@ export function DropCodeModal() {
                   </div>
                   <div className='max-h-28 space-y-1 overflow-y-auto pr-1'>
                     {source.files.map((f) => (
-                      <p key={f.filePath} className='truncate text-[11px] text-muted-foreground'>
+                      <p key={f.filePath} className='truncate text-[11px] text-muted-foreground' title={f.filename}>
                         {f.filename} · {formatBytes(f.fileSize)}
                       </p>
                     ))}
@@ -581,7 +583,7 @@ export function DropCodeModal() {
               ) : (
                 <div className='flex items-center gap-2'>
                   <Folder className='h-4 w-4 shrink-0 text-primary' />
-                  <span className='min-w-0 flex-1 truncate text-sm font-bold text-foreground'>
+                  <span className='min-w-0 flex-1 truncate text-sm font-bold text-foreground' title={source.name}>
                     {source.name}
                   </span>
                   <span className='shrink-0 text-[11px] text-muted-foreground'>

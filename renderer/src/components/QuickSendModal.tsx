@@ -149,7 +149,7 @@ export function QuickSendModal() {
               )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">
+              <p className="truncate text-sm font-medium text-foreground" title={files.length === 1 ? files[0].filename : undefined}>
                 {files.length === 1 ? files[0].filename : `${files.length} items selected`}
               </p>
               <p className="text-xs text-muted-foreground">{formatBytes(totalBytes)} total</p>

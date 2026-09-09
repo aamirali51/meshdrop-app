@@ -19,7 +19,9 @@ export function UpdateToaster() {
             {
               label: 'Restart Now',
               onClick: () => {
-                restartAndInstall().catch(() => {})
+                restartAndInstall().catch(() =>
+                  toast.error('Restart Failed', 'Could not restart to install the update — try again.')
+                )
               }
             }
           ],

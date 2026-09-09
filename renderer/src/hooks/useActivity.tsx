@@ -22,7 +22,7 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
         .then((res: any) => {
           if (Array.isArray(res)) setActivity(res)
         })
-        .catch(() => {})
+        .catch(() => toast.error('Activity Unavailable', 'Could not load your activity history.'))
     }
     fetchActivity()
     const unsub = on(EVENTS.TRANSFER_COMPLETED, fetchActivity)
