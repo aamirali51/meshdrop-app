@@ -9,10 +9,12 @@ import {
   FileAudio,
   FileCode,
   FileImage,
+  FilePenLine,
   FileSpreadsheet,
   FileText,
   FileVideo,
   Folder,
+  FolderPlus,
   Grid3X3,
   HardDrive,
   Image as ImageIcon,
@@ -22,6 +24,8 @@ import {
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Trash2,
+  Upload,
   X
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -125,11 +129,15 @@ interface FolderBrowserProps {
   connected: boolean
   connecting: boolean
   initialPath?: string
+  canWrite?: boolean
   onNavigatePath: (path: string) => Promise<unknown[]>
   onDownload?: (entry: SiteEntry) => void
   onOpenExternal?: (entry: SiteEntry) => void
   /** Called when the user clicks a previewable file (image/video/audio). */
   onPreview?: (entry: SiteEntry) => void
+  onMkdir?: (path: string) => Promise<void>
+  onWriteFile?: (path: string, dataBase64: string) => Promise<void>
+  onDeletePath?: (path: string) => Promise<void>
   onBack: () => void
   onClose: (siteId: string) => void
 }
@@ -139,10 +147,14 @@ export function FolderBrowser({
   connected,
   connecting,
   initialPath = '/',
+  canWrite = false,
   onNavigatePath,
   onDownload,
   onOpenExternal,
   onPreview,
+  onMkdir,
+  onWriteFile,
+  onDeletePath,
   onBack,
   onClose
 }: FolderBrowserProps) {
@@ -231,6 +243,13 @@ export function FolderBrowser({
     onDownload?.(entry)
   }, [onPreview, onDownload])
 
+  const handleDelete = useCallback((entry: SiteEntry) => {
+    if (!onDeletePath) return
+    const name = entryName(entry)
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+    onDeletePath(entry.path).then(() => load(path)).catch((e) => alert((e as Error).message || 'Delete failed'))
+  }, [onDeletePath, path, load])
+
   const menuItems: ContextMenuItem[] = useMemo(() => {
     if (!menu) return []
     const items: ContextMenuItem[] = []
@@ -240,6 +259,7 @@ export function FolderBrowser({
         icon: <Folder className='h-3.5 w-3.5' />,
         onClick: () => navigate(menu.entry.path)
       })
+      if (canWrite && onDeletePath) items.push({ label: 'Delete folder', icon: <Trash2 className='h-3.5 w-3.5' />, onClick: () => handleDelete(menu.entry) })
     } else {
       items.push({
         label: fileKind(menu.entry.name) === 'image' || fileKind(menu.entry.name) === 'video' || fileKind(menu.entry.name) === 'audio' ? 'Preview' : 'Open',
@@ -252,23 +272,26 @@ export function FolderBrowser({
       if (onOpenExternal) {
         items.push({ label: 'Open in browser', icon: <ExternalLink className='h-3.5 w-3.5' />, onClick: () => onOpenExternal(menu.entry) })
       }
+      if (canWrite && onDeletePath) items.push({ label: 'Delete file', icon: <Trash2 className='h-3.5 w-3.5' />, onClick: () => handleDelete(menu.entry) })
     }
     items.push({ separator: true })
     items.push({ label: 'Refresh', icon: <RefreshCw className='h-3.5 w-3.5' />, onClick: () => load(path) })
     return items
-  }, [menu, navigate, path, load, onDownload, onOpenExternal, openFile])
+  }, [menu, navigate, path, load, onDownload, onOpenExternal, openFile, canWrite, onDeletePath, handleDelete])
 
   const statusLine =
     dirs.length > 0
       ? `${dirs.length} folder${dirs.length === 1 ? '' : 's'} · ${rawFiles.length} file${rawFiles.length === 1 ? '' : 's'}`
       : `${rawFiles.length} file${rawFiles.length === 1 ? '' : 's'}`
 
+  // F10: name truncation with title tooltip — no overflow/scroll
   const renderGridItem = (entry: SiteEntry) => (
     <div
       key={entry.path}
       onContextMenu={(e) => openContextMenu(e, entry)}
       onDoubleClick={() => entry.type === 'dir' ? navigate(entry.path) : openFile(entry)}
       className='group cursor-pointer overflow-hidden rounded-xl border border-border/60 bg-card/50 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md'
+      title={entryName(entry)}
     >
       <div className={cn('relative flex aspect-[4/3] items-center justify-center bg-muted/10', entry.type === 'dir' ? 'bg-primary/5' : '')}>
         {entry.type === 'dir' ? (
@@ -285,12 +308,21 @@ export function FolderBrowser({
             <Download className='h-3.5 w-3.5 text-foreground' />
           </button>
         )}
+        {canWrite && onDeletePath && (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDelete(entry) }}
+            className='absolute left-1.5 top-1.5 rounded-full bg-destructive/90 p-1 opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-destructive group-hover:opacity-100'
+            title='Delete'
+          >
+            <Trash2 className='h-3 w-3 text-white' />
+          </button>
+        )}
       </div>
-      <div className='px-2.5 py-2'>
+      <div className='px-2.5 py-2 min-w-0'>
         <p className='truncate text-xs font-bold text-foreground' title={entryName(entry)}>{entryName(entry)}</p>
-        <p className='mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground'>
-          <span>{entry.type === 'dir' ? 'Folder' : fmtSize(entry.size)}</span>
-          <span>{fmtDate(entry.mtimeMs)}</span>
+        <p className='mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground gap-2'>
+          <span className='truncate'>{entry.type === 'dir' ? 'Folder' : fmtSize(entry.size)}</span>
+          <span className='shrink-0'>{fmtDate(entry.mtimeMs)}</span>
         </p>
       </div>
     </div>
@@ -302,11 +334,12 @@ export function FolderBrowser({
       onContextMenu={(e) => openContextMenu(e, entry)}
       onDoubleClick={() => entry.type === 'dir' ? navigate(entry.path) : openFile(entry)}
       className='group flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-border/60 hover:bg-accent/40'
+      title={entryName(entry)}
     >
       {entry.type === 'dir'
         ? <Folder className='h-5 w-5 shrink-0 text-primary/80' />
         : <FileTypeIcon name={entryName(entry)} className={cn('h-5 w-5 shrink-0', fileTypeColor(entry.name))} />}
-      <span className='min-w-0 flex-1 truncate text-xs font-semibold text-foreground'>{entryName(entry)}</span>
+      <span className='min-w-0 flex-1 truncate text-xs font-semibold text-foreground' title={entryName(entry)}>{entryName(entry)}</span>
       <span className='w-20 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground'>{entry.type === 'file' ? fmtSize(entry.size) : '—'}</span>
       <span className='hidden w-24 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground sm:block'>{fmtDate(entry.mtimeMs)}</span>
       {entry.type === 'file' && (
@@ -323,6 +356,18 @@ export function FolderBrowser({
 
   return (
     <div className='flex h-full flex-col gap-3 overflow-hidden animate-fade-in'>
+      {/* Collab ops — only when role allows */}
+      {canWrite && (onMkdir || onWriteFile) && (
+        <div className='flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2'>
+          <span className='text-[11px] font-bold text-amber-600 flex items-center gap-1'><FilePenLine className='h-3 w-3' />Collaboration enabled</span>
+          <span className='text-[11px] text-muted-foreground hidden sm:inline'>— you can create folders, upload, and delete</span>
+          <span className='ml-auto flex items-center gap-1.5'>
+            {onMkdir && <CollabMkdirButton currentPath={path} onMkdir={onMkdir} onDone={() => load(path)} />}
+            {onWriteFile && <CollabUploadButton currentPath={path} onWriteFile={onWriteFile} onDone={() => load(path)} />}
+          </span>
+        </div>
+      )}
+
       {/* Toolbar: back + breadcrumb | search / view / sort */}
       <div className='flex flex-wrap items-center gap-2'>
         <div className='flex min-w-0 items-center gap-1.5'>
@@ -504,5 +549,50 @@ export function FolderBrowser({
 
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
     </div>
+  )
+}
+
+function CollabMkdirButton({ currentPath, onMkdir, onDone }: { currentPath: string; onMkdir: (path: string) => Promise<void>; onDone: () => void }) {
+  const [name, setName] = useState('')
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    const n = name.trim().replace(/[\/\\]/g, '')
+    if (!n) return
+    const target = (currentPath === '/' ? `/${n}` : `${currentPath.replace(/\/$/, '')}/${n}`)
+    setBusy(true)
+    try { await onMkdir(target); setOpen(false); setName(''); onDone() } catch (e) { alert((e as Error).message || 'Create failed') } finally { setBusy(false) }
+  }
+  if (!open) return <Button size='sm' variant='outline' className='h-7 gap-1 text-xs' onClick={() => setOpen(true)}><FolderPlus className='h-3.5 w-3.5' />New folder</Button>
+  return (
+    <span className='flex items-center gap-1'>
+      <input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { setOpen(false); setName('') } }} placeholder='Folder name' className='w-28 rounded-lg border border-border bg-card px-2 py-1 text-xs outline-none focus:border-primary' autoFocus />
+      <Button size='sm' className='h-7 px-2 text-xs' disabled={busy || !name.trim()} onClick={submit}>{busy ? <Loader2 className='h-3 w-3 animate-spin' /> : 'Create'}</Button>
+      <button onClick={() => { setOpen(false); setName('') }} className='rounded p-1 text-muted-foreground hover:text-foreground'><X className='h-3 w-3' /></button>
+    </span>
+  )
+}
+
+function CollabUploadButton({ currentPath, onWriteFile, onDone }: { currentPath: string; onWriteFile: (path: string, dataBase64: string) => Promise<void>; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setBusy(true)
+    try {
+      for (const f of Array.from(files)) {
+        const buf = await f.arrayBuffer()
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+        const target = (currentPath === '/' ? `/${f.name}` : `${currentPath.replace(/\/$/, '')}/${f.name}`)
+        await onWriteFile(target, b64)
+      }
+      onDone()
+    } catch (e) { alert((e as Error).message || 'Upload failed') } finally { setBusy(false); if (inputRef.current) inputRef.current.value = '' }
+  }
+  return (
+    <span className='flex items-center gap-1'>
+      <input ref={inputRef} type='file' className='hidden' onChange={(e) => handleFiles(e.target.files)} />
+      <Button size='sm' variant='outline' className='h-7 gap-1 text-xs' disabled={busy} onClick={() => inputRef.current?.click()}>{busy ? <Loader2 className='h-3.5 w-3.5 animate-spin' /> : <Upload className='h-3.5 w-3.5' />}Upload</Button>
+    </span>
   )
 }
