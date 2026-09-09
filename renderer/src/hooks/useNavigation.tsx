@@ -38,7 +38,9 @@ export const PAGE_TITLES: Record<NavRoute, string> = {
 
 /** Position-based shortcut number (Ctrl+1..9); null when the route has no
  * shortcut. Ten and beyond are unreachable on real keyboards (Ctrl+10 is not
- * typable), so they are deliberately not advertised. */
+ * typable), so they are deliberately not advertised.
+ * Note: browsers reserve Ctrl+1..9 for tab switching, so these shortcuts only
+ * fire in the Electron window; CommandPalette hides the hints in web mode. */
 export function shortcutNumber(route: NavRoute): number | null {
   const n = ROUTE_ORDER.indexOf(route) + 1
   return n >= 1 && n <= 9 ? n : null
@@ -88,7 +90,10 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  // Global keyboard shortcuts: ⌘/Ctrl + 1..8 navigates to the matching page.
+  // Global keyboard shortcuts: ⌘/Ctrl + 1..9 navigates to the matching page.
+  // (1..9 only — same ceiling as shortcutNumber; digits 10+ are not typable
+  // as a single chord. In a plain browser the OS/browser swallows Ctrl+1..9
+  // for tab switching before this handler can run — Electron-only in effect.)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return

@@ -20,6 +20,7 @@ import { useDevices } from '@/hooks/useDevices'
 import { useTransfers } from '@/hooks/useTransfers'
 import { useNavigation, formatShortcut } from '@/hooks/useNavigation'
 import { useTheme } from '@/hooks/useTheme'
+import { isElectron } from '@/lib/capabilities'
 import type { NavRoute } from '@/types'
 
 interface PaletteItem {
@@ -92,7 +93,11 @@ export function CommandPalette() {
         id: `nav-${i.route}`,
         label: i.label,
         icon: i.icon,
-        hint: formatShortcut(i.route) || undefined,
+        // Ctrl+1..9 are browser-tab switches in a normal browser and never
+        // reach the page, so web mode does not advertise them (same rule as
+        // the TopBar's Ctrl+K hint). Electron owns the real window, so it gets
+        // the hints.
+        hint: isElectron ? (formatShortcut(i.route) || undefined) : undefined,
         action: () => {
           navigate(i.route)
           toggleCommandPalette()
