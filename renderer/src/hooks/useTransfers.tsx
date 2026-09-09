@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
-import { call, on } from '@/lib/ipc'
+import { call, on, onSessionResynced } from '@/lib/ipc'
 import { fileToPath, pickFile } from '@/lib/capabilities'
 import { useToast } from '@/hooks/useToast'
 import { useNavigation } from '@/hooks/useNavigation'
@@ -42,13 +42,18 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
   // Initial load + live subscriptions: incoming offers, transfer lifecycle
   // events (upsert records), and the pill prompt (not forced nav).
   useEffect(() => {
-    call(METHODS.TRANSFERS_LIST, null)
-      .then((res: any) => {
-        if (Array.isArray(res)) {
-          setTransfers(res.filter((t: any) => !t.isSync && t.source !== 'sync'))
-        }
-      })
-      .catch(() => {})
+    const loadTransfers = () => {
+      call(METHODS.TRANSFERS_LIST, null)
+        .then((res: any) => {
+          if (Array.isArray(res)) {
+            setTransfers(res.filter((t: any) => !t.isSync && t.source !== 'sync'))
+          }
+        })
+        .catch(() => {})
+    }
+    loadTransfers()
+    // WS resync (web): re-pull the full history once the transport reopens.
+    const unsubResync = onSessionResynced(loadTransfers)
 
     const unsubOffer = on(EVENTS.TRANSFER_OFFER_RECEIVED, (offer: any) => {
       if (offer && offer.transferId && !offer.isSync && offer.source !== 'sync') {
@@ -116,6 +121,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
       unsubTFailed()
       unsubTCompleted()
       unsubTProgress()
+      unsubResync()
     }
   }, [navigate])
 

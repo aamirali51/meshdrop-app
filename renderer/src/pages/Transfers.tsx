@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -53,6 +53,31 @@ const STATUS_STYLE: Record<TransferStatus, string> = {
   waiting_peer: 'text-amber-500 border-amber-500/30 bg-amber-500/10 border-dashed'
 }
 
+// F05: a receive can wait on "waiting_peer" forever when the sender never
+// comes online (engine timing deliberately untouched — this is UI affordance).
+// Default wait is 5 minutes; override with localStorage
+// 'meshdrop.waitingTimeoutMin' (minutes). The countdown, the timed-out state
+// and Retry/Cancel live here in the renderer.
+const DEFAULT_WAIT_TIMEOUT_MS = 5 * 60 * 1000
+
+function waitingTimeoutMs(): number {
+  try {
+    const raw = localStorage.getItem('meshdrop.waitingTimeoutMin')
+    const n = raw ? Number(raw) : NaN
+    if (Number.isFinite(n) && n > 0) return Math.round(n * 60 * 1000)
+  } catch {
+    /* storage unavailable — default */
+  }
+  return DEFAULT_WAIT_TIMEOUT_MS
+}
+
+function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 export function Transfers() {
   const {
     transfers,
@@ -67,7 +92,7 @@ export function Transfers() {
     sendFileToDevice
   } = useTransfers()
   const { devices } = useDevices()
-  const { toggleDropCodeModal, openWatchParty } = useShares()
+  const { toggleDropCodeModal, openWatchParty, claimFileWithCode } = useShares()
   const { toast } = useToast()
   const [targetId, setTargetId] = useState('')
   const [sending, setSending] = useState(false)
@@ -75,6 +100,37 @@ export function Transfers() {
   const [rowMenu, setRowMenu] = useState<{ transfer: TransferRecord; x: number; y: number } | null>(
     null
   )
+
+  // F05 waiting_peer countdown: tick only while a row is actually waiting.
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  const [retriedAt, setRetriedAt] = useState<Record<string, number>>({})
+  const hasWaitingPeer = transfers.some((t) => t.status === 'waiting_peer')
+  useEffect(() => {
+    if (!hasWaitingPeer) return
+    const iv = window.setInterval(() => setNowTick(Date.now()), 1000)
+    return () => window.clearInterval(iv)
+  }, [hasWaitingPeer])
+
+  const waitTimeoutMs = waitingTimeoutMs()
+  const waitingElapsedMs = (t: TransferRecord) =>
+    nowTick - Math.max(Number(t.createdAt) || 0, retriedAt[t.id] || 0)
+  const waitingTimedOut = (t: TransferRecord) =>
+    t.status === 'waiting_peer' && waitingElapsedMs(t) >= waitTimeoutMs
+
+  const handleRetryWait = async (t: TransferRecord) => {
+    const code = t.claimCode
+    if (!code) {
+      toast.error('Cannot retry', 'This waiting transfer has no claim code to re-send.')
+      return
+    }
+    try {
+      await claimFileWithCode(code)
+      setRetriedAt((prev) => ({ ...prev, [t.id]: Date.now() }))
+      toast.success('Retrying', `Claim re-sent for "${t.filename}" — still waiting for the sender.`)
+    } catch (err) {
+      toast.error('Retry failed', (err as Error)?.message || 'Could not re-send the claim.')
+    }
+  }
 
   const eligibleDevices = devices.filter((d) => d.isOnline && d.isTrusted && (d.publicKey || d.id))
   const activeCount = transfers.filter(
@@ -137,6 +193,16 @@ export function Transfers() {
     if (t.status === 'waiting_peer') {
       return (
         <div className='flex items-center gap-1.5'>
+          {waitingTimedOut(t) && (
+            <Button
+              size='sm'
+              variant='outline'
+              className='h-7 px-2 text-[10px] font-bold'
+              onClick={() => handleRetryWait(t)}
+            >
+              <RotateCcw className='mr-1 h-3 w-3' /> Retry
+            </Button>
+          )}
           <Button
             size='sm'
             variant='ghost'
@@ -467,10 +533,20 @@ export function Transfers() {
                       <div className='min-w-0'>
                         <p className='text-sm font-bold text-foreground truncate'>{t.filename}</p>
                         {t.status === 'waiting_peer' ? (
-                          <p className='text-[11px] text-muted-foreground'>
-                            {t.claimCode || 'DROP code'} · the sender's device has not come online
-                            yet — the download starts automatically when it does
-                          </p>
+                          waitingTimedOut(t) ? (
+                            <p className='text-[11px] font-semibold text-destructive'>
+                              Sender didn't respond — check they're online, then Retry or Cancel.
+                            </p>
+                          ) : (
+                            <p className='text-[11px] text-muted-foreground'>
+                              {t.claimCode || 'DROP code'} · waiting for the sender to accept —
+                              download starts automatically when they come online
+                              <span className='text-muted-foreground/60'>
+                                {' '}
+                                · times out in {formatCountdown(waitTimeoutMs - waitingElapsedMs(t))}
+                              </span>
+                            </p>
+                          )
                         ) : (
                           <p className='text-[11px] text-muted-foreground'>
                             {t.direction === 'send' ? 'to' : 'from'}{' '}

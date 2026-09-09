@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
-import { call, on } from '@/lib/ipc'
+import { call, on, onSessionResynced } from '@/lib/ipc'
 import type { NotificationItem } from '@/types'
 
 interface NotificationsContextValue {
@@ -17,16 +17,24 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   // Initial load + live push of new notifications.
   useEffect(() => {
-    call(METHODS.NOTIFICATIONS_LIST, null)
-      .then((res: any) => {
-        if (Array.isArray(res)) setNotifications(res)
-      })
-      .catch(() => {})
+    const fetchNotifications = () => {
+      call(METHODS.NOTIFICATIONS_LIST, null)
+        .then((res: any) => {
+          if (Array.isArray(res)) setNotifications(res)
+        })
+        .catch(() => {})
+    }
+    fetchNotifications()
 
     const unsub = on(EVENTS.NOTIFICATION_RECEIVED, (notif: any) => {
       if (notif) setNotifications((prev) => [notif, ...prev])
     })
-    return () => unsub()
+    // WS resync (web): re-pull the inbox once the transport reopens.
+    const unsubResync = onSessionResynced(fetchNotifications)
+    return () => {
+      unsub()
+      unsubResync()
+    }
   }, [])
 
   const addNotification = useCallback(

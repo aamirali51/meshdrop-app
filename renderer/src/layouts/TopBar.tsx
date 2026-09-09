@@ -16,9 +16,9 @@ export function TopBar() {
   const {
     toggleCommandPalette,
     toggleNotificationDrawer,
-    diagnostics
+    connectionUp
   } = useApp()
-  const { identity, toggleQRCodeModal } = useDevices()
+  const { identity, devices, toggleQRCodeModal } = useDevices()
   const { notifications } = useNotifications()
   const { theme, toggle } = useTheme()
   const [profileMenu, setProfileMenu] = useState<{ x: number; y: number } | null>(null)
@@ -29,6 +29,7 @@ export function TopBar() {
     '/sync': 'Sync Folders',
     '/party': 'Watch Party',
     '/shared-folders': 'Shared Folders',
+    '/tunnels': 'Tunnels',
     '/transfers': 'Transfers',
     '/activity': 'Activity',
     '/history': 'History',
@@ -39,8 +40,19 @@ export function TopBar() {
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
-  const meshOnline = diagnostics.connected !== false
-  const peers = diagnostics.connectedPeersCount ?? null
+  // F11+F06: the pill tells the truth, in priority order — WS down, no paired
+  // devices, paired with ≥1 online, paired with 0 online. Never "no devices
+  // attached" (this device IS attached) and never "Online" while dead.
+  const remoteOnline = devices.filter((d) => d.isTrusted && d.isOnline).length
+  const pairedCount = devices.filter((d) => d.isTrusted).length
+  const connectionLost = !connectionUp
+  const pill = connectionLost
+    ? { text: 'Connection lost — reconnecting…', online: false as const }
+    : pairedCount === 0
+      ? { text: 'Pair a device to start', online: false as const }
+      : remoteOnline > 0
+        ? { text: `${remoteOnline} device${remoteOnline === 1 ? '' : 's'} online`, online: true as const }
+        : { text: 'Ready — no devices online', online: false as const }
 
   return (
     <header
@@ -84,40 +96,44 @@ export function TopBar() {
         <div
           className={cn(
             'no-drag hidden lg:flex items-center gap-2 rounded-full border px-3 py-1.5',
-            meshOnline ? 'border-meshdrop-cyan/30 bg-meshdrop-cyan/10' : 'border-hairline/10 bg-muted/20'
+            connectionLost
+              ? 'border-red-500/40 bg-red-500/10'
+              : pill.online
+                ? 'border-meshdrop-cyan/30 bg-meshdrop-cyan/10'
+                : 'border-hairline/10 bg-muted/20'
           )}
           title='Live P2P mesh status'
         >
           <span className='relative flex h-2 w-2'>
             <span
               className={cn(
-                'absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping',
-                meshOnline ? 'bg-meshdrop-cyan' : 'bg-muted-foreground/60'
+                'absolute inline-flex h-full w-full rounded-full opacity-75',
+                pill.online && !connectionLost ? 'animate-ping bg-meshdrop-cyan' : '',
+                connectionLost ? 'bg-red-500' : ''
               )}
             />
             <span
               className={cn(
                 'relative inline-flex h-2 w-2 rounded-full',
-                meshOnline ? 'bg-meshdrop-cyan' : 'bg-muted-foreground/60'
+                connectionLost
+                  ? 'bg-red-500'
+                  : pill.online
+                    ? 'bg-meshdrop-cyan'
+                    : 'bg-muted-foreground/60'
               )}
             />
           </span>
           <span
             className={cn(
               'font-mono text-[10px] font-extrabold',
-              meshOnline ? 'text-meshdrop-cyan' : 'text-muted-foreground'
+              connectionLost
+                ? 'text-red-400'
+                : pill.online
+                  ? 'text-meshdrop-cyan'
+                  : 'text-muted-foreground'
             )}
           >
-            {meshOnline ? (
-              <>
-                Online
-                {peers != null && peers > 0
-                  ? ` · ${peers} peer${peers === 1 ? '' : 's'} connected`
-                  : ' · no devices attached'}
-              </>
-            ) : (
-              'Connecting…'
-            )}
+            {pill.text}
           </span>
         </div>
 

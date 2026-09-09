@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
-import { call, on } from '@/lib/ipc'
+import { call, on, onSessionResynced } from '@/lib/ipc'
 import { useToast } from '@/hooks/useToast'
 import type { Device, UserIdentity } from '@/types'
 
@@ -52,11 +52,14 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
 
   // Initial loads + live refresh on device lifecycle events.
   useEffect(() => {
-    call(METHODS.DEVICES_GET_IDENTITY, null)
-      .then((res: any) => {
-        if (res && res.id) setIdentity(res)
-      })
-      .catch(() => {})
+    const refreshIdentity = () => {
+      call(METHODS.DEVICES_GET_IDENTITY, null)
+        .then((res: any) => {
+          if (res && res.id) setIdentity(res)
+        })
+        .catch(() => {})
+    }
+    refreshIdentity()
 
     const refreshDevices = () => {
       call(METHODS.DEVICES_LIST, null)
@@ -83,6 +86,12 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
     const unsub5 = on(EVENTS.PEER_DISCONNECTED, refreshDevices)
     const unsub6 = on(EVENTS.DEVICE_OFFLINE, refreshDevices)
     const unsub7 = on(EVENTS.WORKER_READY, refreshDevices)
+    // WS resync (web): the socket just reopened after the host was unreachable —
+    // identity and the device list may have changed while we were offline.
+    const unsub8 = onSessionResynced(() => {
+      refreshIdentity()
+      refreshDevices()
+    })
 
     return () => {
       clearTimeout(t1)
@@ -95,6 +104,7 @@ export function DevicesProvider({ children }: { children: ReactNode }) {
       unsub5()
       unsub6()
       unsub7()
+      unsub8()
     }
   }, [])
 

@@ -250,30 +250,14 @@ export async function pickFiles(): Promise<PickedFile[] | null> {
 }
 
 /**
- * A folder the engine can read. Electron: native dialog. Web: the host opens
- * the OS-native folder dialog on the machine it runs on (/fs/pick — a Windows
- * host shows the real Windows folder picker). When the host cannot show one
- * (non-Windows, headless session, picker failed to start) the request does not
- * resolve a path, so we fall back to the in-app FolderPickerModal, which walks
- * the HOST's real drives (/fs/drives + /fs/list) and returns the absolute path.
+ * A folder the engine can read. Electron: native OS dialog (desktop app only).
+ * Web: the in-app FolderPickerModal, which walks the HOST's real drives
+ * (/fs/drives + /fs/list) and returns the absolute path chosen there. A
+ * browser page never asks the host to open an OS dialog — the host exposes no
+ * such endpoint (see bridge.js), so this is the only folder path in web mode.
  */
 export async function pickFolder(defaultPath?: string): Promise<string | null> {
   if (isElectronEnv) return bridge?.openFolderDialog() ?? null
-  try {
-    let url = `${locationBaseUrl()}/fs/pick`
-    if (defaultPath) url += `?path=${encodeURIComponent(defaultPath)}`
-    const res = await webFetch(url)
-    if (res.status === 403) throw new Error(SESSION_EXPIRED_MESSAGE)
-    if (res.ok) {
-      const data = (await res.json().catch(() => null)) as { path?: string | null } | null
-      // path:null means the user cancelled the native dialog — do not fall
-      // through to the in-app picker.
-      if (data && typeof data.path === 'string') return data.path
-      if (data && data.path === null) return null
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message === SESSION_EXPIRED_MESSAGE) throw err
-  }
   const { pickHostFolder } = await import('@/components/FolderPickerModal')
   return pickHostFolder()
 }
@@ -361,26 +345,66 @@ export interface QuickSendData {
 /** Electron: OS protocol-handler links. Web: a launch URL's ?code= param. */
 export function onDeepLink(callback: (data: DeepLinkData) => void): () => void {
   if (isElectronEnv) return bridge?.onDeepLink(callback) ?? (() => {})
+  webDeepLinkListeners.add(callback)
+  maybeQueueWebDeepLink()
+  return () => {
+    webDeepLinkListeners.delete(callback)
+  }
+}
+
+// Web deep links (?code= in the launch URL). The parameter is read once and
+// stripped on the FIRST subscription; delivery is queued until the session
+// transport is ready (the WS/RPC session a claim needs) and then fanned out to
+// EVERY subscriber — multiple hooks route different code families (DROP →
+// receive modal, SITE → visit), so one code must reach them all, and it must
+// never fire before boot-time subscribers are registered or before the
+// transport can answer the claim.
+const webDeepLinkListeners = new Set<(data: DeepLinkData) => void>()
+let webDeepLinkPending: DeepLinkData | null = null
+let webDeepLinkScheduled = false
+
+function readWebDeepLinkOnce(): DeepLinkData | null {
+  if (webDeepLinkPending) return webDeepLinkPending
   try {
     const url = new URL(window.location.href)
     const raw = url.searchParams.get('code')
-    if (raw) {
-      url.searchParams.delete('code')
-      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
-      const code = decodeURIComponent(raw)
-      // Defer so subscribers (hooks mounting in the same tick) are registered.
-      window.setTimeout(() => {
-        try {
-          callback({ url: window.location.href, code, kind: 'url' })
-        } catch {
-          /* subscriber errors must not escape */
-        }
-      }, 0)
+    if (!raw) return null
+    url.searchParams.delete('code')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+    webDeepLinkPending = {
+      url: window.location.href,
+      code: decodeURIComponent(raw),
+      kind: 'url'
     }
   } catch {
     /* malformed URL — no code */
   }
-  return () => {}
+  return webDeepLinkPending
+}
+
+function maybeQueueWebDeepLink(): void {
+  if (webDeepLinkScheduled || !readWebDeepLinkOnce()) return
+  webDeepLinkScheduled = true
+  // Wait for the session transport (like the Electron path waits for the
+  // worker's ready event), then deliver on a macrotask so every subscriber
+  // that mounts during bootstrap has registered. A ready-failure must not
+  // strand the code silently: still deliver once the queue settles.
+  void import('@/lib/ipc')
+    .then((m) => m.ensureReady().catch(() => {}))
+    .then(() => {
+      window.setTimeout(() => {
+        const pending = webDeepLinkPending
+        webDeepLinkPending = null
+        if (!pending) return
+        for (const cb of [...webDeepLinkListeners]) {
+          try {
+            cb(pending)
+          } catch {
+            /* subscriber errors must not escape */
+          }
+        }
+      }, 0)
+    })
 }
 
 export function onQuickSend(callback: (data: QuickSendData) => void): () => void {

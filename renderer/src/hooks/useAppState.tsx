@@ -1,12 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
-import { call, on } from '@/lib/ipc'
+import { call, on, onConnectionStatus } from '@/lib/ipc'
 import { onTrayHidden, onUpdateDownloaded, restartAndInstall } from '@/lib/capabilities'
 import { useToast } from '@/hooks/useToast'
 import type { NetworkDiagnostics } from '@/types'
 
 interface AppContextValue {
   diagnostics: NetworkDiagnostics
+  /** F06: WS session state from the transport — false while the host is down
+   * and the socket is reconnecting (web mode; always true in Electron). */
+  connectionUp: boolean
   isCommandPaletteOpen: boolean
   isNotificationDrawerOpen: boolean
   toggleCommandPalette: () => void
@@ -32,6 +35,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   })
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false)
+  const [connectionUp, setConnectionUp] = useState(true)
+
+  // F06: mirror the transport's WS state into the shell.
+  useEffect(() => onConnectionStatus(setConnectionUp), [])
 
   // Live diagnostics (real values, no fabrication): initial fetch, a short
   // poll, and a refresh on connection changes. Plus shell-level listeners:
@@ -96,6 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider
       value={{
         diagnostics,
+        connectionUp,
         isCommandPaletteOpen,
         isNotificationDrawerOpen,
         toggleCommandPalette,

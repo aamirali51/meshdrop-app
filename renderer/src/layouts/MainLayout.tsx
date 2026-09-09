@@ -31,6 +31,7 @@ import { SyncInviteModal } from '@/components/SyncInviteModal'
 import { DropPreviewModal } from '@/components/DropPreviewModal'
 import { WhatsNewModal } from '@/components/WhatsNewModal'
 import { WatchPartyModal } from '@/components/WatchPartyModal'
+import { useApp } from '@/hooks/useAppState'
 import { useDevices } from '@/hooks/useDevices'
 import { useTransfers } from '@/hooks/useTransfers'
 import { resolveDrop } from '@/lib/capabilities'
@@ -55,6 +56,7 @@ export function MainLayout() {
   const { isQRCodeModalOpen, toggleQRCodeModal } = useDevices()
   const { openShareWith, watchParty, closeWatchParty } = useShares()
   const { incomingPill, dismissIncomingPill, goToIncoming } = useTransfers()
+  const { connectionUp } = useApp()
   const { toast } = useToast()
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0)
@@ -102,6 +104,15 @@ export function MainLayout() {
       <Sidebar />
       <div className='flex flex-1 flex-col min-w-0'>
         <TopBar />
+        {!connectionUp && (
+          <div
+            role='status'
+            className='flex items-center justify-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1 text-[11px] font-semibold text-destructive'
+          >
+            <span className='h-1.5 w-1.5 animate-pulse rounded-full bg-destructive' />
+            Connection lost — reconnecting…
+          </div>
+        )}
         <main className='flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6'>
           <div className='w-full pb-6'>
             <AnimatePresence mode='wait'>

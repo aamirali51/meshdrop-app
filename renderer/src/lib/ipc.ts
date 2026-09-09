@@ -93,10 +93,75 @@ function getWebTransport(): HttpTransport {
   if (!webTransport) {
     webTransport = new HttpTransport({
       baseUrl: locationBaseUrl(),
-      token: consumeUrlToken()
+      token: consumeUrlToken(),
+      onStatusChange: notifyConnectionStatus
     })
   }
   return webTransport
+}
+
+// ─── F06: connection awareness + session resync (web transport only) ────────
+// The WS session drives a global connected/reconnecting state for the shell
+// (pill + banner), and every false→true edge broadcasts an internal
+// 'session.resynced' so data hooks re-pull their primary lists without a
+// remount. Electron has no HTTP transport — the bridge lives and dies with
+// the app window, so nothing fires there (its hooks refresh on engine events).
+
+type ConnectionStatusListener = (up: boolean) => void
+
+const connectionListeners = new Set<ConnectionStatusListener>()
+const resyncListeners = new Set<() => void>()
+// Assumed up at boot: a page only loads with a session token in hand; the WS
+// will report a drop the moment the socket actually closes.
+let connectionUp = true
+
+function notifyConnectionStatus(up: boolean): void {
+  const wasUp = connectionUp
+  connectionUp = up
+  if (!wasUp && up) {
+    for (const cb of [...resyncListeners]) {
+      try {
+        cb()
+      } catch {
+        /* subscriber errors must not break the reconnect fan-out */
+      }
+    }
+  }
+  for (const cb of [...connectionListeners]) {
+    try {
+      cb(up)
+    } catch {
+      /* swallow */
+    }
+  }
+}
+
+/** Web only: subscribe to WS session state (true = connected). The callback
+ * fires immediately with the current state and on every change. */
+export function onConnectionStatus(cb: ConnectionStatusListener): () => void {
+  if (!isBridgeAvailable) {
+    connectionListeners.add(cb)
+    try {
+      cb(connectionUp)
+    } catch {
+      /* swallow */
+    }
+    return () => {
+      connectionListeners.delete(cb)
+    }
+  }
+  return () => {}
+}
+
+/** Web only: run `fn` every time the WS session re-establishes after a drop. */
+export function onSessionResynced(fn: () => void): () => void {
+  if (!isBridgeAvailable) {
+    resyncListeners.add(fn)
+    return () => {
+      resyncListeners.delete(fn)
+    }
+  }
+  return () => {}
 }
 
 const NOISY_METHODS = new Set([

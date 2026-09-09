@@ -96,6 +96,10 @@ export interface HttpTransportOptions {
   /** Factory returning a socket with the minimal onopen/onmessage/… surface. */
   socketFactory?: (url: string) => TransportSocket
   log?: (...args: unknown[]) => void
+  /** F06: connection-state feed for the UI — true when the WS is open, false
+   * while it is down/reconnecting. Only the browser transport reports; the
+   * Electron path has no HTTP transport. */
+  onStatusChange?: (up: boolean) => void
 }
 
 type QueuedCall = {
@@ -177,6 +181,7 @@ export class HttpTransport {
   private readonly fetchImpl: typeof fetch
   private readonly socketFactory: (url: string) => TransportSocket
   private readonly log: (...args: unknown[]) => void
+  private readonly onStatusChange?: (up: boolean) => void
 
   private listeners = new Map<string, Set<(data: unknown) => void>>()
   private queue: QueuedCall[] = []
@@ -206,6 +211,7 @@ export class HttpTransport {
     this.fetchImpl = opts.fetchImpl ?? defaultFetch()
     this.socketFactory = opts.socketFactory ?? defaultSocketFactory
     this.log = opts.log ?? ((...args: unknown[]) => console.log(...args))
+    this.onStatusChange = opts.onStatusChange
   }
 
   private generateId(): string {
@@ -400,6 +406,7 @@ export class HttpTransport {
           this.emitLocal(EVENTS.WORKER_READY as EventName, {})
         }
       }, 1500)
+      this.onStatusChange?.(true)
     }
     socket.onmessage = (ev) => {
       if (typeof ev?.data === 'string' || ev?.data instanceof ArrayBuffer) this.handleFrame(ev.data)
@@ -415,6 +422,7 @@ export class HttpTransport {
         // subsequent opens flush the queue.
         this.log(`[IPC ${this.ts()}] !! WS closed before ready — retrying in ${this.reconnectDelayMs} ms`)
       }
+      this.onStatusChange?.(false)
       this.reconnectTimer = setTimeout(() => this.connectSocket(), this.reconnectDelayMs)
       this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, 15000)
     }

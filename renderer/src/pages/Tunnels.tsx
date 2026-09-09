@@ -103,8 +103,8 @@ export function Tunnels() {
             {offered.map((t) => (
               <div key={t.tunnelId} className="flex items-center justify-between gap-3 rounded-xl border bg-background px-4 py-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-bold truncate">{t.name || `Port ${t.port}`} <span className="font-mono text-xs text-muted-foreground">{t.port}{t.udp ? ' udp' : ''}</span></div>
-                  <div className="text-xs text-muted-foreground">From {t.peerName || t.peerId.slice(0, 8)} · {t.code ? `code ${t.code}` : 'paired'}</div>
+                  <div className="text-sm font-bold truncate">Port {t.port}</div>
+                  <div className="text-xs text-muted-foreground">{t.peerName || t.peerId.slice(0, 8)} · {t.code ? `code ${t.code}` : 'paired'}{t.udp ? ' · udp' : ''}</div>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <Button size="sm" disabled={busy} onClick={() => handleAccept(t.tunnelId)}><Zap className="h-4 w-4" />Accept</Button>
@@ -156,7 +156,7 @@ export function Tunnels() {
                 {tunnels.filter((t) => t.state !== 'closed').map((t) => (
                   <div key={t.tunnelId} className={cn('flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5', t.state === 'open' ? 'bg-primary/5 border-primary/20' : t.state === 'offered' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-card')}>
                     <div className="min-w-0">
-                      <div className="text-sm font-bold truncate">{t.name || `Tunnel ${t.tunnelId.slice(0, 8)}`}</div>
+                      <div className="text-sm font-bold truncate">{t.peerName || `Tunnel ${t.tunnelId.slice(0, 8)}`}</div>
                       <div className="text-xs text-muted-foreground font-mono">{t.host}:{t.port}{t.udp ? ' udp' : ''} · {t.role} · {t.state}{t.code ? ` · ${t.code}` : ''}</div>
                       <div className="text-[11px] text-muted-foreground">{Math.round(t.bytesUp / 1024)} KB up · {Math.round(t.bytesDown / 1024)} KB down</div>
                     </div>

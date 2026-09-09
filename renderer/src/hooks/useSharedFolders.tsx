@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
-import { call, on } from '@/lib/ipc'
+import { call, on, onSessionResynced } from '@/lib/ipc'
 import { onDeepLink } from '@/lib/capabilities'
 import { useToast } from '@/hooks/useToast'
 
@@ -139,6 +139,8 @@ export function SharedFoldersProvider({ children }: { children: ReactNode }) {
       EVENTS.SITE_INVITE_RECEIVED || 'site.invite_received'
     ]
     const unsubs = events.map((e) => on(e, debouncedRefresh))
+    // WS resync (web): re-pull sites/visits once the transport reopens.
+    const unsubResync = onSessionResynced(refresh)
     // A share just landed — surface a toast so it's not silent
     const unsubInvite = on('site.invite_received' as string, (data: unknown) => {
       const d = data as { name?: string; code?: string } | null
@@ -149,7 +151,7 @@ export function SharedFoldersProvider({ children }: { children: ReactNode }) {
       if (!code) return
       if (data.kind === 'site' || code.startsWith('SITE-')) setPendingVisitCode(code)
     })
-    return () => { if (debounce) clearTimeout(debounce); unsubs.forEach((u) => u()); unsubInvite(); if (unsubDeepLink) unsubDeepLink() }
+    return () => { if (debounce) clearTimeout(debounce); unsubs.forEach((u) => u()); unsubInvite(); unsubResync(); if (unsubDeepLink) unsubDeepLink() }
   }, [initialRefresh, refresh, toast])
 
   const publishSite = useCallback(async (params: { folderPath: string; name?: string; writeMode?: string; spa?: boolean; expirationPreset?: string }) => {

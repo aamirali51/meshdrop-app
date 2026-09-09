@@ -1,42 +1,41 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import type { NavRoute } from '@/types'
 
+// Single source of truth for routes, in sidebar order. The hash-route
+// validator, the Ctrl+N handler AND the shortcut hints (CommandPalette) all
+// read this one table, so a hint always matches what the key actually opens.
 const ROUTE_ORDER: NavRoute[] = [
   '/dashboard',
+  '/transfers',
   '/devices',
   '/sync',
   '/party',
   '/shared-folders',
-  '/transfers',
+  '/tunnels',
+  '/settings',
   '/activity',
   '/history',
   '/diagnostics',
-  '/settings',
   '/about'
 ]
 
-// Not every route carries a number shortcut (e.g. /party is palette-only);
-// the Ctrl+N handler resolves through ROUTE_ORDER, which stays authoritative.
-export const ROUTE_SHORTCUTS: Partial<Record<NavRoute, number>> = {
-  '/dashboard': 1,
-  '/devices': 2,
-  '/sync': 3,
-  '/transfers': 4,
-  '/shared-folders': 5,
-  '/activity': 6,
-  '/history': 7,
-  '/diagnostics': 8,
-  '/settings': 9,
-  '/about': 10
+/** Position-based shortcut number (Ctrl+1..9); null when the route has no
+ * shortcut. Ten and beyond are unreachable on real keyboards (Ctrl+10 is not
+ * typable), so they are deliberately not advertised. */
+export function shortcutNumber(route: NavRoute): number | null {
+  const n = ROUTE_ORDER.indexOf(route) + 1
+  return n >= 1 && n <= 9 ? n : null
 }
 
 export function isMacPlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent)
 }
 
-/** '⌘3' on macOS, 'Ctrl+3' elsewhere */
+/** '⌘3' on macOS, 'Ctrl+3' elsewhere; '' when the route has no shortcut. */
 export function formatShortcut(route: NavRoute): string {
-  return `${isMacPlatform() ? '⌘' : 'Ctrl+'}${ROUTE_SHORTCUTS[route]}`
+  const n = shortcutNumber(route)
+  if (n === null) return ''
+  return `${isMacPlatform() ? '⌘' : 'Ctrl+'}${n}`
 }
 
 interface NavigationContextValue {

@@ -92,7 +92,7 @@ export function CommandPalette() {
         id: `nav-${i.route}`,
         label: i.label,
         icon: i.icon,
-        hint: formatShortcut(i.route),
+        hint: formatShortcut(i.route) || undefined,
         action: () => {
           navigate(i.route)
           toggleCommandPalette()

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
-import { call, on } from '@/lib/ipc'
+import { call, on, onSessionResynced } from '@/lib/ipc'
 import { useToast } from '@/hooks/useToast'
 
 export interface TunnelRecord {
@@ -82,7 +82,8 @@ export function TunnelsProvider({ children }: { children: ReactNode }) {
         toast.success('Tunnel Offer', msg)
       }
     })
-    return () => { unsubs.forEach((u) => u()); unsubOffer() }
+    const unsubResync = onSessionResynced(() => setTimeout(fetchAll, 300))
+    return () => { unsubs.forEach((u) => u()); unsubOffer(); unsubResync() }
   }, [fetchAll, toast])
 
   const createPairedTunnel = useCallback(async (params: { peerId: string; port: number; host?: string; name?: string; udp?: boolean }) => {

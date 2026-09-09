@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
-import { call, on } from '@/lib/ipc'
+import { call, on, onSessionResynced } from '@/lib/ipc'
 
 export interface SyncLibrary {
   id: string
@@ -51,6 +51,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refresh()
+    // WS resync (web): re-pull the library list once the transport reopens.
+    const unsubResync = onSessionResynced(refresh)
     const events = [
       EVENTS.SYNC_LIBRARY_ADDED || 'sync:libraryAdded',
       EVENTS.SYNC_LIBRARY_REMOVED || 'sync:libraryRemoved',
@@ -115,6 +117,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       unsubFailed()
       unsubCancelled()
       unsubPhase()
+      unsubResync()
     }
   }, [refresh])
 

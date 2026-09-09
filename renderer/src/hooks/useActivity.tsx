@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { METHODS, EVENTS } from '@/types/protocol'
-import { call, on } from '@/lib/ipc'
+import { call, on, onSessionResynced } from '@/lib/ipc'
 import { useToast } from '@/hooks/useToast'
 import type { ActivityItem } from '@/types'
 
@@ -26,7 +26,12 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
     }
     fetchActivity()
     const unsub = on(EVENTS.TRANSFER_COMPLETED, fetchActivity)
-    return () => unsub()
+    // WS resync (web): re-pull the timeline once the transport reopens.
+    const unsubResync = onSessionResynced(fetchActivity)
+    return () => {
+      unsub()
+      unsubResync()
+    }
   }, [])
 
   const clearHistory = useCallback(async () => {
