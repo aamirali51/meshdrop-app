@@ -47,6 +47,30 @@ function openGithub() {
   openExternal('https://github.com/aamirali51/meshdrop-app')
 }
 
+function StandaloneNote() {
+  const [standalone, setStandalone] = useState(false)
+  useEffect(() => {
+    try {
+      const m = window.matchMedia('(display-mode: standalone)').matches
+      const ios = (window.navigator as unknown as { standalone?: boolean }).standalone
+      setStandalone(!!m || !!ios)
+    } catch {}
+  }, [])
+  return (
+    <Card className="border-primary/20 bg-primary/5">
+      <CardContent className="space-y-2 p-4 text-xs leading-relaxed">
+        <p className="font-bold text-foreground">Web & standalone mode</p>
+        <p className="text-muted-foreground">
+          When installed, MeshDrop runs in its own window — no browser address bar, its own taskbar icon, and offline shell caching for the UI. Your data and pairing still live on the host; the installed app is a standalone view onto the same host session (open it from the launcher so the one-time token is present).
+        </p>
+        <p className="text-[11px] text-muted-foreground/80">
+          {standalone ? 'You are running in standalone (installed) mode.' : 'Install from the “Install MeshDrop” button in the top bar when your browser offers it, or via the browser menu → Install / Add to Home Screen.'}
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 const APP_VERSION = appVersion()
 
 export function About() {
@@ -130,6 +154,8 @@ export function About() {
           </div>
         </CardContent>
       </Card>
+
+      {isWeb && <StandaloneNote />}
 
       <Card className="overflow-hidden border-amber-500/20 bg-gradient-to-br from-amber-500/5 via-card to-orange-500/5">
         <CardContent className="space-y-4 p-5 sm:p-6">

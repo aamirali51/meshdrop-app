@@ -1,4 +1,4 @@
-import { Search, Bell, Sun, Moon, QrCode, ShieldCheck, Waypoints, User, Info } from 'lucide-react'
+import { Search, Bell, Sun, Moon, QrCode, ShieldCheck, Waypoints, User, Info, Download } from 'lucide-react'
 import { PAGE_TITLES, useNavigation } from '@/hooks/useNavigation'
 import { useApp } from '@/hooks/useAppState'
 import { useDevices } from '@/hooks/useDevices'
@@ -8,7 +8,8 @@ import { ContextMenu } from '@/components/ContextMenu'
 import { WindowControls } from '@/components/WindowControls'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { isElectron, isMac } from '@/lib/capabilities'
+import { isElectron, isMac, isWeb } from '@/lib/capabilities'
+import { usePwaInstall } from '@/hooks/usePwaInstall'
 
 export function TopBar() {
   const { currentRoute, navigate } = useNavigation()
@@ -16,6 +17,7 @@ export function TopBar() {
   const { identity, devices, toggleQRCodeModal } = useDevices()
   const { notifications } = useNotifications()
   const { theme, toggle } = useTheme()
+  const { canInstall, promptInstall } = usePwaInstall()
   const [profileMenu, setProfileMenu] = useState<{ x: number; y: number } | null>(null)
   const [scrolled, setScrolled] = useState(false)
 
@@ -90,6 +92,17 @@ export function TopBar() {
           </span>
           <span className={cn('font-mono text-[10px] font-extrabold', connectionLost ? 'text-red-400' : pill.online ? 'text-meshdrop-cyan' : 'text-muted-foreground')}>{pill.text}</span>
         </div>
+
+        {isWeb && canInstall && (
+          <button
+            onClick={promptInstall}
+            className="no-drag hidden sm:inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Install MeshDrop"
+          >
+            <Download className="h-4 w-4" />
+            Install MeshDrop
+          </button>
+        )}
 
         <button
           onClick={toggleNotificationDrawer}
