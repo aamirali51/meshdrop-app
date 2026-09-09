@@ -883,7 +883,7 @@ function RelayStats() {
   React.useEffect(() => {
     let alive = true
     const fetch = () => {
-      call(METHODS.RELAY_STATS, null)
+      call((METHODS as any).RELAY_STATS ?? 'relay.stats', null)
         .then((s: any) => { if (alive) { setStats(s); setUnavailable(false) } })
         .catch(() => { if (alive && stats === null) setUnavailable(true) })
     }

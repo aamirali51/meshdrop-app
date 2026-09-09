@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import type { NavRoute } from '@/types'
 
-// Single source of truth for routes, in sidebar order. The hash-route
-// validator, the Ctrl+N handler AND the shortcut hints (CommandPalette) all
-// read this one table, so a hint always matches what the key actually opens.
+// Wave 1: reordered to match new Sidebar grouping (Share, Transfers, Devices,
+// Sync, Watch Party, Shared Folders | MORE: Activity, Tunnels, Diagnostics,
+// Settings, About) — History is last, kept only for deep-link redirect to
+// /activity?view=history. Single source for shortcuts + validator + hints.
 const ROUTE_ORDER: NavRoute[] = [
   '/dashboard',
   '/transfers',
@@ -11,16 +12,14 @@ const ROUTE_ORDER: NavRoute[] = [
   '/sync',
   '/party',
   '/shared-folders',
-  '/tunnels',
-  '/settings',
   '/activity',
-  '/history',
+  '/tunnels',
   '/diagnostics',
-  '/about'
+  '/settings',
+  '/about',
+  '/history',
 ]
 
-// Human page names, kept next to ROUTE_ORDER so a route's shortcut, sidebar
-// label and window title can't drift apart. TopBar renders these as headings.
 export const PAGE_TITLES: Record<NavRoute, string> = {
   '/dashboard': 'Share',
   '/devices': 'My Devices',
@@ -33,14 +32,44 @@ export const PAGE_TITLES: Record<NavRoute, string> = {
   '/history': 'History',
   '/diagnostics': 'Diagnostics',
   '/settings': 'Settings',
-  '/about': 'About'
+  '/about': 'About',
 }
 
-/** Position-based shortcut number (Ctrl+1..9); null when the route has no
- * shortcut. Ten and beyond are unreachable on real keyboards (Ctrl+10 is not
- * typable), so they are deliberately not advertised.
- * Note: browsers reserve Ctrl+1..9 for tab switching, so these shortcuts only
- * fire in the Electron window; CommandPalette hides the hints in web mode. */
+export const PAGE_SUBTITLES: Record<NavRoute, string> = {
+  '/dashboard': 'Send files directly. No cloud.',
+  '/transfers': 'Live progress of sends and receives.',
+  '/devices': 'Your paired devices on the mesh.',
+  '/sync': 'Keep folders in sync across devices.',
+  '/party': 'Watch together in sync.',
+  '/shared-folders': 'Files shared with you.',
+  '/tunnels': 'Port tunnels over the mesh.',
+  '/activity': 'Timeline of transfers and sessions.',
+  '/history': 'Searchable record of everything.',
+  '/diagnostics': 'Live connection metrics.',
+  '/settings': 'Preferences and network.',
+  '/about': 'Version and links.',
+}
+
+function isHistoryHash(raw: string): boolean {
+  const path = raw.split('?')[0]
+  return path === '/history' || path === 'history'
+}
+
+function normalizeHash(raw: string): { route: NavRoute; hash: string } | null {
+  // raw is without '#', e.g. "/dashboard" or "/activity?view=history" or "/history"
+  if (!raw) return null
+  // History absorbs into Activity: #/history -> #/activity?view=history
+  if (isHistoryHash(raw)) {
+    return { route: '/activity', hash: '/activity?view=history' }
+  }
+  const [path] = raw.split('?')
+  if ((ROUTE_ORDER as string[]).includes(path)) {
+    // if path is /history we already handled; otherwise validate
+    if ((ROUTE_ORDER as string[]).includes(path)) return { route: path as NavRoute, hash: raw }
+  }
+  return null
+}
+
 export function shortcutNumber(route: NavRoute): number | null {
   const n = ROUTE_ORDER.indexOf(route) + 1
   return n >= 1 && n <= 9 ? n : null
@@ -50,7 +79,6 @@ export function isMacPlatform(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent)
 }
 
-/** '⌘3' on macOS, 'Ctrl+3' elsewhere; '' when the route has no shortcut. */
 export function formatShortcut(route: NavRoute): string {
   const n = shortcutNumber(route)
   if (n === null) return ''
@@ -66,42 +94,64 @@ const NavigationContext = createContext<NavigationContextValue | null>(null)
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [currentRoute, setCurrentRoute] = useState<NavRoute>(() => {
-    const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : ''
-    return (ROUTE_ORDER as string[]).includes(hash) ? (hash as NavRoute) : '/dashboard'
+    if (typeof window === 'undefined') return '/dashboard'
+    const raw = window.location.hash.slice(1)
+    const normalized = normalizeHash(raw)
+    if (normalized) {
+      // Redirect /history deep link on boot (no extra history entry if already correct)
+      if (isHistoryHash(raw) && window.location.hash !== `#${normalized.hash}`) {
+        window.history.replaceState(null, '', `#${normalized.hash}`)
+      }
+      return normalized.route
+    }
+    return '/dashboard'
   })
 
   const navigate = useCallback((route: NavRoute) => {
+    // History redirect preserve
+    if (route === '/history') {
+      const target = '/activity?view=history'
+      setCurrentRoute('/activity')
+      if (typeof window !== 'undefined') window.location.hash = target
+      return
+    }
     setCurrentRoute(route)
     if (typeof window !== 'undefined') window.location.hash = route
   }, [])
 
-  // F22: hash-only navigation left the window/tab title stuck on the static
-  // "MeshDrop" from index.html — follow the current page instead.
   useEffect(() => {
     document.title = currentRoute ? `${PAGE_TITLES[currentRoute]} — MeshDrop` : 'MeshDrop'
   }, [currentRoute])
 
   useEffect(() => {
     const onHash = () => {
-      const h = window.location.hash.slice(1)
-      if ((ROUTE_ORDER as string[]).includes(h)) setCurrentRoute(h as NavRoute)
+      const raw = window.location.hash.slice(1)
+      const normalized = normalizeHash(raw)
+      if (normalized) {
+        // If user landed on /history, rewrite hash to /activity?view=history
+        if (isHistoryHash(raw)) {
+          window.history.replaceState(null, '', `#${normalized.hash}`)
+        }
+        setCurrentRoute(normalized.route)
+      }
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  // Global keyboard shortcuts: ⌘/Ctrl + 1..9 navigates to the matching page.
-  // (1..9 only — same ceiling as shortcutNumber; digits 10+ are not typable
-  // as a single chord. In a plain browser the OS/browser swallows Ctrl+1..9
-  // for tab switching before this handler can run — Electron-only in effect.)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return
       if (e.altKey || e.shiftKey) return
       const num = Number(e.key)
-      if (!Number.isInteger(num) || num < 1 || num > ROUTE_ORDER.length) return
+      if (!Number.isInteger(num) || num < 1 || num > 9) return
+      // Map 1..9 to ROUTE_ORDER[0..8]; beyond 9 has no shortcut
+      const idx = num - 1
+      if (idx >= ROUTE_ORDER.length) return
+      const target = ROUTE_ORDER[idx]
+      if (shortcutNumber(target) === null) return
       e.preventDefault()
-      navigate(ROUTE_ORDER[num - 1])
+      navigate(target)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
