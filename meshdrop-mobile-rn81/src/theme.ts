@@ -384,6 +384,29 @@ export function useTheme(): ThemeContextValue {
 // Fallback constant theme export for compatibility
 export const theme = darkTheme
 
+// Fixed immersive media palette. Full-screen players (MediaPlayer,
+// WatchPartyModal) and the file preview viewer stay dark regardless of the app
+// theme, so they must not use theme tokens (which flip between light/dark).
+// Define the dark surface values once here so every media surface matches.
+export const mediaPalette = {
+  bg: '#06090E',
+  surface: '#0B0F17',
+  surfaceAlt: 'rgba(15, 23, 42, 0.90)',
+  overlay: 'rgba(0, 0, 0, 0.45)',
+  text: '#F8FAFC',
+  textSecondary: '#CBD5E1',
+  muted: '#94A3B8',
+  faint: '#64748B',
+  accent: '#818CF8',
+  accentSoft: 'rgba(129, 140, 248, 0.15)',
+  accentBorder: 'rgba(129, 140, 248, 0.40)',
+  success: '#34D399',
+  danger: '#EF4444',
+  border: 'rgba(255, 255, 255, 0.10)',
+  borderFaint: 'rgba(255, 255, 255, 0.06)',
+  track: 'rgba(255, 255, 255, 0.22)',
+} as const
+
 export const fonts = {
   mono: 'monospace',
   sans: 'System',

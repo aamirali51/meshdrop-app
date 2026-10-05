@@ -15,9 +15,10 @@ import {
   Copy,
   X,
 } from 'lucide-react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { call, on } from '../bridge'
 import { copyToClipboard } from '../clipboard'
-import { fonts } from '../theme'
+import { fonts, mediaPalette } from '../theme'
 import { MediaPlayer, type MediaPlayerHandle } from './MediaPlayer'
 
 interface WatchPartyModalProps {
@@ -39,6 +40,7 @@ export function WatchPartyModal({
   filePath,
   isHost = false,
 }: WatchPartyModalProps) {
+  const insets = useSafeAreaInsets()
   const [videoSrc, setVideoSrc] = useState<string>('')
   const [loopbackSrc, setLoopbackSrc] = useState<string>('')
   const [syncWithHost, setSyncWithHost] = useState(true)
@@ -195,10 +197,10 @@ export function WatchPartyModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
-      <View style={[styles.container, { backgroundColor: '#06090E' }]}>
+      <View style={[styles.container, { backgroundColor: mediaPalette.bg }]}>
         {/* Top Header Bar (hidden in fullscreen) */}
         {!isFullscreen && (
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
             <View style={styles.headerLeft}>
               <View style={styles.pulseDot}>
                 <View style={styles.innerDot} />
@@ -214,20 +216,20 @@ export function WatchPartyModal({
                 style={[styles.syncBtn, syncWithHost && styles.syncBtnActive]}
                 onPress={() => setSyncWithHost((prev) => !prev)}
               >
-                <Radio size={13} color={syncWithHost ? '#818CF8' : '#64748B'} />
-                <Text style={[styles.syncText, { color: syncWithHost ? '#818CF8' : '#64748B' }]}>
+                <Radio size={13} color={syncWithHost ? mediaPalette.accent : mediaPalette.faint} />
+                <Text style={[styles.syncText, { color: syncWithHost ? mediaPalette.accent : mediaPalette.faint }]}>
                   {syncWithHost ? 'SYNCED' : 'LOCAL'}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.codeButton} onPress={handleCopyCode}>
-                <Radio size={13} color="#818CF8" />
+                <Radio size={13} color={mediaPalette.accent} />
                 <Text style={styles.codeText}>{roomCode}</Text>
-                {copied ? <Check size={13} color="#34D399" /> : <Copy size={13} color="#94A3B8" />}
+                {copied ? <Check size={13} color={mediaPalette.success} /> : <Copy size={13} color={mediaPalette.muted} />}
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                <X size={20} color="#F8FAFC" />
+                <X size={18} color={mediaPalette.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -252,7 +254,7 @@ export function WatchPartyModal({
           <View style={styles.footerInfo}>
             <View style={styles.infoCard}>
               <View style={styles.infoCardRow}>
-                <Users size={16} color="#818CF8" />
+                <Users size={16} color={mediaPalette.accent} />
                 <Text style={styles.infoTitle}>Mesh Swarm Playback</Text>
               </View>
               <Text style={styles.infoSubtitle}>
@@ -276,10 +278,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 48,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomColor: mediaPalette.border,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -298,26 +299,26 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#34D399',
+    backgroundColor: mediaPalette.success,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    fontWeight: '900',
+    color: mediaPalette.text,
     letterSpacing: -0.3,
   },
   hostBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: 'rgba(129, 140, 248, 0.2)',
+    borderRadius: 6,
+    backgroundColor: mediaPalette.accentSoft,
     borderWidth: 1,
-    borderColor: 'rgba(129, 140, 248, 0.4)',
+    borderColor: mediaPalette.accentBorder,
   },
   hostBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#818CF8',
+    color: mediaPalette.accent,
     letterSpacing: 0.5,
   },
   headerRight: {
@@ -334,7 +335,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   syncBtnActive: {
-    backgroundColor: 'rgba(129, 140, 248, 0.15)',
+    backgroundColor: mediaPalette.accentSoft,
   },
   syncText: {
     fontSize: 10,
@@ -345,23 +346,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: mediaPalette.borderFaint,
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: mediaPalette.border,
   },
   codeText: {
     fontSize: 11,
     fontFamily: fonts?.mono || 'monospace',
-    color: '#E2E8F0',
+    color: mediaPalette.textSecondary,
     fontWeight: '600',
   },
   closeButton: {
-    padding: 5,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    padding: 6,
+    borderRadius: 10,
+    backgroundColor: mediaPalette.borderFaint,
   },
   playerWrap: {
     flex: 1,
@@ -369,15 +370,15 @@ const styles = StyleSheet.create({
   footerInfo: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopColor: mediaPalette.border,
   },
   infoCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: mediaPalette.borderFaint,
     borderRadius: 12,
     padding: 14,
     gap: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: mediaPalette.borderFaint,
   },
   infoCardRow: {
     flexDirection: 'row',
@@ -387,11 +388,11 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: mediaPalette.text,
   },
   infoSubtitle: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: mediaPalette.muted,
     lineHeight: 18,
   },
 })

@@ -70,10 +70,15 @@ jobs:
           node-version: 20
           cache: npm
 
+      # An `-android` tag (e.g. v1.0.66-android) ships a mobile-only update:
+      # skip the desktop build/publish entirely so desktop users stay on their
+      # current version while the Android job still uploads the APK + manifest.
       - name: Install dependencies
+        if: ${{ !endsWith(github.ref_name, '-android') }}
         run: npm ci
 
       - name: Build & publish
+        if: ${{ !endsWith(github.ref_name, '-android') }}
         run: npm run build:release
         env:
           GH_TOKEN: ${{ secrets.RELEASES_PAT }}
@@ -86,7 +91,7 @@ jobs:
       # electron/updater-util.js. NSIS-installed updates (electron-updater)
       # don't need signatures.
       - name: Sign portable artifacts & publish release
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && !endsWith(github.ref_name, '-android')
         shell: bash
         run: |
           set -e
@@ -107,7 +112,7 @@ jobs:
           TAG: ${{ github.ref_name }}
 
       - name: Warn when portable signing key is missing
-        if: runner.os == 'Windows' && env.MESHDROP_UPDATE_KEY == ''
+        if: runner.os == 'Windows' && env.MESHDROP_UPDATE_KEY == '' && !endsWith(github.ref_name, '-android')
         shell: bash
         run: echo "::warning::MESHDROP_UPDATE_KEY secret not set — portable self-updates will be unsigned (refused). NSIS installer updates still work."
 

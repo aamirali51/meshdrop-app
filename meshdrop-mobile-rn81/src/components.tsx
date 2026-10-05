@@ -36,6 +36,7 @@ import {
   Cpu,
   Sparkles,
 } from 'lucide-react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme, fonts, type ThemeTokens } from './theme'
 
 export function PulseIndicator({ color, size = 8 }: { color?: string; size?: number }) {
@@ -130,7 +131,7 @@ export function Card({
       case 'glass':
         return { backgroundColor: theme.bgGlassHeavy, borderColor: theme.border }
       case 'accent':
-        return { backgroundColor: theme.primarySoft, borderColor: 'rgba(79, 70, 229, 0.25)' }
+        return { backgroundColor: theme.primarySoft, borderColor: theme.borderFocus }
       default:
         return { backgroundColor: theme.bgCard, borderColor: theme.cardBorder }
     }
@@ -149,7 +150,7 @@ export function Card({
         },
         getVariantStyle(),
         glow && {
-          borderColor: theme.primaryGlow ? theme.primary : 'rgba(99, 102, 241, 0.35)',
+          borderColor: theme.primary,
           shadowColor: theme.primary,
           shadowOpacity: theme.isDark ? 0.25 : 0.1,
           shadowRadius: 12,
@@ -193,7 +194,7 @@ export function StatCard({
     >
       <View style={styles.statTop}>
         {IconComponent && (
-          <View style={[styles.statIconBox, { backgroundColor: resolvedColor + '18', borderColor: resolvedColor + '30' }]}>
+          <View style={[styles.statIconBox, { backgroundColor: resolvedColor + '18', borderColor: resolvedColor + '30', borderRadius: theme.radiusSm }]}>
             <IconComponent size={15} color={resolvedColor} />
           </View>
         )}
@@ -405,7 +406,7 @@ export function PairingCodeCard({
           </Text>
         </View>
         {onRefresh && (
-          <TouchableOpacity onPress={onRefresh} style={[styles.refreshIconBtn, { backgroundColor: theme.bgElevated }]} activeOpacity={0.7}>
+          <TouchableOpacity onPress={onRefresh} style={[styles.refreshIconBtn, { backgroundColor: theme.bgElevated, borderRadius: theme.radiusSm }]} activeOpacity={0.7}>
             <RefreshCw size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
@@ -502,7 +503,7 @@ export function DeviceCard({
               {device.name}
             </Text>
             {device.isTrusted && (
-              <View style={[styles.trustBadge, { backgroundColor: theme.primarySoft }]}>
+              <View style={[styles.trustBadge, { backgroundColor: theme.primarySoft, borderRadius: theme.radiusXs }]}>
                 <ShieldCheck size={12} color={theme.primary} />
               </View>
             )}
@@ -514,31 +515,29 @@ export function DeviceCard({
               {device.os || 'Mesh Node'} · {device.isOnline ? 'Online' : 'Offline'}
               {(device as any).relayedViaOwnPeer ? ' · via your Desktop' : ''}
             </Text>
-            {device.isOnline && (
-              <View style={[
-                styles.transportBadge,
-                (device as any).transferMethod === 'lan'
-                  ? styles.transportBadgeLan
-                  : (device as any).transferMethod === 'relay' || (device as any).relayed
-                    ? styles.transportBadgeRelay
-                    : styles.transportBadgeDirect
-              ]}>
-                <Text style={[
-                  styles.transportBadgeText,
-                  (device as any).transferMethod === 'lan'
-                    ? styles.transportTextLan
-                    : (device as any).transferMethod === 'relay' || (device as any).relayed
-                      ? styles.transportTextRelay
-                      : styles.transportTextDirect
-                ]}>
-                  {(device as any).transferMethod === 'lan'
-                    ? '⚡ LAN'
-                    : (device as any).transferMethod === 'relay' || (device as any).relayed
-                      ? '🌐 Relay'
-                      : '🔗 Direct'}
-                </Text>
-              </View>
-            )}
+            {device.isOnline && (() => {
+              const isRelay = (device as any).transferMethod === 'relay' || (device as any).relayed
+              const transport = (device as any).transferMethod === 'lan' ? 'lan' : isRelay ? 'relay' : 'direct'
+              const transportColor =
+                transport === 'lan' ? theme.success : transport === 'relay' ? theme.purple : theme.accent
+              const transportLabel = transport === 'lan' ? '⚡ LAN' : transport === 'relay' ? '🌐 Relay' : '🔗 Direct'
+              return (
+                <View
+                  style={[
+                    styles.transportBadge,
+                    {
+                      borderRadius: theme.radiusXs,
+                      backgroundColor: transportColor + '22',
+                      borderColor: transportColor + '4D',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.transportBadgeText, { color: transportColor }]}>
+                    {transportLabel}
+                  </Text>
+                </View>
+              )
+            })()}
           </View>
         </View>
 
@@ -570,6 +569,7 @@ export function SimpleModal({
   onClose: () => void
 }) {
   const { theme } = useTheme()
+  const insets = useSafeAreaInsets()
 
   return (
     <Modal
@@ -590,6 +590,7 @@ export function SimpleModal({
             {
               backgroundColor: theme.bgCard,
               borderColor: theme.border,
+              paddingBottom: 24 + insets.bottom,
               borderTopLeftRadius: theme.radiusXl,
               borderTopRightRadius: theme.radiusXl,
             },
@@ -643,7 +644,7 @@ export function SectionHeader({
         <View style={[styles.sectionAccentBar, { backgroundColor: theme.primary }]} />
         <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
         {badge !== undefined && (
-          <View style={[styles.sectionBadge, { backgroundColor: theme.primarySoft }]}>
+          <View style={[styles.sectionBadge, { backgroundColor: theme.primarySoft, borderRadius: theme.radiusFull }]}>
             <Text style={[styles.sectionBadgeText, { color: theme.primary }]}>{badge}</Text>
           </View>
         )}
@@ -1014,37 +1015,13 @@ const styles = StyleSheet.create({
   transportBadge: {
     paddingHorizontal: 5,
     paddingVertical: 1,
-    borderRadius: 4,
+    borderWidth: 1,
     marginLeft: 6,
-  },
-  transportBadgeLan: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  transportBadgeDirect: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  transportBadgeRelay: {
-    backgroundColor: 'rgba(168, 85, 247, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.3)',
   },
   transportBadgeText: {
     fontSize: 9,
     fontWeight: '800',
     fontFamily: fonts.mono,
-  },
-  transportTextLan: {
-    color: '#10B981',
-  },
-  transportTextDirect: {
-    color: '#3B82F6',
-  },
-  transportTextRelay: {
-    color: '#A855F7',
   },
 })
 

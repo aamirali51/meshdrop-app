@@ -33,10 +33,11 @@ import {
   FileImage,
   FileAudio,
 } from 'lucide-react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { call, on } from '../bridge'
 import { Card, Btn, Pill, SectionHeader, SimpleModal } from '../components'
 import { MediaPlayer } from '../components/MediaPlayer'
-import { useTheme, fonts } from '../theme'
+import { useTheme, fonts, mediaPalette } from '../theme'
 
 const { width: winWidth, height: winHeight } = Dimensions.get('window')
 
@@ -1064,7 +1065,7 @@ function FilePreviewModal({
   onClose: () => void
   onSave?: () => void
 }) {
-  const { theme } = useTheme()
+  const insets = useSafeAreaInsets()
   const [mediaError, setMediaError] = useState<string | null>(null)
   const [imageFailed, setImageFailed] = useState(false)
 
@@ -1081,9 +1082,9 @@ function FilePreviewModal({
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <View style={[styles.previewRoot, { backgroundColor: '#000000' }]}>
+      <View style={[styles.previewRoot, { backgroundColor: mediaPalette.bg }]}>
         {/* Header */}
-        <View style={styles.previewHeader}>
+        <View style={[styles.previewHeader, { paddingTop: 16 + insets.top }]}>
           <View style={styles.flex1}>
             <Text style={styles.previewTitle} numberOfLines={1}>
               {preview?.name}
@@ -1095,14 +1096,14 @@ function FilePreviewModal({
             ) : null}
           </View>
           <TouchableOpacity onPress={onClose} style={styles.previewClose} activeOpacity={0.7}>
-            <X size={20} color="#F8FAFC" />
+            <X size={18} color={mediaPalette.text} />
           </TouchableOpacity>
         </View>
 
         {/* Content */}
         <View style={styles.previewBody}>
           {!preview ? null : fetching ? (
-            <ActivityIndicator size="large" color="#818CF8" />
+            <ActivityIndicator size="large" color={mediaPalette.accent} />
           ) : isImage ? (
             imageFailed ? (
               <View style={styles.previewCenter}>
@@ -1148,7 +1149,7 @@ function FilePreviewModal({
             </View>
           ) : (
             <View style={styles.previewCenter}>
-              <FileText size={40} color="#64748B" />
+              <FileText size={40} color={mediaPalette.faint} />
               <Text style={styles.previewMutedText}>No inline preview for this file.</Text>
             </View>
           )}
@@ -1159,10 +1160,10 @@ function FilePreviewModal({
           <View style={styles.previewFooter}>
             <TouchableOpacity
               onPress={onSave}
-              style={[styles.previewFooterBtn, { backgroundColor: '#1E293B' }]}
+              style={[styles.previewFooterBtn, { backgroundColor: mediaPalette.surface }]}
               activeOpacity={0.8}
             >
-              <Download size={16} color="#E2E8F0" />
+              <Download size={16} color={mediaPalette.textSecondary} />
               <Text style={styles.previewFooterText}>Save</Text>
             </TouchableOpacity>
           </View>
@@ -1214,7 +1215,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 110,
+    paddingBottom: 90,
   },
   flex1: {
     flex: 1,
@@ -1588,22 +1589,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   previewTitle: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '800',
+    color: mediaPalette.text,
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: -0.2,
   },
   previewSub: {
-    color: '#94A3B8',
+    color: mediaPalette.muted,
     fontSize: 11,
     marginTop: 2,
   },
   previewClose: {
     width: 32,
     height: 32,
-    borderRadius: 9,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1E293B',
+    backgroundColor: mediaPalette.surface,
   },
   previewBody: {
     flex: 1,
@@ -1626,13 +1628,13 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   previewErrorText: {
-    color: '#FCA5A5',
+    color: mediaPalette.danger,
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
   },
   previewMutedText: {
-    color: '#64748B',
+    color: mediaPalette.faint,
     fontSize: 13,
     marginTop: 8,
     textAlign: 'center',
@@ -1653,7 +1655,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   previewFooterText: {
-    color: '#E2E8F0',
+    color: mediaPalette.textSecondary,
     fontSize: 12.5,
     fontWeight: '700',
   },

@@ -800,19 +800,19 @@ export function Settings({ identity }: { identity?: any }) {
 
       {/* Support & Bitcoin Donation */}
       <SectionHeader title="Support MeshDrop" />
-      <Card glow style={[styles.donationCard, { borderColor: 'rgba(217, 119, 6, 0.35)', backgroundColor: theme.bgCard }]}>
+      <Card glow style={[styles.donationCard, { borderColor: theme.warningBorder, backgroundColor: theme.bgCard }]}>
         <View style={styles.donationHeader}>
-          <View style={[styles.bitcoinIconBox, { backgroundColor: theme.isDark ? 'rgba(217, 119, 6, 0.15)' : '#FFFBEB' }]}>
-            <Text style={styles.bitcoinSymbol}>₿</Text>
+          <View style={[styles.bitcoinIconBox, { backgroundColor: theme.warningBg, borderColor: theme.warningBorder }]}>
+            <Text style={[styles.bitcoinSymbol, { color: theme.warning }]}>₿</Text>
           </View>
           <View style={styles.flex1}>
             <View style={styles.donationTitleRow}>
               <Text style={[styles.donationTitle, { color: theme.text }]}>Donate with Bitcoin</Text>
-              <Heart size={14} color="#E11D48" fill="#E11D48" />
+              <Heart size={14} color={theme.danger} fill={theme.danger} />
             </View>
             <Text style={[styles.donationSub, { color: theme.muted }]}>Direct Developer Support</Text>
           </View>
-          <Pill label="Bitcoin (BTC)" color="#D97706" />
+          <Pill label="Bitcoin (BTC)" color={theme.warning} />
         </View>
 
         <Text style={[styles.donationDescription, { color: theme.textSecondary }]}>
@@ -1147,12 +1147,10 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   bitcoinSymbol: {
-    color: '#D97706',
     fontSize: 20,
     fontWeight: '900',
   },
@@ -1179,7 +1177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 12,
@@ -1204,7 +1202,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 9,
     paddingHorizontal: 12,
-    borderRadius: 9,
+    borderRadius: 10,
   },
   donationBtnPrimary: {
     shadowOffset: { width: 0, height: 2 },

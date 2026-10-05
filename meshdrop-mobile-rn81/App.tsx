@@ -17,7 +17,7 @@ import {
   useWindowDimensions,
   ScrollView,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   Laptop,
   Upload,
@@ -90,6 +90,7 @@ const TABS: { key: TabType; label: string; icon: React.ElementType }[] = [
 
 function MainApp(): React.JSX.Element {
   const { theme, isDark, toggleTheme } = useTheme()
+  const insets = useSafeAreaInsets()
   const [currentTab, setCurrentTab] = useState<TabType>('devices')
   const currentTabRef = useRef<TabType>('devices')
   useEffect(() => { currentTabRef.current = currentTab }, [currentTab])
@@ -529,7 +530,7 @@ function MainApp(): React.JSX.Element {
 
       {/* Floating Bottom Dock — horizontal scroll on narrow screens */}
       {!hideAppChrome && (
-        <View style={styles.dockContainer}>
+        <View style={[styles.dockContainer, { paddingBottom: 6 + insets.bottom }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -627,7 +628,7 @@ const styles = StyleSheet.create({
   versionPill: {
     paddingHorizontal: 5,
     paddingVertical: 1,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   versionText: {
     fontSize: 9,
@@ -663,7 +664,7 @@ const styles = StyleSheet.create({
   headerIconBtn: {
     width: 32,
     height: 32,
-    borderRadius: 9,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

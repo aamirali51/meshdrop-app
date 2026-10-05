@@ -41,7 +41,7 @@ import RNFS from 'react-native-fs'
 import { call, on } from '../bridge'
 import { copyToClipboard } from '../clipboard'
 import { pickFiles } from '../filePicker'
-import { useTheme, fonts } from '../theme'
+import { useTheme, fonts, mediaPalette } from '../theme'
 import { Card, Btn } from '../components'
 import { NativeVideoView } from '../components/NativeVideoView'
 
@@ -865,7 +865,7 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
                 onPress={handleCopyCode}
               >
                 <Radio size={12} color={theme.primary} />
-                {activeRoom.isPrivate && <Lock size={10} color={theme.warning || '#F59E0B'} />}
+                {activeRoom.isPrivate && <Lock size={10} color={theme.warning} />}
                 <Text style={[styles.codePillText, { color: theme.text }]}>{activeRoom.roomCode}</Text>
                 {copied ? <Check size={12} color={theme.success} /> : <Copy size={12} color={theme.muted} />}
               </TouchableOpacity>
@@ -991,7 +991,7 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
           {/* Join with Code Card */}
           <Card style={[styles.lobbyCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
             <View style={styles.cardHeaderRow}>
-              <Radio size={18} color="#818CF8" />
+              <Radio size={18} color={theme.purple} />
               <Text style={[styles.cardHeaderTitle, { color: theme.text }]}>Join with Room Code</Text>
             </View>
             <Text style={[styles.cardSubText, { color: theme.muted }]}>
@@ -1167,12 +1167,12 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
                       </Text>
                       <TouchableOpacity style={styles.immersiveCodePill} onPress={handleCopyCode}>
                         <Text style={styles.immersiveCodeText}>{activeRoom.roomCode}</Text>
-                        {copied ? <Check size={12} color="#10B981" /> : <Copy size={12} color="#94A3B8" />}
+                        {copied ? <Check size={12} color={mediaPalette.success} /> : <Copy size={12} color={mediaPalette.muted} />}
                       </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity style={styles.immersiveCloseBtn} onPress={handleLeaveRoom}>
-                      <LogOut size={16} color="#EF4444" />
+                      <LogOut size={16} color={mediaPalette.danger} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1378,10 +1378,10 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
                     const isHostPeer = activeRoom.hostPeerId === p.peerId
                     const diff = typeof p.positionSec === 'number' ? currentTime - p.positionSec : null
                     const status = p.buffering
-                      ? { label: 'Buffering', color: '#38BDF8' }
+                      ? { label: 'Buffering', color: theme.accent }
                       : diff == null || Math.abs(diff) < 0.8
                         ? { label: 'Synced', color: theme.success }
-                        : { label: `${Math.abs(diff) < 60 ? `${Math.abs(diff).toFixed(1)}s` : formatTime(Math.abs(diff))} ${diff > 0 ? 'behind' : 'ahead'}`, color: '#F59E0B' }
+                        : { label: `${Math.abs(diff) < 60 ? `${Math.abs(diff).toFixed(1)}s` : formatTime(Math.abs(diff))} ${diff > 0 ? 'behind' : 'ahead'}`, color: theme.warning }
                     return (
                       <View key={p.peerId} style={[styles.participantRow, { backgroundColor: theme.bgElevated, borderColor: theme.hairline }]}>
                         <View style={styles.participantInfo}>
@@ -1398,7 +1398,7 @@ export function WatchParty({ onActiveRoomChange }: WatchPartyProps) {
                               <MicOff size={13} color={theme.muted} />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.modBtn} onPress={() => handleModerate('promote', p.peerId, p.name)}>
-                              <Crown size={13} color="#F59E0B" />
+                              <Crown size={13} color={theme.warning} />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.modBtn} onPress={() => handleModerate('kick', p.peerId, p.name)}>
                               <UserX size={13} color={theme.danger} />

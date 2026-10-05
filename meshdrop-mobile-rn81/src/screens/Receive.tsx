@@ -344,8 +344,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   heroTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '900',
+    letterSpacing: -0.3,
   },
   heroSub: {
     fontSize: 12,

@@ -454,7 +454,7 @@ export function Transfers() {
                 {/\.(mp4|mkv|mov|webm|ts|m4v|avi)$/i.test(item.filename || '') && (
                   <View style={[styles.actionsRow, { borderTopColor: theme.hairline }]}>
                     <TouchableOpacity
-                      style={[styles.actionBtn, { backgroundColor: 'rgba(129, 140, 248, 0.15)' }]}
+                      style={[styles.actionBtn, { backgroundColor: theme.purpleSoft }]}
                       onPress={() =>
                         setWatchPartyModal({
                           visible: true,
@@ -466,8 +466,8 @@ export function Transfers() {
                       }
                       activeOpacity={0.7}
                     >
-                      <Film size={12} color="#818CF8" />
-                      <Text style={[styles.actionBtnText, { color: '#818CF8', fontWeight: '700' }]}>
+                      <Film size={12} color={theme.purple} />
+                      <Text style={[styles.actionBtnText, { color: theme.purple, fontWeight: '700' }]}>
                         Mesh Party
                       </Text>
                     </TouchableOpacity>

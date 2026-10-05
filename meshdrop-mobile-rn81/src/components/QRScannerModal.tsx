@@ -8,10 +8,10 @@ import {
   PermissionsAndroid,
   Platform,
   ActivityIndicator,
-  SafeAreaView,
   Animated,
   Easing,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Camera } from 'react-native-camera-kit'
 import { X, Zap, ZapOff, QrCode, AlertCircle, Sparkles } from 'lucide-react-native'
 import { useTheme, fonts } from '../theme'
@@ -133,7 +133,7 @@ export function QRScannerModal({
             onPress={onClose}
             activeOpacity={0.7}
           >
-            <X size={20} color={theme.text} />
+            <X size={18} color={theme.text} />
           </TouchableOpacity>
 
           <View style={styles.headerTitleContainer}>
@@ -252,14 +252,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.2,
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: -0.2,
   },
   iconButton: {
     width: 38,
     height: 38,
-    borderRadius: 12,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   retryButtonText: {
     fontSize: 14,

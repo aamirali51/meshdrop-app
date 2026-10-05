@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native'
 import {
   History as HistoryIcon,
@@ -241,7 +242,11 @@ export function History() {
         })}
       </ScrollView>
 
-      {filteredHistory.length === 0 ? (
+      {loading && history.length === 0 ? (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator color={theme.primary} />
+        </View>
+      ) : filteredHistory.length === 0 ? (
         <Card style={[styles.emptyCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <HistoryIcon size={36} color={theme.muted} style={{ marginBottom: 12 }} />
           <Text style={[styles.emptyTitle, { color: theme.text }]}>No Transfer Records</Text>
@@ -336,6 +341,10 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 90,
   },
+  loadingBox: {
+    paddingVertical: 48,
+    alignItems: 'center',
+  },
   statGrid: {
     flexDirection: 'row',
     gap: 8,
@@ -354,7 +363,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 4,
     paddingHorizontal: 9,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   clearBtnText: {
     fontSize: 11.5,

@@ -21,6 +21,7 @@ import {
   Zap,
   Send,
 } from 'lucide-react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { call } from '../bridge'
 import { useTheme, fonts } from '../theme'
 import { Pill, PulseIndicator } from '../components'
@@ -57,6 +58,7 @@ function getDeviceIcon(os?: string) {
 
 export function ShareTargetModal({ visible, payload, onClose }: ShareTargetModalProps) {
   const { theme } = useTheme()
+  const insets = useSafeAreaInsets()
   const [devices, setDevices] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [sendingDevice, setSendingDevice] = useState<string | null>(null)
@@ -121,8 +123,18 @@ export function ShareTargetModal({ visible, payload, onClose }: ShareTargetModal
       transparent
       animationType="slide"
       onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={[styles.sheet, { backgroundColor: theme.bgCard }]}>
+      <View style={[styles.overlay, { backgroundColor: theme.modalBackdrop }]}>
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: theme.bgCard,
+              paddingBottom: 32 + insets.bottom,
+              borderTopLeftRadius: theme.radiusXl,
+              borderTopRightRadius: theme.radiusXl,
+            },
+          ]}
+        >
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
@@ -136,7 +148,7 @@ export function ShareTargetModal({ visible, payload, onClose }: ShareTargetModal
             </View>
             <TouchableOpacity
               onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: theme.bgElevated }]}
+              style={[styles.closeBtn, { backgroundColor: theme.bgElevated, borderRadius: theme.radiusSm }]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <X size={18} color={theme.muted} />
             </TouchableOpacity>
@@ -255,16 +267,12 @@ export function ShareTargetModal({ visible, payload, onClose }: ShareTargetModal
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 32,
-    maxHeight: '85%',
+    maxHeight: '92%',
   },
   header: {
     flexDirection: 'row',
@@ -285,19 +293,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.3,
   },
   subtitle: {
     fontSize: 12,
     marginTop: 1,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 6,
   },
   summaryCard: {
     flexDirection: 'row',
@@ -341,9 +346,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.5,
     marginBottom: 10,
   },
   loadingBox: {

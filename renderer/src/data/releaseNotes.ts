@@ -10,10 +10,16 @@ export interface ReleaseNoteItem {
 }
 
 export const LATEST_RELEASE_NOTES: ReleaseNoteItem = {
-  version: '1.0.65',
+  version: '1.0.66',
   title: "What's New in MeshDrop",
   date: 'September 2026',
   features: [
+    {
+      icon: 'sparkles',
+      title: 'UI Consistency Pass',
+      description:
+        'Unified colors, corner radii, typography and media playback surfaces across the app. Edge-to-edge screens, sheets and the bottom dock now respect the device safe area.'
+    },
     {
       icon: 'shield',
       title: 'Desktop Launch Fix',

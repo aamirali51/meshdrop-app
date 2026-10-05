@@ -16,24 +16,24 @@ import RNFS from 'react-native-fs'
 import { SimpleModal, Btn } from '../components'
 import { useTheme, fonts } from '../theme'
 
-const CURRENT_VERSION = '1.0.53'
+const CURRENT_VERSION = '1.0.66'
 const VERSION_FILE_PATH = `${RNFS.DocumentDirectoryPath}/.meshdrop_version`
 
 const FEATURES = [
   {
-    icon: Folder,
-    title: 'Folder Browsing & Selective Download',
-    desc: 'When claiming a shared folder, peruse all files inside and selectively download only the files you want or grab the whole folder.',
-  },
-  {
-    icon: Zap,
-    title: 'Fast Direct Streaming',
-    desc: 'Upgraded peer-to-peer chunking and adaptive socket buffers for rapid transfers over Wi-Fi and DHT.',
+    icon: Sparkles,
+    title: 'Consistent Look & Feel',
+    desc: 'Unified colors, spacing, corner radii and typography across every screen, plus one shared palette for the video player and file previews.',
   },
   {
     icon: ShieldCheck,
-    title: 'Noise E2E Encryption',
-    desc: 'Direct cryptographically secured transfers with zero cloud logging and zero tracking.',
+    title: 'Better Edge-to-Edge Layout',
+    desc: 'The bottom dock, sheets and full-screen viewers now respect the device safe area, so nothing tucks under the home indicator or notch.',
+  },
+  {
+    icon: Zap,
+    title: 'Polish & Fixes',
+    desc: 'Standardized empty, loading and error states, and a loading indicator for the transfer ledger where it was previously silent.',
   },
 ]
 

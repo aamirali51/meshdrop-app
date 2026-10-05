@@ -27,7 +27,7 @@ import {
   X,
 } from 'lucide-react-native'
 import { NativeVideoView } from './NativeVideoView'
-import { useTheme, fonts } from '../theme'
+import { fonts, mediaPalette } from '../theme'
 
 const { width: winWidth, height: winHeight } = Dimensions.get('window')
 
@@ -173,7 +173,6 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
   },
   ref
 ) {
-  const { theme } = useTheme()
   const [isPlaying, setIsPlaying] = useState(true)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -341,20 +340,20 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
             {/* Center play/pause + seek */}
             <View style={styles.centerRow} pointerEvents="box-none">
               <TouchableOpacity style={styles.seekBtn} onPress={() => seekDelta(-10)}>
-                <RotateCcw size={22} color="#F8FAFC" />
+                <RotateCcw size={22} color={mediaPalette.text} />
                 <Text style={styles.seekText}>10s</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.bigPlay} onPress={togglePlay}>
                 {isPlaying ? (
-                  <Pause size={30} color="#0B0F17" />
+                  <Pause size={30} color={mediaPalette.surface} />
                 ) : (
-                  <Play size={30} color="#0B0F17" style={{ marginLeft: 3 }} />
+                  <Play size={30} color={mediaPalette.surface} style={{ marginLeft: 3 }} />
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.seekBtn} onPress={() => seekDelta(10)}>
-                <RotateCw size={22} color="#F8FAFC" />
+                <RotateCw size={22} color={mediaPalette.text} />
                 <Text style={styles.seekText}>10s</Text>
               </TouchableOpacity>
             </View>
@@ -364,8 +363,8 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
               {/* Scrubber */}
               <DragBar
                 value={isScrubbing ? scrubPreview / (duration || 1) : progressFraction}
-                accent={theme.accent}
-                track="rgba(255,255,255,0.22)"
+                accent={mediaPalette.accent}
+                track={mediaPalette.track}
                 onScrub={(f) => {
                   setIsScrubbing(true)
                   setScrubPreview(f * (duration || 0))
@@ -388,18 +387,18 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
                   {/* Volume slider */}
                   <TouchableOpacity style={styles.iconBtn} onPress={toggleMute}>
                     {muted || volume === 0 ? (
-                      <VolumeX size={18} color="#F8FAFC" />
+                      <VolumeX size={18} color={mediaPalette.text} />
                     ) : volume < 0.5 ? (
-                      <Volume1 size={18} color="#F8FAFC" />
+                      <Volume1 size={18} color={mediaPalette.text} />
                     ) : (
-                      <Volume2 size={18} color="#F8FAFC" />
+                      <Volume2 size={18} color={mediaPalette.text} />
                     )}
                   </TouchableOpacity>
                   <View style={styles.volumeWrap}>
                     <DragBar
                       value={muted ? 0 : volume}
-                      accent={theme.accent}
-                      track="rgba(255,255,255,0.22)"
+                      accent={mediaPalette.accent}
+                      track={mediaPalette.track}
                       height={3}
                       thumbSize={10}
                       onScrub={(f) => {
@@ -421,9 +420,9 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
                   {/* Fullscreen */}
                   <TouchableOpacity style={styles.iconBtn} onPress={toggleFullscreen}>
                     {fullscreen ? (
-                      <Minimize2 size={18} color="#F8FAFC" />
+                      <Minimize2 size={18} color={mediaPalette.text} />
                     ) : (
-                      <Maximize2 size={18} color="#F8FAFC" />
+                      <Maximize2 size={18} color={mediaPalette.text} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -442,14 +441,14 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#06090E',
+    backgroundColor: mediaPalette.bg,
   },
   viewport: {
     flex: 1,
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0B0F17',
+    backgroundColor: mediaPalette.surface,
   },
   empty: {
     justifyContent: 'center',
@@ -457,14 +456,14 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   emptyText: {
-    color: '#94A3B8',
+    color: mediaPalette.muted,
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
   },
   controls: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: mediaPalette.overlay,
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -485,16 +484,16 @@ const styles = StyleSheet.create({
   seekText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#CBD5E1',
+    color: mediaPalette.textSecondary,
   },
   bigPlay: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#38BDF8',
+    backgroundColor: mediaPalette.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#38BDF8',
+    shadowColor: mediaPalette.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 10,
@@ -502,11 +501,11 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     gap: 10,
-    backgroundColor: 'rgba(15,23,42,0.9)',
+    backgroundColor: mediaPalette.surfaceAlt,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: mediaPalette.border,
   },
   dragBarHit: {
     justifyContent: 'center',
@@ -527,6 +526,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -5,
     borderWidth: 2,
+    backgroundColor: mediaPalette.text,
   },
   actionRow: {
     flexDirection: 'row',
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 12,
-    color: '#CBD5E1',
+    color: mediaPalette.textSecondary,
     fontFamily: fonts?.mono || 'monospace',
   },
   actions: {
@@ -554,13 +554,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: mediaPalette.border,
     alignItems: 'center',
   },
   rateText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: mediaPalette.text,
     fontFamily: fonts?.mono || 'monospace',
   },
 })
