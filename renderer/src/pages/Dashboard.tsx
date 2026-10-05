@@ -79,7 +79,8 @@ const PRESET_MS: Record<string, number> = {
 function getShareTotalMs(s: PendingShare): number {
   if (s.createdAt && s.expiresAt && s.expiresAt > s.createdAt) return s.expiresAt - s.createdAt
   const preset = (s.expirationPreset || '').toLowerCase()
-  return PRESET_MS[preset] || 30 * 60 * 1000
+  // `??`, not `||`: a `never` preset is 0 (no expiry) and 0 is falsy.
+  return PRESET_MS[preset] ?? 30 * 60 * 1000
 }
 
 function getRingValue(s: PendingShare): number {
