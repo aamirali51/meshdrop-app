@@ -10,10 +10,16 @@ export interface ReleaseNoteItem {
 }
 
 export const LATEST_RELEASE_NOTES: ReleaseNoteItem = {
-  version: '1.0.64',
+  version: '1.0.65',
   title: "What's New in MeshDrop",
   date: 'September 2026',
   features: [
+    {
+      icon: 'shield',
+      title: 'Desktop Launch Fix',
+      description:
+        'Fixed a startup failure on Windows, macOS and Linux where the packaged app could not load the P2P engine’s runtime modules and showed a “Cannot find module” error on launch.'
+    },
     {
       icon: 'sparkles',
       title: 'Non-Expiring Share Links',
