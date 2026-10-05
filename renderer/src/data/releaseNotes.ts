@@ -10,10 +10,16 @@ export interface ReleaseNoteItem {
 }
 
 export const LATEST_RELEASE_NOTES: ReleaseNoteItem = {
-  version: '1.0.66',
+  version: '1.0.67',
   title: "What's New in MeshDrop",
   date: 'September 2026',
   features: [
+    {
+      icon: 'zap',
+      title: 'Never-Expiring Links Fixed',
+      description:
+        'Choosing the "Never" expiration for a Drop Code now truly creates a permanent link. It was silently falling back to a 30-minute expiry, so the share appeared with a countdown.'
+    },
     {
       icon: 'sparkles',
       title: 'UI Consistency Pass',
