@@ -27,7 +27,7 @@ import { pickFiles, pickFolder } from '@/lib/capabilities'
 import { buildShareLink, shareLinkMeta } from '@/lib/shareLinks'
 import type { PendingShare, PendingShareStatus } from '@/types'
 
-type ExpirationPreset = '5m' | '15m' | '30m' | '1h' | '6h' | '24h' | '3d' | '7d'
+type ExpirationPreset = '5m' | '15m' | '30m' | '1h' | '6h' | '24h' | '3d' | '7d' | 'never'
 
 const PRESETS: { value: ExpirationPreset; label: string }[] = [
   { value: '5m', label: '5 min' },
@@ -37,7 +37,8 @@ const PRESETS: { value: ExpirationPreset; label: string }[] = [
   { value: '6h', label: '6 hours' },
   { value: '24h', label: '24 hours' },
   { value: '3d', label: '3 days' },
-  { value: '7d', label: '7 days' }
+  { value: '7d', label: '7 days' },
+  { value: 'never', label: 'Never' }
 ]
 
 // 0 = unlimited downloads until expiry.
@@ -172,6 +173,8 @@ export function DropCodeModal() {
 
   const liveShare = share ? pendingShares.find((s) => s.id === share.id) || share : null
   const shareStatus: PendingShareStatus = liveShare?.status || 'waiting'
+  const shareExpiresAt = liveShare?.expiresAt || share?.expiresAt || 0
+  const neverExpires = shareExpiresAt <= 0
   const isExpired = liveShare ? liveShare.expiresAt > 0 && Date.now() >= liveShare.expiresAt : false
 
   const STATUS_LABEL: Record<PendingShareStatus, string> = {
@@ -221,11 +224,10 @@ export function DropCodeModal() {
       !isExpired &&
       Date.now() - createdAtRef.current > 12000
     ) {
-      const remaining = formatRemaining(liveShare?.expiresAt || share.expiresAt)
-      toast.success(
-        'Code Still Active',
-        `${share.code} stays valid for ${remaining} even after closing this window.`
-      )
+      const tail = shareExpiresAt > 0
+        ? `stays valid for ${formatRemaining(shareExpiresAt)} even after closing this window.`
+        : 'never expires — share the link anytime.'
+      toast.success('Code Still Active', `${share.code} ${tail}`)
     }
     reset()
     toggleDropCodeModal()
@@ -409,10 +411,10 @@ export function DropCodeModal() {
               <div className='rounded-xl border border-border/40 bg-card/40 p-2.5 text-xs space-y-1'>
                 <div className='flex items-center justify-between'>
                   <span className='flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground'>
-                    <Clock className='h-3 w-3 text-primary' /> Expires in
+                    <Clock className='h-3 w-3 text-primary' /> {neverExpires ? 'Expiry' : 'Expires in'}
                   </span>
                   <span className='font-mono text-xs font-black tabular-nums text-foreground'>
-                    {isExpired ? '0:00' : formatRemaining(liveShare?.expiresAt || share.expiresAt)}
+                    {neverExpires ? 'Never expires' : isExpired ? '0:00' : formatRemaining(shareExpiresAt)}
                   </span>
                 </div>
                 <div className='flex items-center justify-between'>
@@ -537,7 +539,7 @@ export function DropCodeModal() {
                       {shareLabel(s)}
                     </span>
                     <span className='font-mono tabular-nums text-muted-foreground'>
-                      {s.expiresAt > 0 ? formatRemaining(s.expiresAt) : '—'}
+                      {s.expiresAt > 0 ? formatRemaining(s.expiresAt) : 'Never'}
                     </span>
                     <Button
                       size='sm'

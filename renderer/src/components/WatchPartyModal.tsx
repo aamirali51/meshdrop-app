@@ -4,16 +4,13 @@ import {
   Pause,
   Volume2,
   VolumeX,
-  Maximize2,
-  Minimize2,
   Radio,
-  Users,
   Film,
-  Sparkles,
   RotateCcw,
   Check,
   Copy,
-  Layers
+  Layers,
+  Captions,
 } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { Button } from '@/components/ui/button'
@@ -67,7 +64,7 @@ export function WatchPartyModal({
   const bufferingTimerRef = useRef<ReturnType<typeof setTimeout>|null>(null)
   const retryVerRef = useRef(0)
 
-  // Fetch local loopback Range stream URL
+  // Fetch local loopback Range stream URL — watermark gating preserved
   useEffect(() => {
     if (!open) {
       setStreamUrl('')
@@ -87,9 +84,6 @@ export function WatchPartyModal({
             setStreamUrl(res.url)
             return
           }
-          // Not playable yet (progressive transfer still verifying the moov /
-          // prefix watermark). Retry a bounded number of times — the engine
-          // only hands out a URL once the source is genuinely playable.
           if (attempts < 60) {
             attempts++
             retryTimer = setTimeout(tryResolve, 3000)
@@ -114,7 +108,7 @@ export function WatchPartyModal({
     }
   }, [open, transferId, filePath, toast])
 
-  // Attach video stream (Universal multi-engine: mpegts.js for TS/FLV, Hls.js for m3u8, native HTML5 for MP4/WebM/MKV)
+  // Attach video stream — same universal multi-engine as WatchParty page
   useEffect(() => {
     const video = videoRef.current
     if (!video || !streamUrl) return
@@ -151,11 +145,11 @@ export function WatchPartyModal({
           {
             enableWorker: true,
             lazyLoad: true,
-            lazyLoadMaxDuration: 180, // buffer up to 3 mins ahead progressively
+            lazyLoadMaxDuration: 180,
             lazyLoadRecoverDuration: 30,
             deferLoadAfterSourceOpen: false,
             autoCleanupSourceBuffer: true,
-            autoCleanupMaxBackwardDuration: 120, // keep 2 mins behind current playhead
+            autoCleanupMaxBackwardDuration: 120,
             autoCleanupMinBackwardDuration: 60,
             seekType: 'range',
             fixAudioTimestampGap: true
@@ -209,7 +203,6 @@ export function WatchPartyModal({
   const seekDebounceTimer = useRef<NodeJS.Timeout | null>(null)
   const lastTimeUpdate = useRef<number>(0)
 
-  // Broadcast state changes when Host interacts
   const broadcastSync = useCallback(
     (action: 'play' | 'pause' | 'seek', positionSec: number) => {
       if (!isHost && !syncWithHost) return
@@ -223,10 +216,6 @@ export function WatchPartyModal({
     [isHost, syncWithHost, roomCode]
   )
 
-  // Listen for incoming Watch state sync signals from Host (viewers only).
-  // A room-based party surfaces state on watch.state_sync (forwarded from the
-  // engine's party:state:sync); the legacy claim/player path surfaces it on
-  // watch.stateChanged. Accept both so a viewer follows the host in either flow.
   useEffect(() => {
     if (!open || isHost) return
     const applyState = (data: unknown) => {
@@ -247,7 +236,6 @@ export function WatchPartyModal({
       }
 
       if (typeof state.positionSec === 'number') {
-        // Sync timestamp if drift is greater than 1.5 seconds
         const drift = Math.abs(vid.currentTime - state.positionSec)
         if (drift > 1.5) {
           vid.currentTime = state.positionSec
@@ -264,7 +252,6 @@ export function WatchPartyModal({
     }
   }, [open, isHost, syncWithHost])
 
-  // Throttled video time update handler to prevent high-frequency React re-renders
   const handleTimeUpdate = () => {
     const vid = videoRef.current
     if (!vid) return
@@ -301,6 +288,8 @@ export function WatchPartyModal({
         })
         .catch((err) => {
           console.warn('[WatchParty] play() error:', err)
+          const n = (err as any)?.name
+          if (n === 'NotAllowedError') setShowTapToPlay(true)
         })
     } else {
       vid.pause()
@@ -398,34 +387,34 @@ export function WatchPartyModal({
     <Modal
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={roomTitle || 'Watch Party (P2P Streaming)'}
-      description='Synchronized, lossless P2P video stream powered by MeshDrop uDX & Hypercore'
-      className='max-w-4xl'
+      title={roomTitle || 'Watch Party'}
+      description="Dark theater — direct P2P stream with synced playback. Same engines, new costume."
+      className="max-w-4xl !bg-[#0B0E14] !border-white/10"
+      headerTone="dark"
     >
-      <div className='flex flex-col gap-3 py-1'>
-        {/* Top Info Bar */}
-        <div className='flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/40 px-3 py-2 text-xs'>
-          <div className='flex items-center gap-2'>
-            <div className='flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-bold text-primary'>
-              <Radio className='h-3 w-3 animate-pulse' />
-              <span>{isHost ? 'Host Broadcaster' : 'Synced Viewer'}</span>
+      <div className="flex flex-col gap-3 py-1">
+        {/* Top bar — dark */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-bold text-white">
+              <Radio className="h-3 w-3 text-emerald-400 animate-pulse" />
+              <span>{isHost ? 'Host' : 'Guest'} · {isPlaying ? 'In Sync' : 'Paused'}</span>
             </div>
             {roomCode && (
               <button
                 onClick={handleCopyCode}
-                className='flex items-center gap-1 font-mono font-bold text-foreground hover:text-primary transition-colors'
+                className="flex items-center gap-1.5 font-mono font-bold text-white hover:text-white/80 transition-colors"
               >
                 <span>{roomCode}</span>
-                {copied ? <Check className='h-3 w-3 text-status-online' /> : <Copy className='h-3 w-3 text-muted-foreground' />}
+                {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3 text-white/40" />}
               </button>
             )}
           </div>
 
-          <div className='flex items-center gap-2'>
-            <div className='flex items-center gap-1 text-[11px] text-muted-foreground'>
-              <Layers className='h-3.5 w-3.5 text-accent' />
-              <span>P2P Range Streaming</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-white/60">
+              <Layers className="h-3 w-3" /> Range streaming
+            </span>
             {!isHost && hostPos != null && !syncWithHost && videoRef.current && Math.abs(hostPos - currentTime) > 3 && (
               <button
                 onClick={() => {
@@ -434,7 +423,7 @@ export function WatchPartyModal({
                   vid.currentTime = hostPos
                   setCurrentTime(hostPos)
                 }}
-                className='rounded px-2 py-0.5 text-[10px] font-bold border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all'
+                className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-black hover:bg-white/90 transition-colors"
               >
                 Jump to host ({formatTime(Math.abs(hostPos - currentTime))} {hostPos > currentTime ? 'behind' : 'ahead'})
               </button>
@@ -442,28 +431,24 @@ export function WatchPartyModal({
             {!isHost && (
               <button
                 onClick={() => setSyncWithHost((v) => !v)}
-                className={`rounded px-2 py-0.5 text-[10px] font-bold transition-all ${
-                  syncWithHost
-                    ? 'border border-status-online/30 bg-status-online/10 text-status-online'
-                    : 'border border-border/50 bg-muted/20 text-muted-foreground'
-                }`}
+                className={`rounded-full px-3 py-1 text-xs font-bold border transition-colors ${syncWithHost ? 'bg-white text-black border-white' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}
               >
-                {syncWithHost ? 'In Sync with Host' : 'Manual Playback'}
+                {syncWithHost ? 'In Sync' : 'Manual'}
               </button>
             )}
           </div>
         </div>
 
-        {/* Video Player Container */}
+        {/* Video — near-black theater */}
         <div
           ref={containerRef}
           onMouseMove={handleMouseMove}
-          className='relative aspect-video w-full overflow-hidden rounded-2xl border border-border/70 bg-black shadow-2xl flex items-center justify-center group select-none'
+          className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl flex items-center justify-center group select-none"
         >
           {streamUrl ? (
             <video
               ref={videoRef}
-              preload='auto'
+              preload="auto"
               onTimeUpdate={handleTimeUpdate}
               onEnded={() => setIsPlaying(false)}
               onPlay={() => setIsPlaying(true)}
@@ -471,147 +456,153 @@ export function WatchPartyModal({
               onError={(e) => {
                 const me:any=(e.currentTarget as HTMLVideoElement).error; const code=me?me.code:0; const msg=me?(me.message||`MediaError code ${code}`):'MediaError'; console.warn('[WatchParty] Video decode error',code,msg); setPlayerError({code:code||3,message:msg,source:'native'})
               }}
-              onWaiting={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); bufferingTimerRef.current=setTimeout(()=>setIsBuffering(true),5000)}}
-              onStalled={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); bufferingTimerRef.current=setTimeout(()=>setIsBuffering(true),5000)}}
+              onWaiting={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); bufferingTimerRef.current=setTimeout(()=>setIsBuffering(true),1200)}}
+              onStalled={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); bufferingTimerRef.current=setTimeout(()=>setIsBuffering(true),1200)}}
               onPlaying={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); setIsBuffering(false); setShowTapToPlay(false); setPlayerError(null)}}
               onCanPlay={()=>{ if(bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current); setIsBuffering(false)}}
               onClick={togglePlay}
-              className='h-full w-full object-contain cursor-pointer'
+              className="h-full w-full object-contain cursor-pointer"
               playsInline
             />
           ) : (
-            <div className='flex flex-col items-center gap-2 text-muted-foreground'>
-              <Film className='h-10 w-10 animate-pulse text-primary/60' />
-              <span className='text-sm font-medium'>Connecting to local P2P stream...</span>
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <div className="relative">
+                <div className="h-12 w-12 animate-spin rounded-full border-2 border-white/10 border-t-white/90" />
+                <Film className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 text-white/70" />
+              </div>
+              <p className="text-sm font-black text-white">Preparing stream…</p>
+              <p className="text-xs text-white/50">Staging blocks — starts when the head watermark is playable</p>
             </div>
           )}
 
-          {/* FIX2: tap-to-play when autoplay blocked */}
+          {/* Tap for sound — autoplay fallback affordance */}
           {showTapToPlay && !playerError && (
-            <button onClick={()=>{ const v=videoRef.current; if(!v) return; setShowTapToPlay(false); v.play().catch((err:any)=>setPlayerError({code:0,message:err.message||String(err),source:'play'})) }} className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm'>
-              <div className='flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground'><Play className='h-7 w-7 fill-current ml-1' /></div>
-              <span className='text-sm font-semibold text-white'>Tap to play</span>
-              <span className='text-xs text-white/70'>Autoplay was blocked — tap to start</span>
+            <button onClick={()=>{ const v=videoRef.current; if(!v) return; setShowTapToPlay(false); v.muted=false; setIsMuted(false); v.play().catch((err:any)=>setPlayerError({code:0,message:err.message||String(err),source:'play'})) }} className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/75 backdrop-blur-sm p-6 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-black shadow-xl"><Play className="h-7 w-7 fill-current ml-1" /></div>
+              <span className="text-sm font-black text-white">Tap for sound</span>
+              <span className="text-xs text-white/60">Autoplay was blocked — tap to unmute and stay in sync</span>
             </button>
           )}
           {playerError && (
-            <div className='absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/80 p-6 text-center'>
-              <p className='text-sm font-semibold text-white'>{playerError.code===2?'Connection interrupted':playerError.code===3||playerError.code===4?'Format not supported on this device':'Playback failed'}</p>
-              <p className='text-xs text-white/70'>{playerError.message}</p>
-              <button onClick={()=>{ setPlayerError(null); setShowTapToPlay(false); retryVerRef.current++; const m=METHODS.STREAM_URL_GET||'stream.getUrl'; call(m,{transferId,filePath}).then((res:any)=>{ if(res?.url) setStreamUrl(`${res.url}&vw=${retryVerRef.current}`)}).catch(()=>{}) }} className='rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground'>Retry</button>
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/85 p-6 text-center">
+              <p className="text-sm font-black text-white">{playerError.code===2?'Connection interrupted':playerError.code===3||playerError.code===4?'Format not supported':'Playback failed'}</p>
+              <p className="text-xs text-white/60 max-w-[32ch]">{playerError.message}</p>
+              <button onClick={()=>{ setPlayerError(null); setShowTapToPlay(false); retryVerRef.current++; const m=METHODS.STREAM_URL_GET||'stream.getUrl'; call(m,{transferId,filePath}).then((res:any)=>{ if(res?.url) setStreamUrl(`${res.url}&vw=${retryVerRef.current}`)}).catch(()=>{}) }} className="rounded-xl bg-white px-5 py-2.5 text-xs font-black text-black hover:bg-white/90">Retry</button>
             </div>
           )}
           {isBuffering && !playerError && !showTapToPlay && (
-            <div className='absolute inset-0 z-10 flex items-center justify-center bg-black/30 pointer-events-none'><div className='h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white' /><span className='ml-2 text-xs text-white/80'>Buffering…</span></div>
+            <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/25 pointer-events-none">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+              <span className="text-xs font-medium text-white/80">Buffering…</span>
+            </div>
           )}
 
-          {/* Big Center Play Icon when paused */}
+          {/* Center play when paused */}
           {!isPlaying && streamUrl && !showTapToPlay && !playerError && (
             <button
               onClick={togglePlay}
-              className='absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity'
+              className="absolute inset-0 flex items-center justify-center bg-black/30"
+              aria-label="Play"
             >
-              <div className='flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-primary text-primary-foreground shadow-2xl transition-transform hover:scale-110 active:scale-95'>
-                <Play className='h-7 w-7 fill-current ml-1' />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-black shadow-2xl hover:scale-105 active:scale-95 transition-transform">
+                <Play className="h-7 w-7 fill-current ml-1" />
               </div>
             </button>
           )}
 
-          {/* Player Overlay Controls */}
+          {/* Controls — dark theater style */}
           <div
-            className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 transition-opacity duration-300 ${
+            className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/60 to-transparent p-4 transition-opacity duration-300 ${
               showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
           >
-            {/* Scrub & Buffer Bar */}
-            <div className='relative mb-2 flex items-center group/scrub'>
-              {/* Loaded Buffer Bar */}
+            <div className="relative mb-3 flex items-center">
               {duration > 0 && (
                 <div
                   style={{ width: `${(bufferedEnd / duration) * 100}%` }}
-                  className='absolute h-1.5 rounded-full bg-white/30 pointer-events-none transition-all'
+                  className="absolute h-1.5 rounded-full bg-white/15 pointer-events-none"
                 />
               )}
-              {/* Progress Slider */}
               <input
-                type='range'
+                type="range"
                 min={0}
                 max={duration || 100}
                 value={currentTime}
                 onChange={handleSeek}
-                className='relative z-10 w-full h-1.5 accent-primary cursor-pointer rounded-full bg-white/20 transition-all hover:h-2'
+                className="relative z-10 w-full h-1.5 accent-white cursor-pointer rounded-full bg-white/10"
+                aria-label="Seek"
               />
             </div>
 
-            {/* Bottom Controls Bar */}
-            <div className='flex items-center justify-between gap-2 text-white'>
-              <div className='flex items-center gap-3'>
+            <div className="flex items-center justify-between gap-2 text-white">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={togglePlay}
-                  className='flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/20 transition-colors'
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow-md hover:bg-white/90 active:scale-95 transition-all"
+                  aria-label={isPlaying ? 'Pause' : 'Play'}
                 >
-                  {isPlaying ? <Pause className='h-4 w-4 fill-current' /> : <Play className='h-4 w-4 fill-current ml-0.5' />}
+                  {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
                 </button>
 
-                <div className='flex items-center gap-1.5'>
+                <div className="flex items-center gap-1">
                   <button
                     onClick={toggleMute}
-                    className='flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/20 transition-colors'
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-white/15 transition-colors"
+                    aria-label={isMuted ? 'Unmute' : 'Mute'}
                   >
-                    {isMuted || volume === 0 ? <VolumeX className='h-4 w-4' /> : <Volume2 className='h-4 w-4' />}
+                    {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                   </button>
                   <input
-                    type='range'
+                    type="range"
                     min={0}
                     max={1}
                     step={0.05}
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className='w-16 h-1 accent-white bg-white/30 rounded cursor-pointer'
+                    className="hidden sm:block w-20 h-1 accent-white bg-white/15 rounded cursor-pointer"
+                    aria-label="Volume"
                   />
                 </div>
 
-                <span className='font-mono text-xs text-white/80 select-none'>
-                  {formatTime(currentTime)} / {formatTime(duration)}
+                <span className="hidden sm:inline font-mono text-xs tabular-nums text-white/80">
+                  {formatTime(currentTime)} <span className="text-white/30">/</span> {formatTime(duration)}
                 </span>
               </div>
 
-              <div className='flex items-center gap-2'>
+              <div className="flex items-center gap-1.5">
                 <Button
-                  size='sm'
-                  variant='ghost'
+                  size="sm"
+                  variant="ghost"
                   onClick={() => {
                     if (videoRef.current) {
                       videoRef.current.currentTime = 0
                       broadcastSync('seek', 0)
                     }
                   }}
-                  className='h-7 px-2 text-xs text-white/80 hover:bg-white/20 hover:text-white'
+                  className="h-8 gap-1 rounded-full bg-white/10 px-3 text-xs font-bold text-white hover:bg-white hover:text-black border border-white/10"
                 >
-                  <RotateCcw className='h-3 w-3 mr-1' />
+                  <RotateCcw className="h-3.5 w-3.5" />
                   Restart
                 </Button>
 
                 <button
                   onClick={toggleFullscreen}
-                  className='flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/20 transition-colors text-white'
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-white/15 transition-colors"
+                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
                 >
-                  {isFullscreen ? <Minimize2 className='h-4 w-4' /> : <Maximize2 className='h-4 w-4' />}
+                  {isFullscreen ? <span className="text-xs">⤓</span> : <span className="text-xs">⤢</span>}
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className='flex items-center justify-between pt-1'>
-          <div className='flex items-center gap-1.5 text-[11px] text-muted-foreground'>
-            <Sparkles className='h-3.5 w-3.5 text-primary' />
-            <span>Progressive buffer active · Instant seek supported</span>
-          </div>
-
-          <Button variant='outline' onClick={onClose} size='sm' className='font-semibold'>
-            Close Player
+        <div className="flex items-center justify-between pt-1">
+          <span className="flex items-center gap-1.5 text-[11px] text-white/40">
+            <Captions className="h-3.5 w-3.5" /> Theater — direct P2P · staged shareId · watermark gating
+          </span>
+          <Button variant="outline" onClick={onClose} size="sm" className="rounded-full font-bold border-white/10 bg-white text-black hover:bg-white/90">
+            Close
           </Button>
         </div>
       </div>

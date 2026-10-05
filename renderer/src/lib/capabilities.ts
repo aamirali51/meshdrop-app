@@ -207,26 +207,43 @@ function inputPickFiles(multiple: boolean): Promise<PickedFile[] | null> {
     document.body.appendChild(input)
 
     let settled = false
+    // Once the dialog has handed us a selection, the staging upload that
+    // follows owns the outcome. It can take far longer than any fixed window
+    // (a 4K file runs to tens of GB), so nothing about focus may cancel a
+    // pick that already produced files.
+    let sawChange = false
+    const cleanup = () => {
+      window.removeEventListener('focus', onWindowFocus)
+      input.remove()
+    }
     const finish = (result: PickedFile[] | null) => {
       if (settled) return
       settled = true
-      window.removeEventListener('focus', onWindowFocus)
-      input.remove()
+      cleanup()
       resolve(result)
     }
     const fail = (err: Error) => {
       if (settled) return
       settled = true
-      window.removeEventListener('focus', onWindowFocus)
-      input.remove()
+      cleanup()
       reject(err)
     }
     const onWindowFocus = () => {
-      // The OS dialog closed without a change event → cancelled.
-      window.setTimeout(() => finish(null), 400)
+      // Focus returns when the dialog closes. Without a change event the user
+      // cancelled; the short delay lets a change event that is already in
+      // flight land first. Browsers that fire `cancel` never need this path.
+      window.setTimeout(() => {
+        if (sawChange) return
+        finish(null)
+      }, 400)
     }
     input.addEventListener('change', () => {
+      sawChange = true
       const files = Array.from(input.files || [])
+      if (!files.length) {
+        finish(null)
+        return
+      }
       importFiles(files).then((picked) => finish(picked.length ? picked : null), fail)
     })
     input.addEventListener('cancel', () => finish(null))

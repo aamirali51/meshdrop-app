@@ -72,7 +72,8 @@ const PRESET_MS: Record<string, number> = {
   '6h': 6 * 60 * 60 * 1000,
   '24h': 24 * 60 * 60 * 1000,
   '3d': 3 * 24 * 60 * 60 * 1000,
-  '7d': 7 * 24 * 60 * 60 * 1000
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  never: 0
 }
 
 function getShareTotalMs(s: PendingShare): number {
@@ -91,7 +92,7 @@ function getRingValue(s: PendingShare): number {
 }
 
 export function Dashboard() {
-  const { devices, toggleTrustDevice, toggleFavoriteDevice, removeDevice, setInspectingDevice } =
+  const { devices, toggleTrustDevice, toggleFavoriteDevice, removeDevice, setInspectingDevice, renameDevice } =
     useDevices()
   const { transfers, sendFileToDevice, sendFilePath } = useTransfers()
   const { activity } = useActivity()
@@ -551,7 +552,8 @@ export function Dashboard() {
                 onViewDetails={setInspectingDevice}
                 onToggleTrust={(d) => toggleTrustDevice(d.id)}
                 onToggleFavorite={(d) => toggleFavoriteDevice(d.id)}
-                onRemove={setRemoveTarget}
+                onRemove={(d, opts) => removeDevice(d.id, opts)}
+                onRename={(d, n) => renameDevice(d.id, n)}
               />
             ))}
           </div>

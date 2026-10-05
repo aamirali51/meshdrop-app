@@ -10,10 +10,16 @@ export interface ReleaseNoteItem {
 }
 
 export const LATEST_RELEASE_NOTES: ReleaseNoteItem = {
-  version: '1.0.63',
+  version: '1.0.64',
   title: "What's New in MeshDrop",
   date: 'September 2026',
   features: [
+    {
+      icon: 'sparkles',
+      title: 'Non-Expiring Share Links',
+      description:
+        'Drop Codes and shared folders can now be set to never expire — pick "Never" in the expiration presets to create a permanent link you can share anytime.'
+    },
     {
       icon: 'folder',
       title: 'Folder Browsing & Selective Download',

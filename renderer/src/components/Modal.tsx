@@ -13,6 +13,12 @@ interface ModalProps {
   className?: string
   /** Prevents ESC / click-outside from closing (e.g. security approvals). */
   blockClose?: boolean
+  /**
+   * Header text tone. 'theme' (default) follows the app theme tokens; 'dark'
+   * forces light header text for panels whose background is hardcoded dark, so
+   * the title does not vanish when the app is in light mode.
+   */
+  headerTone?: 'theme' | 'dark'
 }
 
 export function Modal({
@@ -22,8 +28,10 @@ export function Modal({
   description,
   children,
   className,
-  blockClose
+  blockClose,
+  headerTone = 'theme'
 }: ModalProps) {
+  const darkHeader = headerTone === 'dark'
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -38,11 +46,21 @@ export function Modal({
         >
           <div className='flex items-start justify-between gap-4'>
             <div className='min-w-0'>
-              <Dialog.Title className='text-base font-black tracking-tight text-foreground'>
+              <Dialog.Title
+                className={cn(
+                  'text-base font-black tracking-tight text-foreground',
+                  darkHeader && '!text-white'
+                )}
+              >
                 {title}
               </Dialog.Title>
               {description && (
-                <Dialog.Description className='mt-0.5 text-xs text-muted-foreground'>
+                <Dialog.Description
+                  className={cn(
+                    'mt-0.5 text-xs text-muted-foreground',
+                    darkHeader && '!text-white/60'
+                  )}
+                >
                   {description}
                 </Dialog.Description>
               )}
@@ -50,7 +68,10 @@ export function Modal({
             {!blockClose && (
               <Dialog.Close
                 aria-label='Close'
-                className='rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
+                className={cn(
+                  'rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
+                  darkHeader && '!text-white/60 hover:!bg-white/10 hover:!text-white'
+                )}
               >
                 <X className='h-4 w-4' />
               </Dialog.Close>
