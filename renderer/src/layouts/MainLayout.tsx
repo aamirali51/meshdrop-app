@@ -140,7 +140,7 @@ export function MainLayout() {
             </div>
           )}
           <main id="main-scroll" className="flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="mx-auto w-full max-w-[1160px] px-4 py-6 md:px-6 md:py-7">
+            <div className="mx-auto w-full px-4 py-6 md:px-6 md:py-7">
               {!isDesignPreview && <PageHeader route={currentRoute} />}
               {isDesignPreview ? (
                 <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading design preview…</div>}>

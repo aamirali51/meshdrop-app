@@ -233,6 +233,61 @@ const SECTIONS: GuideSection[] = [
     link: { label: 'Open Diagnostics', route: '/diagnostics' },
   },
   {
+    id: 'cli-install',
+    icon: <Terminal className="h-4 w-4" />,
+    title: 'Install the mesh CLI (every platform)',
+    blurb:
+      'The CLI is an npm package (@meshdrop-go/host). Install Node 18+, then it is one command — or skip Node entirely with Docker on a NAS/server. Identical on Windows, macOS and Linux, and the same binary doubles as the always-on host.',
+    steps: [
+      {
+        title: 'Windows',
+        body: 'Install Node LTS (winget install OpenJS.NodeJS.LTS, or the installer from nodejs.org), open a NEW PowerShell window, then run the npm command below. If “mesh” is not recognised afterwards, add %AppData%\\npm to your PATH and reopen the terminal.',
+      },
+      {
+        title: 'macOS',
+        body: 'Install Node with Homebrew (brew install node) or nvm, then the npm command below. If npm refuses with EACCES, switch to nvm or set a user prefix (npm config set prefix ~/.npm-global) instead of using sudo.',
+      },
+      {
+        title: 'Linux',
+        body: 'Install Node 18+ via nvm, NodeSource, or your distro package (Debian/Ubuntu: nodejs + npm; Fedora: nodejs; Arch: nodejs npm), then the npm command below. A global install may need sudo or a user prefix. Then “mesh service install” gives you a systemd unit that starts on boot.',
+      },
+      {
+        title: 'NAS / server — no Node needed (Docker)',
+        body: 'On Synology, QNAP, unRAID or any Docker host, run the image with network_mode: host (required — the bridge hides the LAN address and breaks peer discovery). The identity lives in the /data volume, so back it up. Nothing else to install.',
+      },
+      {
+        title: 'No install at all (one-off)',
+        body: 'npx @meshdrop-go/host status runs the CLI once without a global install — handy for a quick check or a throwaway script.',
+      },
+      {
+        title: 'Verify, update, remove',
+        body: 'mesh version confirms the install; mesh update checks npm for a newer release. Upgrade with npm install -g @meshdrop-go/host@latest; remove with npm rm -g @meshdrop-go/host (plus mesh service uninstall --yes if you installed the service).',
+      },
+    ],
+    code: {
+      label: 'install — one line per platform',
+      lines: [
+        '# 1) Node 18+ (skip if you already have it)',
+        'winget install OpenJS.NodeJS.LTS                 # Windows',
+        'brew install node                                # macOS',
+        '# Linux: install Node 18+ via nvm or your package manager',
+        '',
+        '# 2) the mesh CLI (any OS)',
+        'npm install -g @meshdrop-go/host    &&    mesh version',
+        'npx @meshdrop-go/host status                     # …or run once, no install',
+        '',
+        '# 3) NAS / server — no Node, Docker instead',
+        'docker run -d --name meshdrop --network host \\',
+        '  -e PUID=1000 -e PGID=1000 -e MESHDROP_HOST_NAME=nas \\',
+        '  -v ./meshdrop-data:/data -v ./meshdrop-downloads:/downloads \\',
+        '  --restart unless-stopped ghcr.io/aamirali51/meshdrop-host:latest',
+        '',
+        '# 4) start on boot',
+        'mesh service install --name nas                  # systemd / launchd / Windows task',
+      ],
+    },
+  },
+  {
     id: 'cli',
     icon: <Terminal className="h-4 w-4" />,
     title: 'Command line (CLI)',

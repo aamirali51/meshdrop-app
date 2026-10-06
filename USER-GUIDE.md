@@ -27,18 +27,33 @@ Android app, and the headless CLI/Docker deployment for NAS and servers.
 - Updates are offered in-app; the app downloads the new APK and hands off to the
   Android installer.
 
-### Command line (CLI) — Linux / macOS / Windows
-Requires Node 18+.
+### Command line (CLI) — Windows, macOS, Linux
+Requires **Node 18+**. Install Node first, then the CLI:
+
+| OS | Install Node 18+ | Install the CLI |
+|---|---|---|
+| **Windows** | `winget install OpenJS.NodeJS.LTS` (or nodejs.org installer), then open a **new** PowerShell | `npm install -g @meshdrop-go/host` |
+| **macOS** | `brew install node` (or nvm) | `npm install -g @meshdrop-go/host` |
+| **Linux** | nvm, NodeSource, or your distro's `nodejs`/`npm` package | `npm install -g @meshdrop-go/host` (may need sudo, or a user prefix) |
+
 ```sh
-npm install -g @meshdrop-go/host
-mesh version
+npm install -g @meshdrop-go/host   &&   mesh version
 ```
+- **Windows:** if `mesh` isn't recognised, add `%AppData%\npm` to PATH and reopen the terminal.
+- **macOS:** on an `EACCES` error, use nvm or `npm config set prefix ~/.npm-global` — don't use sudo.
+- **No global install?** `npx @meshdrop-go/host status` runs it once without installing.
+- **Upgrade:** `npm install -g @meshdrop-go/host@latest` (or `mesh update`). **Remove:** `npm rm -g @meshdrop-go/host`.
+- Then, on any always-on machine: `mesh service install` (systemd / launchd / Windows logon task).
 
 ### NAS / server (Docker) — recommended for always-on boxes
+No Node needed — the image bundles everything.
 ```sh
-# docker-compose.yml is in the meshdrop-host repo
-docker compose up -d
+docker run -d --name meshdrop --network host \
+  -e PUID=1000 -e PGID=1000 -e MESHDROP_HOST_NAME=nas \
+  -v ./meshdrop-data:/data -v ./meshdrop-downloads:/downloads \
+  --restart unless-stopped ghcr.io/aamirali51/meshdrop-host:latest
 ```
+Or use the repo's `docker-compose.yml` (`docker compose up -d`).
 > **Host networking is required** (`network_mode: host`). Docker's default bridge
 > hides the real LAN address, which breaks local peer discovery and slows
 > transfers. See §8.
