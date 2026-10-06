@@ -1,7 +1,7 @@
 {
  "name": "meshdrop",
  "productName": "MeshDrop Go",
-  "version": "1.0.68",
+  "version": "1.0.69",
  "upgrade": "pear://49x3eqdfgubimdescau51sn7to47c85zkky66mi1kxaxrqpturho",
  "description": "MeshDrop Go — zero-cloud P2P file sharing. Direct, end-to-end encrypted file transfers between your own devices. No accounts. No cloud.",
  "license": "MIT",

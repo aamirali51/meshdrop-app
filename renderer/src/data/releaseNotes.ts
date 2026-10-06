@@ -10,10 +10,16 @@ export interface ReleaseNoteItem {
 }
 
 export const LATEST_RELEASE_NOTES: ReleaseNoteItem = {
-  version: '1.0.68',
+  version: '1.0.69',
   title: "What's New in MeshDrop Go",
   date: 'September 2026',
   features: [
+    {
+      icon: 'sparkles',
+      title: 'Expanded Guide + Full-Width Layout',
+      description:
+        'The in-app Guide now covers installing the mesh CLI on Windows, macOS, Linux and NAS/Docker, and pages fill the whole window when you maximise it.'
+    },
     {
       icon: 'sparkles',
       title: 'In-App Guide + mesh CLI',
