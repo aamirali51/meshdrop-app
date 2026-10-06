@@ -2,19 +2,18 @@
 
 **Zero-cloud P2P file sharing.** Direct, end-to-end encrypted file transfers between your own devices. No accounts, no cloud, no size limits.
 
-![MeshDrop Go Interface](images/screenshot.png)
-
 ---
 
 ## Ecosystem
 
-This repository contains the desktop (Electron) and mobile (React Native) clients. The P2P engine lives in a separate public repo so it can be reused independently.
+This repository contains the desktop (Electron) and mobile (React Native) clients. The P2P engine and the headless host live in separate public repos so they can be reused independently.
 
-| Repository                                                           | Visibility | Contents                               |
-| -------------------------------------------------------------------- | ---------- | -------------------------------------- |
-| **meshdrop-app** (this repo)                                         | Private    | Desktop + mobile clients               |
-| [meshdrop-core](https://github.com/aamirali51/meshdrop-core)         | Public     | P2P engine — `@meshdrop-go/core`              |
-| [meshdrop-releases](https://github.com/aamirali51/meshdrop-releases) | Public     | Release artifacts for the auto-updater |
+| Repository                                                           | Visibility | Contents                                          |
+| -------------------------------------------------------------------- | ---------- | ------------------------------------------------- |
+| **meshdrop-app** (this repo)                                         | Public     | Desktop + mobile clients                          |
+| [meshdrop-core](https://github.com/aamirali51/meshdrop-core)         | Public     | P2P engine — `@meshdrop-go/core`                  |
+| [meshdrop-host](https://github.com/aamirali51/meshdrop-host)         | Public     | Headless host + `mesh` CLI — `@meshdrop-go/host`  |
+| [meshdrop-releases](https://github.com/aamirali51/meshdrop-releases) | Public     | Release artifacts for the auto-updater            |
 
 ---
 
@@ -23,6 +22,9 @@ This repository contains the desktop (Electron) and mobile (React Native) client
 - **Zero-Cloud & E2EE** — Direct peer-to-peer file transfers encrypted with Noise protocol (`Noise_XX_25519_ChaChaPoly_BLAKE2b`). No third-party server ever touches your files or metadata.
 - **Code-Based & QR Pairing** — Connect devices using short `MD-` pairing codes or QR scans. Trust is verified via HMAC-SHA256 challenge-response without transmitting raw codes.
 - **One-Time Anonymous Drops** — Send files instantly using single-use `DROP-` codes without pairing devices beforehand.
+- **Never-Expiring Links** — Create a Drop Code with the **Never** expiry for a genuinely permanent share link (no countdown). Max-download limits (or unlimited) still apply.
+- **Command-Line & Headless Host** — Run MeshDrop with **no GUI** on a server or NAS via [`@meshdrop-go/host`](https://github.com/aamirali51/meshdrop-host): a 47-command `mesh` CLI, `mesh service install`, a config file, logs, and a Docker image. See below.
+- **In-App Guide** — A built-in Guide (nav → **Guide**) walks through every feature step by step, including per-platform CLI install.
 - **LAN & Internet Routing** — Automatic local network peer discovery via mDNS/LAN broadcast, with seamless public DHT fallback and TCP relay tunnelling for restrictive NATs.
 - **Resumable Chunked Transfers** — Chunk-scheduled transfers with per-block and whole-file SHA-256 verification. Interrupted transfers resume automatically from the last verified block.
 - **Portable Mode with Custom Install** — Run as a single-file portable executable (`MeshDrop-<version>-portable.exe`) with an interactive **Install to Folder** option:
@@ -35,6 +37,31 @@ This repository contains the desktop (Electron) and mobile (React Native) client
 
 ---
 
+## Command line & NAS / servers
+
+The GUI is optional — `meshdrop-host` runs the exact same engine headless and exposes the app protocol over a token-authed localhost API.
+
+```sh
+npm install -g @meshdrop-go/host
+mesh service install          # start on boot (systemd / launchd / Windows task)
+mesh status --watch           # live peers, connection, transfers
+mesh drop ./folder --never    # permanent share link
+mesh watch ~/inbox --to nas   # auto-send new files
+```
+
+Or on a NAS / server with Docker (host networking **required**):
+
+```sh
+docker run -d --name meshdrop --network host \
+  -e PUID=1000 -e PGID=1000 -e MESHDROP_HOST_NAME=nas \
+  -v ./meshdrop-data:/data -v ./meshdrop-downloads:/downloads \
+  --restart unless-stopped ghcr.io/aamirali51/meshdrop-host:latest
+```
+
+Full docs: [meshdrop-host](https://github.com/aamirali51/meshdrop-host) · [USER-GUIDE.md](USER-GUIDE.md).
+
+---
+
 ## Architecture
 
 ```mermaid
@@ -44,21 +71,22 @@ graph TD
     C <-->|hyperswarm| N["DHT / LAN Peers"]
     C <-->|corestore| S[("Hyperbee Storage")]
     C -.->|same engine| RN["MeshDrop Go - Node threads"]
+    C -.->|same engine| H["meshdrop-host - headless"]
 ```
 
-- **`@meshdrop-go/core`** ([meshdrop-core](https://github.com/aamirali51/meshdrop-core)) — The standalone, platform-agnostic P2P networking and transfer engine. Zero Electron or DOM dependencies. Runs in-process on Desktop and via Node threads on mobile.
+- **`@meshdrop-go/core`** ([meshdrop-core](https://github.com/aamirali51/meshdrop-core)) — The standalone, platform-agnostic P2P networking and transfer engine. Zero Electron or DOM dependencies. Runs in-process on Desktop, via Node threads on mobile, and headless in `meshdrop-host`.
 - **Desktop Application (`electron/`, `renderer/`)** — Glassmorphic React UI built with TypeScript, Vite, and Tailwind CSS, connected to main process IPC bridges (`contextIsolation` enabled).
 
 ---
 
 ## Supported Platforms
 
-| Platform    | Distribution Format                                    | Status     |
-| :---------- | :----------------------------------------------------- | :--------- |
-| **Windows** | NSIS Installer (`.exe`), Single-File Portable (`.exe`) | ✅ v1.0.14 |
-| **macOS**   | DMG Package (`.dmg`, arm64)                            | ✅ v1.0.14 |
-| **Linux**   | AppImage (`.AppImage`, x86_64)                         | ✅ v1.0.14 |
-| **Android** | React Native APK (`.apk`)                              | ✅ v1.0.14 |
+| Platform    | Distribution Format                                    | Status      |
+| :---------- | :----------------------------------------------------- | :---------- |
+| **Windows** | NSIS Installer (`.exe`), Single-File Portable (`.exe`) | ✅ v1.0.69  |
+| **macOS**   | DMG / ZIP (`.dmg`, arm64 + x64)                        | ✅ v1.0.69  |
+| **Linux**   | AppImage (`.AppImage`, x86_64)                         | ✅ v1.0.69  |
+| **Android** | React Native APK (`.apk`)                              | ✅ v1.0.69  |
 
 Pre-built downloads: [GitHub Releases](https://github.com/aamirali51/meshdrop-releases/releases)
 
@@ -128,6 +156,8 @@ Required secrets in this repo:
 | --------------------- | ---------------------------------------------------------------------------------- |
 | `RELEASES_PAT`        | Classic PAT with `repo` scope — uploads artifacts to `meshdrop-releases`           |
 | `MESHDROP_UPDATE_KEY` | Ed25519 private key — signs portable APK/exe for integrity verification (optional) |
+
+The CLI/headless host has its own workflow in `meshdrop-host` (tag `cli-v*` → npm + GHCR), independent of app releases.
 
 ---
 
