@@ -24,7 +24,7 @@ interface QRCodeModalProps {
 export function QRCodeModal({
   visible,
   title = 'Node QR Matrix',
-  subtitle = 'Scan with another MeshDrop node to initiate instant link',
+  subtitle = 'Scan with another MeshDrop Go node to initiate instant link',
   value,
   onClose,
 }: QRCodeModalProps) {
@@ -46,8 +46,8 @@ export function QRCodeModal({
     if (!value) return
     try {
       await NativeShare.share({
-        message: `MeshDrop Code: ${value}\nClaim or pair directly with this code in the MeshDrop app.`,
-        title: 'MeshDrop Share Code',
+        message: `MeshDrop Go Code: ${value}\nClaim or pair directly with this code in the MeshDrop Go app.`,
+        title: 'MeshDrop Go Share Code',
       })
     } catch {
       // Ignored

@@ -1,6 +1,6 @@
 'use strict'
 
-// Shared MeshDrop Sites HTTP gateway — serves live visits and hosted sites
+// Shared MeshDrop Go Sites HTTP gateway — serves live visits and hosted sites
 // over a tokenized loopback URL (the "Open in Browser" surface). Phase 1b:
 // extracted from electron/sites-gateway.js so ONE codebase serves both the
 // Electron desktop app and the headless host (meshdrop-host).
@@ -14,7 +14,7 @@
 //                                             every request (host: its api-token).
 //                                             When unset the gateway mints its own
 //                                             24-byte hex token lazily (Electron).
-//     getEngine:   () => engine|null         — the live @mesh/core MeshEngine
+//     getEngine:   () => engine|null         — the live @meshdrop-go/core MeshEngine
 //                                             (readSiteFile / listSitePath /
 //                                             getActiveVisit / siteServer …).
 //     log:         fn                        — console-compatible logger.
@@ -27,7 +27,7 @@
 
 const http = require('http')
 const crypto = require('crypto')
-const { getSiteMimeType } = require('@mesh/core/siteProtocol')
+const { getSiteMimeType } = require('@meshdrop-go/core/siteProtocol')
 
 const DEFAULT_PORT = 41984
 
@@ -158,7 +158,7 @@ function createSitesGateway(options = {}) {
 
   function chooserHtml(sites) {
     const items = (sites || []).map((s) => `<tr><td><a href="/?t=${effectiveToken()}&siteId=${encodeURIComponent(s.siteId)}">${escapeHtml(s.name)}</a></td><td class="muted">${escapeHtml(s.code || '')}</td></tr>`).join('')
-    return `<!doctype html><html><head><meta charset="utf-8"><title>MeshDrop Sites</title><style>body{font-family:system-ui,sans-serif;background:#0b0f14;color:#e6edf3;max-width:760px;margin:2rem auto;padding:0 1rem}h1{font-size:1.2rem;border-bottom:1px solid #ffffff1a;padding-bottom:.6rem}table{width:100%;border-collapse:collapse}td{padding:.4rem .2rem;border-bottom:1px solid #ffffff0d}a{color:#58a6ff;text-decoration:none}.muted{color:#7d8590;text-align:right;font-size:.8rem}</style></head><body><h1>MeshDrop Sites</h1><table>${items || '<tr><td class="muted">No sites published</td></tr>'}</table></body></html>`
+    return `<!doctype html><html><head><meta charset="utf-8"><title>MeshDrop Go Sites</title><style>body{font-family:system-ui,sans-serif;background:#0b0f14;color:#e6edf3;max-width:760px;margin:2rem auto;padding:0 1rem}h1{font-size:1.2rem;border-bottom:1px solid #ffffff1a;padding-bottom:.6rem}table{width:100%;border-collapse:collapse}td{padding:.4rem .2rem;border-bottom:1px solid #ffffff0d}a{color:#58a6ff;text-decoration:none}.muted{color:#7d8590;text-align:right;font-size:.8rem}</style></head><body><h1>MeshDrop Go Sites</h1><table>${items || '<tr><td class="muted">No sites published</td></tr>'}</table></body></html>`
   }
 
   function isVideo(name) { return /\.(mp4|mkv|webm|mov|avi|m4v|ts|m2ts|mts|flv|wmv|mpg|3gp)$/i.test(name) }
@@ -323,7 +323,7 @@ function createSitesGateway(options = {}) {
         const s = http.createServer(async (req, res) => {
           try {
             const url = new URL(req.url || '/', `http://127.0.0.1:${p}`)
-            if (!hasValidToken(url, req.headers)) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('Forbidden — missing token. Open via the MeshDrop Shared Folders → Open in Browser button.'); return }
+            if (!hasValidToken(url, req.headers)) { res.writeHead(403, { 'Content-Type': 'text/plain' }); res.end('Forbidden — missing token. Open via the MeshDrop Go Shared Folders → Open in Browser button.'); return }
             const engine = getEngine()
             // Universal: any GET for a file extension is a raw file serve (CSS/JS/images/fonts/etc.)
             const ext = url.pathname.split('.').pop()?.toLowerCase() || ''

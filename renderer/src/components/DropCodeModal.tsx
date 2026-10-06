@@ -359,7 +359,7 @@ export function DropCodeModal() {
               </div>
               <div className='space-y-0.5'>
                 <span className='block text-[11px] font-bold text-foreground'>
-                  Scan with MeshDrop Mobile
+                  Scan with MeshDrop Go
                 </span>
                 <span className='block text-[10px] text-muted-foreground'>
                   Direct P2P download without typing

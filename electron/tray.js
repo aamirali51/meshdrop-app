@@ -36,7 +36,7 @@ function buildContextMenu() {
   const { launchAtStartup, startMinimized } = currentStartupSettings
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open MeshDrop',
+      label: 'Open MeshDrop Go',
       click: () => {
         if (currentWin.isMinimized()) currentWin.restore()
         currentWin.show()
@@ -68,7 +68,7 @@ function buildContextMenu() {
     },
     { type: 'separator' },
     {
-      label: 'Quit MeshDrop',
+      label: 'Quit MeshDrop Go',
       click: currentOnQuit
     }
   ])
@@ -127,7 +127,7 @@ function createTrayIcon({ win, onQuit, onToggleStartup, onToggleStartMinimized, 
       icon = nativeImage.createFromBuffer(iconPngBuffer)
     }
     tray = new Tray(icon)
-    tray.setToolTip('MeshDrop — Peer-to-Peer File Sharing')
+    tray.setToolTip('MeshDrop Go — Peer-to-Peer File Sharing')
 
     buildContextMenu()
 

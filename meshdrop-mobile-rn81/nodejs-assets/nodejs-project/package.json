@@ -5,7 +5,7 @@
   "main": "main.js",
   "license": "MIT",
   "dependencies": {
-    "@mesh/core": "file:../../../core",
+    "@meshdrop-go/core": "file:../../../core",
     "compact-encoding": "^3.0.0",
     "corestore": "^7.9.1",
     "hyperbee": "^2.27.3",

@@ -25,7 +25,7 @@ export function FirstRunGuide({
           <Sparkles className='h-5 w-5' />
         </div>
         <div className='min-w-0 flex-1'>
-          <h3 className='text-sm font-extrabold text-foreground'>Welcome to MeshDrop</h3>
+          <h3 className='text-sm font-extrabold text-foreground'>Welcome to MeshDrop Go</h3>
           <p className='mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground'>
             Nothing here yet — and that's fine. Files move directly between your own devices, or
             to anyone through a one-time link. No cloud, no account, no size limits.

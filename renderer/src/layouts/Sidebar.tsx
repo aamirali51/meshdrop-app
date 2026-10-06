@@ -10,6 +10,7 @@ import {
   GlobeLock,
   Wrench,
   Settings,
+  BookOpen,
   Info,
   ChevronLeft,
   ChevronRight,
@@ -44,6 +45,7 @@ const MORE: NavItem[] = [
   { label: 'Activity', route: '/activity', icon: <Activity className="h-5 w-5" /> },
   { label: 'Tunnels', route: '/tunnels', icon: <GlobeLock className="h-5 w-5" /> },
   { label: 'Diagnostics', route: '/diagnostics', icon: <Wrench className="h-5 w-5" /> },
+  { label: 'Guide', route: '/guide', icon: <BookOpen className="h-5 w-5" /> },
   { label: 'Settings', route: '/settings', icon: <Settings className="h-5 w-5" /> },
   { label: 'About', route: '/about', icon: <Info className="h-5 w-5" /> },
 ]
@@ -157,7 +159,7 @@ export function Sidebar() {
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
-              <div className="text-[13px] font-black tracking-tight leading-none text-foreground">MeshDrop</div>
+              <div className="text-[13px] font-black tracking-tight leading-none text-foreground">MeshDrop Go</div>
               <div className="font-mono text-[10px] leading-none text-muted-foreground mt-1">
                 Send files directly. No cloud.
               </div>
@@ -253,7 +255,7 @@ export function Sidebar() {
               onClick: () => navigate('/settings'),
             },
             {
-              label: 'About MeshDrop',
+              label: 'About MeshDrop Go',
               icon: <Info className="h-3.5 w-3.5" />,
               onClick: () => navigate('/about'),
             },

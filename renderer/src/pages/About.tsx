@@ -61,10 +61,10 @@ function StandaloneNote() {
       <CardContent className="space-y-2 p-4 text-xs leading-relaxed">
         <p className="font-bold text-foreground">Web & standalone mode</p>
         <p className="text-muted-foreground">
-          When installed, MeshDrop runs in its own window — no browser address bar, its own taskbar icon, and offline shell caching for the UI. Your data and pairing still live on the host; the installed app is a standalone view onto the same host session (open it from the launcher so the one-time token is present).
+          When installed, MeshDrop Go runs in its own window — no browser address bar, its own taskbar icon, and offline shell caching for the UI. Your data and pairing still live on the host; the installed app is a standalone view onto the same host session (open it from the launcher so the one-time token is present).
         </p>
         <p className="text-[11px] text-muted-foreground/80">
-          {standalone ? 'You are running in standalone (installed) mode.' : 'Install from the “Install MeshDrop” button in the top bar when your browser offers it, or via the browser menu → Install / Add to Home Screen.'}
+          {standalone ? 'You are running in standalone (installed) mode.' : 'Install from the “Install MeshDrop Go” button in the top bar when your browser offers it, or via the browser menu → Install / Add to Home Screen.'}
         </p>
       </CardContent>
     </Card>
@@ -114,7 +114,7 @@ export function About() {
             </div>
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-black tracking-tight text-foreground">MeshDrop</h2>
+                <h2 className="text-xl font-black tracking-tight text-foreground">MeshDrop Go</h2>
                 {uiVersion && <Badge variant="info" className="font-mono">UI {uiVersion}</Badge>}
                 {isWeb && engineVersion && <Badge variant="secondary" className="font-mono">Engine {engineVersion}</Badge>}
                 {!uiVersion && !engineVersion && <Badge variant="secondary">Open source</Badge>}
@@ -144,7 +144,7 @@ export function About() {
             <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Engine version</p>
               <p className="mt-1 font-mono text-sm font-bold text-foreground">{engineVersion ?? (isWeb ? 'Loading…' : uiVersion ?? '—')}</p>
-              <p className="text-[11px] text-muted-foreground">@mesh/core · host</p>
+              <p className="text-[11px] text-muted-foreground">@meshdrop-go/core · host</p>
             </div>
             <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Protocol</p>
@@ -166,7 +166,7 @@ export function About() {
               </div>
               <div>
                 <h3 className="flex items-center gap-2 text-sm font-black text-foreground">
-                  Support MeshDrop <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
+                  Support MeshDrop Go <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
                 </h3>
                 <p className="text-xs text-muted-foreground">100% free · Open source · No ads · Direct P2P</p>
               </div>
@@ -174,7 +174,7 @@ export function About() {
             <Badge variant="warning" className="w-fit">Bitcoin (BTC)</Badge>
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            If MeshDrop helps you move files and sync folders without cloud subscriptions, consider a Bitcoin tip. Every satoshi helps maintain the project.
+            If MeshDrop Go helps you move files and sync folders without cloud subscriptions, consider a Bitcoin tip. Every satoshi helps maintain the project.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
@@ -268,7 +268,7 @@ export function About() {
             </div>
             <div className="flex items-center justify-between rounded-xl border border-border/50 bg-card px-3 py-3">
               <span className="text-muted-foreground">Engine</span>
-              <span className="font-bold text-foreground">@mesh/core</span>
+              <span className="font-bold text-foreground">@meshdrop-go/core</span>
             </div>
           </div>
         </CardContent>
@@ -284,13 +284,13 @@ export function About() {
             <span className="font-mono font-semibold text-muted-foreground">MIT</span>
           </div>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            MeshDrop and <span className="font-mono text-foreground">@mesh/core</span> are MIT-licensed. The MeshDrop name and logo are protected by the trademark
+            MeshDrop Go and <span className="font-mono text-foreground">@meshdrop-go/core</span> are MIT-licensed. The MeshDrop Go name and logo are protected by the trademark
             policy.
           </p>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-3">
             <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
               <FileText className="h-3 w-3" />
-              Engine: @mesh/core · No telemetry · No accounts
+              Engine: @meshdrop-go/core · No telemetry · No accounts
             </span>
             <button onClick={openGithub} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary hover:underline">
               <GithubIcon className="h-3.5 w-3.5" />

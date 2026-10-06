@@ -126,7 +126,7 @@ function sendToAll(name, data) {
   }
 }
 
-// ─── P2P Engine (in-process @mesh/core) ─────────────────────────────────────
+// ─── P2P Engine (in-process @meshdrop-go/core) ─────────────────────────────────────
 //
 // The old architecture ran the P2P engine in a separate Bare worker process
 // (PearRuntime + FramedStream pipe over IPC). The engine now lives directly
@@ -162,7 +162,7 @@ function applyLinuxAutostart(openAtLogin, startMinimized) {
 Type=Application
 Version=1.0
 Name=${appName}
-Comment=MeshDrop — Zero-Cloud P2P File Sharing
+Comment=MeshDrop Go — Zero-Cloud P2P File Sharing
 Exec="${execPath}"${execArgs}
 StartupNotify=false
 Terminal=false
@@ -443,7 +443,7 @@ async function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'MeshDrop',
+    title: 'MeshDrop Go',
     show: !isHiddenBoot,
     backgroundColor: '#0B0F17',
     // Window icon: the .ico on Windows (taskbar/alt-tab), PNG on Linux.
@@ -495,7 +495,7 @@ async function createWindow() {
     try {
       new Notification({
         title: appName,
-        body: 'MeshDrop is still running in the system tray.'
+        body: 'MeshDrop Go is still running in the system tray.'
       }).show()
     } catch {}
     win.webContents.send('app:tray-hidden')
@@ -523,7 +523,7 @@ async function createWindow() {
       .showMessageBox(win, {
         type: 'question',
         title: appName,
-        message: 'MeshDrop is closing',
+        message: 'MeshDrop Go is closing',
         detail:
           'Close to the system tray and keep syncing in the background, or quit completely?',
         buttons: ['Close to tray', 'Quit'],

@@ -17,7 +17,7 @@ import { debugLog } from './debugLog'
 // the browser defaults, while the Phase-2 acceptance script injects Node's
 // global fetch/WebSocket (or the ws package) and drives a spawned host.
 
-export const SESSION_EXPIRED_MESSAGE = 'Session expired — reopen MeshDrop from its launcher'
+export const SESSION_EXPIRED_MESSAGE = 'Session expired — reopen MeshDrop Go from its launcher'
 
 // ─── Web-session glue (browser only; the Node acceptance script injects its
 // own baseUrl/token instead) ────────────────────────────────────────────────
@@ -463,7 +463,7 @@ export class HttpTransport {
         signal: controller.signal
       })
     } catch (err) {
-      throw new Error(`Cannot reach MeshDrop host: ${(err as Error)?.message || String(err)}`)
+      throw new Error(`Cannot reach MeshDrop Go host: ${(err as Error)?.message || String(err)}`)
     } finally {
       clearTimeout(timer)
     }
@@ -471,7 +471,7 @@ export class HttpTransport {
       this.markSessionExpired()
       throw new Error(SESSION_EXPIRED_MESSAGE)
     }
-    if (!res.ok) throw new Error(`Cannot reach MeshDrop host (HTTP ${res.status})`)
+    if (!res.ok) throw new Error(`Cannot reach MeshDrop Go host (HTTP ${res.status})`)
     try {
       const info = (await res.json()) as { engineVersion?: string; protocolVersion?: string }
       if (info.protocolVersion && info.protocolVersion !== PROTOCOL_VERSION) {

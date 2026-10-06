@@ -2,7 +2,7 @@
 pkgname=meshdrop-bin
 pkgver=1.0.37
 pkgrel=1
-pkgdesc="MeshDrop — zero-cloud, direct peer-to-peer file sharing and folder synchronization"
+pkgdesc="MeshDrop Go — zero-cloud, direct peer-to-peer file sharing and folder synchronization"
 arch=('x86_64')
 url="https://github.com/aamirali51/meshdrop-app"
 license=('MIT')

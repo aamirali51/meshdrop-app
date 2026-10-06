@@ -39,7 +39,7 @@ export function UpdateAvailableModal() {
       if (!canInstall) {
         await openInstallSettings()
         Alert.alert(
-          'Allow installs from MeshDrop',
+          'Allow installs from MeshDrop Go',
           'In the app settings that just opened, turn on "Allow from this source", then return here and tap Update again.'
         )
         return
@@ -52,7 +52,7 @@ export function UpdateAvailableModal() {
       if (/install from this app|unknown sources/i.test(msg)) {
         await openInstallSettings()
         Alert.alert(
-          'Allow installs from MeshDrop',
+          'Allow installs from MeshDrop Go',
           'In the app settings that just opened, turn on "Allow from this source", then return here and tap Update again.'
         )
       } else {

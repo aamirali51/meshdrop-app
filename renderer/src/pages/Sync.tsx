@@ -190,7 +190,7 @@ export function Sync() {
     } catch {
       toast.info(
         'Device not detected right now',
-        `Open MeshDrop on ${deviceName} and try again, or pair via code from the Devices page.`
+        `Open MeshDrop Go on ${deviceName} and try again, or pair via code from the Devices page.`
       )
     }
   }
@@ -407,7 +407,7 @@ export function Sync() {
 
   const handleOpenFolder = async (path: string) => {
     if (isWeb) {
-      toast.info('Desktop Only', 'Open the folder in the MeshDrop desktop app to reveal it here.')
+      toast.info('Desktop Only', 'Open the folder in the MeshDrop Go desktop app to reveal it here.')
       return
     }
     const res = await openPath(path)
@@ -833,7 +833,7 @@ export function Sync() {
           <div className='min-w-0 flex-1 space-y-1'>
             <p className='text-sm font-bold text-foreground flex items-center gap-1.5'><ShieldCheck className='h-4 w-4 text-status-online' /> Safe trash</p>
             <p className='text-xs leading-relaxed text-muted-foreground'>
-              When a file is deleted on one side, MeshDrop never erases it immediately. It moves to <code className='rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground'>.meshdrop-trash</code> inside that folder so you can restore it. Items are kept for <span className='font-semibold text-foreground'>30 days</span> before automatic cleanup — your data is never lost without warning.
+              When a file is deleted on one side, MeshDrop Go never erases it immediately. It moves to <code className='rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground'>.meshdrop-trash</code> inside that folder so you can restore it. Items are kept for <span className='font-semibold text-foreground'>30 days</span> before automatic cleanup — your data is never lost without warning.
             </p>
             {libraries.length > 0 && (
               <div className='flex flex-wrap gap-1.5 pt-1'>

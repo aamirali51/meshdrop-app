@@ -3,7 +3,7 @@
 // Native OS Context Menu Manager (Windows Explorer & Linux Desktop).
 //
 // Allows users to right-click any file or directory in their OS file explorer
-// and select "Send via MeshDrop" (or cascade into dynamic online device targets).
+// and select "Send via MeshDrop Go" (or cascade into dynamic online device targets).
 // Operates under HKCU on Windows (zero admin rights required; works for both
 // portable exes and NSIS installations).
 
@@ -40,8 +40,8 @@ async function registerWindowsContextMenu({ execPath, devices = [] } = {}) {
   try {
     for (const { root, subKeyPath } of SHELL_REG_TARGETS) {
       // 1. Set root verb properties
-      await runReg(['add', root, '/ve', '/d', 'Send via MeshDrop', '/f'])
-      await runReg(['add', root, '/v', 'MUIVerb', '/d', 'Send via MeshDrop', '/f'])
+      await runReg(['add', root, '/ve', '/d', 'Send via MeshDrop Go', '/f'])
+      await runReg(['add', root, '/v', 'MUIVerb', '/d', 'Send via MeshDrop Go', '/f'])
       await runReg(['add', root, '/v', 'Icon', '/d', binPath, '/f'])
 
       if (devices.length > 0) {
@@ -55,8 +55,8 @@ async function registerWindowsContextMenu({ execPath, devices = [] } = {}) {
 
         // Option 0: Open in-app device picker
         const pickerKey = `${root}\\shell\\0_picker`
-        await runReg(['add', pickerKey, '/ve', '/d', 'Select Device in MeshDrop...', '/f'])
-        await runReg(['add', pickerKey, '/v', 'MUIVerb', '/d', 'Select Device in MeshDrop...', '/f'])
+        await runReg(['add', pickerKey, '/ve', '/d', 'Select Device in MeshDrop Go...', '/f'])
+        await runReg(['add', pickerKey, '/v', 'MUIVerb', '/d', 'Select Device in MeshDrop Go...', '/f'])
         await runReg(['add', pickerKey, '/v', 'Icon', '/d', binPath, '/f'])
         await runReg(['add', `${pickerKey}\\command`, '/ve', '/d', `"${binPath}" --send "%1"`, '/f'])
 
@@ -114,7 +114,7 @@ function registerLinuxContextMenu({ execPath } = {}) {
       const nautilusScriptsDir = path.join(os.homedir(), '.local', 'share', 'nautilus', 'scripts')
       fs.mkdirSync(nautilusScriptsDir, { recursive: true })
 
-      const scriptFile = path.join(nautilusScriptsDir, 'Send via MeshDrop')
+      const scriptFile = path.join(nautilusScriptsDir, 'Send via MeshDrop Go')
       const scriptContent = `#!/bin/sh\n"${binPath}" --send "$@"\n`
 
       fs.writeFileSync(scriptFile, scriptContent, { mode: 0o755 })
@@ -131,7 +131,7 @@ function unregisterLinuxContextMenu() {
 
   return new Promise((resolve) => {
     try {
-      const scriptFile = path.join(os.homedir(), '.local', 'share', 'nautilus', 'scripts', 'Send via MeshDrop')
+      const scriptFile = path.join(os.homedir(), '.local', 'share', 'nautilus', 'scripts', 'Send via MeshDrop Go')
       if (fs.existsSync(scriptFile)) fs.unlinkSync(scriptFile)
     } catch {}
     resolve()

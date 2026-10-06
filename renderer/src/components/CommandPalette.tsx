@@ -17,6 +17,7 @@ import {
   FolderKanban,
   GlobeLock,
   Wrench,
+  BookOpen,
   Clock,
 } from 'lucide-react'
 import { useApp } from '@/hooks/useAppState'
@@ -90,6 +91,7 @@ export function CommandPalette() {
     { label: 'Activity', route: '/activity', icon: <Activity className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Tunnels', route: '/tunnels', icon: <GlobeLock className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Diagnostics', route: '/diagnostics', icon: <Wrench className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Guide', route: '/guide', icon: <BookOpen className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Settings', route: '/settings', icon: <Settings className="h-4 w-4 text-muted-foreground" /> },
     { label: 'About', route: '/about', icon: <Info className="h-4 w-4 text-muted-foreground" /> },
   ]
@@ -326,7 +328,7 @@ export function CommandPalette() {
           </div>
 
           <div className="flex items-center justify-between border-t border-border/40 bg-muted/20 px-4 py-2 font-mono text-[10px] text-muted-foreground">
-            <span className="font-bold text-foreground">MeshDrop</span>
+            <span className="font-bold text-foreground">MeshDrop Go</span>
             <span className="flex items-center gap-2">
               <span className="hidden sm:inline">↑↓ navigate · ↵ select · Esc close</span>
               <span className="rounded border border-border/50 bg-card px-1.5 py-0.5">{glyph}K</span>

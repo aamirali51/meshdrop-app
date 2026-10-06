@@ -142,7 +142,7 @@ export function ShareTargetModal({ visible, payload, onClose }: ShareTargetModal
                 <Upload size={20} color={theme.primary} />
               </View>
               <View>
-                <Text style={[styles.title, { color: theme.text }]}>Share to MeshDrop</Text>
+                <Text style={[styles.title, { color: theme.text }]}>Share to MeshDrop Go</Text>
                 <Text style={[styles.subtitle, { color: theme.muted }]}>Select a paired device to send</Text>
               </View>
             </View>
@@ -196,7 +196,7 @@ export function ShareTargetModal({ visible, payload, onClose }: ShareTargetModal
               <AlertCircle size={28} color={theme.muted} />
               <Text style={[styles.emptyTitle, { color: theme.text }]}>No Paired Devices</Text>
               <Text style={[styles.emptySub, { color: theme.muted }]}>
-                Pair with another device using a pairing code in the MeshDrop app first.
+                Pair with another device using a pairing code in the MeshDrop Go app first.
               </Text>
             </View>
           ) : (

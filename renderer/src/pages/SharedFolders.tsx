@@ -136,7 +136,7 @@ export function SharedFolders() {
 
   const handleVisit = async () => {
     setBusy(true)
-    try { await openShare(visitCode.trim().toUpperCase()); setVisitOpen(false); setVisitCode(''); setTab('withMe'); toast.success('Folder Opened', 'Browsing inside MeshDrop') } catch (err) { toast.error('Could Not Open', (err as Error)?.message || 'Host may be offline') } finally { setBusy(false) }
+    try { await openShare(visitCode.trim().toUpperCase()); setVisitOpen(false); setVisitCode(''); setTab('withMe'); toast.success('Folder Opened', 'Browsing inside MeshDrop Go') } catch (err) { toast.error('Could Not Open', (err as Error)?.message || 'Host may be offline') } finally { setBusy(false) }
   }
 
   const handleOpenReceived = async (site: ReceivedSite) => {
@@ -155,7 +155,7 @@ export function SharedFolders() {
   }
 
   const openPathLocal = (p: string) => {
-    if (isWeb) { toast.info('Desktop Only', 'Open the folder in the MeshDrop desktop app to reveal it here.'); return }
+    if (isWeb) { toast.info('Desktop Only', 'Open the folder in the MeshDrop Go desktop app to reveal it here.'); return }
     capOpenPath(p)
   }
 

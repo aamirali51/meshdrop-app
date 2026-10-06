@@ -7,8 +7,8 @@
 #                            GH_TOKEN / GITHUB_TOKEN with repo access)
 
 appId: com.meshdrop.desktop
-productName: MeshDrop
-copyright: Copyright © 2026 MeshDrop
+productName: MeshDrop Go
+copyright: Copyright © 2026 MeshDrop Go
 
 directories:
   output: dist
@@ -16,7 +16,7 @@ directories:
 
 # Artifact naming: MeshDrop-1.0.0-win-x64.exe, MeshDrop-1.0.0-mac-x64.dmg,
 # MeshDrop-1.0.0-linux-x64.AppImage
-artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+artifactName: MeshDrop-${version}-${os}-${arch}.${ext}
 
 # GitHub Releases publish target. Owner/repo are inferred from the
 # `repository` field in package.json, so no env vars are needed to build
@@ -40,18 +40,18 @@ files:
   - package.json
   - '!**/*.ts'
   - '!**/*.map'
-  # Full production node_modules: the P2P engine (@mesh/core) and its peers
+  # Full production node_modules: the P2P engine (@meshdrop-go/core) and its peers
   # (blind-relay, hyperswarm, hypercore, …) are runtime dependencies. `!**/node_modules/**/*`
   # in package.json honours eslint-config-prettier/.gitignore rules that hide
   # node_modules locally, but electron-builder must ship it; hoisted deps of the
   # symlinked `file:../meshdrop-core` (blind-relay, …) live in our root
-  # node_modules, not in a nested @mesh/core/node_modules, so without this entry
+  # node_modules, not in a nested @meshdrop-go/core/node_modules, so without this entry
   # the packaged app throws `Cannot find module 'blind-relay'` on start.
   - '!**/node_modules/*/.cache/**/*'
   - '!**/.bin/**/*'
   - node_modules/**/*
 
-# The P2P engine (@mesh/core) uses native/prebuilt modules (sodium-native,
+# The P2P engine (@meshdrop-go/core) uses native/prebuilt modules (sodium-native,
 # udx-native) that cannot load from inside asar, so node_modules stays
 # unpacked on disk.
 asarUnpack:
@@ -64,6 +64,10 @@ win:
   target:
     - nsis
     - portable
+  # Keep the on-disk executable name stable so the NSIS installer, the
+  # portable self-update helper and the firewall rules keep working after
+  # the rebrand (display name is productName).
+  executableName: MeshDrop
   icon: build/icon.ico
 
 nsis:
@@ -77,12 +81,12 @@ nsis:
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   installerHeaderIcon: build/icon.ico
-  artifactName: ${productName}-Setup-${version}.${ext}
+  artifactName: MeshDrop-Setup-${version}.${ext}
 
 # Portable single-file exe keeps the generic artifact pattern
 # (MeshDrop-<version>-win-x64.exe).
 portable:
-  artifactName: ${productName}-${version}-portable.${ext}
+  artifactName: MeshDrop-${version}-portable.${ext}
 
 # macOS: dmg for humans, zip for the auto-updater (electron-updater on macOS
 # installs from zips — a dmg-only feed silently breaks updates). Both Apple
@@ -103,5 +107,7 @@ mac:
 linux:
   target:
     - AppImage
+  # Keep the AppImage's internal executable name stable across the rebrand.
+  executableName: MeshDrop
   category: Network
   icon: build/icon.png

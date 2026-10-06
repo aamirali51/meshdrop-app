@@ -178,7 +178,7 @@ export function RadarPulseEmptyState({
       </Text>
       <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
         {subtitle ||
-          'Keep MeshDrop open on your other devices or scan a pairing QR code to establish an encrypted link immediately.'}
+          'Keep MeshDrop Go open on your other devices or scan a pairing QR code to establish an encrypted link immediately.'}
       </Text>
 
       {onAction && actionLabel ? (

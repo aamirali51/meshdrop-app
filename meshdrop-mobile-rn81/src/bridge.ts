@@ -1,4 +1,4 @@
-// RPC bridge to the embedded Bare Worklet thread (@mesh/core engine).
+// RPC bridge to the embedded Bare Worklet thread (@meshdrop-go/core engine).
 //
 // Mirrors the lynko-mobile rnBridge pattern that works on device:
 //   - the engine is packed by bare-pack into an APK asset

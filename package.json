@@ -1,9 +1,9 @@
 {
  "name": "meshdrop",
- "productName": "MeshDrop",
-  "version": "1.0.67",
+ "productName": "MeshDrop Go",
+  "version": "1.0.68",
  "upgrade": "pear://49x3eqdfgubimdescau51sn7to47c85zkky66mi1kxaxrqpturho",
- "description": "MeshDrop — zero-cloud P2P file sharing. Direct, end-to-end encrypted file transfers between your own devices. No accounts. No cloud.",
+ "description": "MeshDrop Go — zero-cloud P2P file sharing. Direct, end-to-end encrypted file transfers between your own devices. No accounts. No cloud.",
  "license": "MIT",
  "author": "Aamir Ali",
  "repository": {
@@ -42,7 +42,7 @@
   "@fontsource/inter": "^5.2.5",
   "@fontsource/jetbrains-mono": "^5.2.5",
   "@hyperswarm/secret-stream": "^6.9.1",
-  "@mesh/core": "file:../meshdrop-core",
+  "@meshdrop-go/core": "file:../meshdrop-core",
   "@radix-ui/react-avatar": "^1.2.6",
   "@radix-ui/react-dialog": "^1.1.23",
   "@radix-ui/react-dropdown-menu": "^2.1.24",

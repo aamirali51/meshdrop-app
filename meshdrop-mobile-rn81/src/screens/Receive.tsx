@@ -172,7 +172,7 @@ export function Receive() {
         </View>
 
         <Text style={[styles.heroDescription, { color: theme.textSecondary }]}>
-          MeshDrop codes allow serverless, peer-to-peer file downloads across any device on your Wi-Fi or DHT swarm with end-to-end encryption.
+          MeshDrop Go codes allow serverless, peer-to-peer file downloads across any device on your Wi-Fi or DHT swarm with end-to-end encryption.
         </Text>
 
         {/* Input Box */}

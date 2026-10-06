@@ -525,7 +525,7 @@ export function Sync({ identity: _identity }: { identity?: any }) {
         if (!hasAccess && mod.requestAllFilesAccess) {
           Alert.alert(
             'All Files Access Required',
-            'To scan and continuously synchronize folders like Camera Roll and Documents across your devices, MeshDrop needs All Files Access permission.',
+            'To scan and continuously synchronize folders like Camera Roll and Documents across your devices, MeshDrop Go needs All Files Access permission.',
             [
               { text: 'Cancel', style: 'cancel' },
               {

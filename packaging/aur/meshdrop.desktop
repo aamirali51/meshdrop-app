@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=MeshDrop
+Name=MeshDrop Go
 Comment=Zero-cloud, direct peer-to-peer file sharing and folder synchronization
 Exec=meshdrop %U
 Terminal=false

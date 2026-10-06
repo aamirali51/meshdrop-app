@@ -1,4 +1,4 @@
-// Bundles the @mesh/core engine for the Bare Worklet.
+// Bundles the @meshdrop-go/core engine for the Bare Worklet.
 //
 // Two passes are required:
 //   1. --linked bundle  -> records the native addons as `linked:` refs so the
@@ -23,7 +23,7 @@ const out = path.join(root, 'src', 'engine', 'mesh-engine.bundle.js')
 const addonsOut = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-addons-'))
 
 const host = process.env.ENGINE_HOST || process.argv.slice(2).find(a => !a.startsWith('-')) || 'android-arm64'
-// `fs` in @mesh/core (storage.js self-healing reset) is a Node builtin that
+// `fs` in @meshdrop-go/core (storage.js self-healing reset) is a Node builtin that
 // bare-pack cannot resolve; map it to bare-fs, which the engine already uses.
 const common = `--host ${host} --format bundle.cjs --imports "${path.join(root, 'scripts', 'engine-imports.json')}"`
 console.log(`[build-engine] Target host: ${host}`)
@@ -45,7 +45,7 @@ try {
   console.log('[build-engine] Bundle check passed.')
 } catch (err) {
   console.error('[build-engine] FAILED: engine bundle has module-only syntax (top-level await).')
-  console.error('[build-engine] Find the offending `await` in src/engine/index.js or @mesh/core and fix it before rebuilding.')
+  console.error('[build-engine] Find the offending `await` in src/engine/index.js or @meshdrop-go/core and fix it before rebuilding.')
   process.exit(1)
 }
 

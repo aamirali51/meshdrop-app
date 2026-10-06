@@ -152,7 +152,7 @@ export function Settings({ identity }: { identity?: any }) {
     setTimeout(() => setCopiedBtc(false), 2500)
     Alert.alert(
       'Bitcoin Address Copied',
-      ok ? '12bNXZEg6vDtJZUMdauhkvUqg92UPeWJfs copied to clipboard. Thank you for supporting MeshDrop!' : 'Could not access clipboard.'
+      ok ? '12bNXZEg6vDtJZUMdauhkvUqg92UPeWJfs copied to clipboard. Thank you for supporting MeshDrop Go!' : 'Could not access clipboard.'
     )
   }
 
@@ -799,7 +799,7 @@ export function Settings({ identity }: { identity?: any }) {
       )}
 
       {/* Support & Bitcoin Donation */}
-      <SectionHeader title="Support MeshDrop" />
+      <SectionHeader title="Support MeshDrop Go" />
       <Card glow style={[styles.donationCard, { borderColor: theme.warningBorder, backgroundColor: theme.bgCard }]}>
         <View style={styles.donationHeader}>
           <View style={[styles.bitcoinIconBox, { backgroundColor: theme.warningBg, borderColor: theme.warningBorder }]}>
@@ -816,7 +816,7 @@ export function Settings({ identity }: { identity?: any }) {
         </View>
 
         <Text style={[styles.donationDescription, { color: theme.textSecondary }]}>
-          MeshDrop is 100% free and open-source software — no cloud accounts, no subscriptions, and no tracking. If MeshDrop helps you transfer files across your devices, tips via Bitcoin are deeply appreciated to support ongoing maintenance!
+          MeshDrop Go is 100% free and open-source software — no cloud accounts, no subscriptions, and no tracking. If MeshDrop Go helps you transfer files across your devices, tips via Bitcoin are deeply appreciated to support ongoing maintenance!
         </Text>
 
         <TouchableOpacity

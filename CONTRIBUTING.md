@@ -1,6 +1,6 @@
-# Contributing to MeshDrop
+# Contributing to MeshDrop Go
 
-Thanks for wanting to help! MeshDrop is a zero-cloud P2P file-sharing app —
+Thanks for wanting to help! MeshDrop Go is a zero-cloud P2P file-sharing app —
 no accounts, no cloud, no size limits. It's built on the Holepunch
 (Hyperswarm/Hypercore) stack and ships for Windows, macOS, and Linux, with an
 Android app in development.
@@ -42,12 +42,12 @@ npm run dev:multi  # two Electron windows as peers
 
 ## Project layout
 
-| Path | What it is |
-| :--- | :--- |
-| `core/` | **`@mesh/core`** — the standalone, platform-agnostic P2P engine (MIT). No Electron, no DOM. This is what runs the network: pairing, drop codes, transfers. |
-| `electron/` | The Electron main-process shell that owns the engine in-process and bridges it to the UI. |
-| `renderer/` | The React + TypeScript + Tailwind UI (glassmorphic design system). |
-| `docs/` | Architecture references and design briefs. |
+| Path        | What it is                                                                                                                                                 |
+| :---------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/`     | **`@meshdrop-go/core`** — the standalone, platform-agnostic P2P engine (MIT). No Electron, no DOM. This is what runs the network: pairing, drop codes, transfers. |
+| `electron/` | The Electron main-process shell that owns the engine in-process and bridges it to the UI.                                                                  |
+| `renderer/` | The React + TypeScript + Tailwind UI (glassmorphic design system).                                                                                         |
+| `docs/`     | Architecture references and design briefs.                                                                                                                 |
 
 The engine and the app are intentionally decoupled — changes to one usually
 shouldn't require changes to the other.
@@ -58,7 +58,7 @@ shouldn't require changes to the other.
   checks both, `npm run format` fixes both. Please run them before pushing.
 - Match the surrounding style: keep comments concise and honest, prefer plain
   functions over clever abstractions, and never add telemetry or fabricated
-  data — MeshDrop reports only what is actually measured.
+  data — MeshDrop Go reports only what is actually measured.
 - Write meaningful, conventional commit messages (e.g. `feat:`, `fix:`,
   `docs:`, `test:`, `chore:`).
 
@@ -68,15 +68,15 @@ shouldn't require changes to the other.
 2. Make your changes and add tests where the behavior is testable (the
    engine has a CLI E2E harness at `core/test.js`).
 3. Run `npm run lint` and `npm test`.
-4. Push and open a pull request against `main`. Describe *what* changed and
-   *why*; screenshots or GIFs are welcome for UI changes.
+4. Push and open a pull request against `main`. Describe _what_ changed and
+   _why_; screenshots or GIFs are welcome for UI changes.
 
 Small, focused PRs get reviewed and merged much faster than large ones.
 
 ## Developer Certificate of Origin (DCO)
 
 We require a sign-off on every commit so we always have a clean chain of
-authorship — this lets MeshDrop stay under the MIT License without needing a
+authorship — this lets MeshDrop Go stay under the MIT License without needing a
 separate contributor agreement.
 
 By contributing, you agree to the [Developer Certificate of Origin](https://developercertificate.org/):
@@ -86,23 +86,23 @@ By contributing, you agree to the [Developer Certificate of Origin](https://deve
 > By making a contribution to this project, I certify that:
 >
 > (a) The contribution was created in whole or in part by me and I have the
->     right to submit it under the open source license indicated in the file; or
+> right to submit it under the open source license indicated in the file; or
 >
 > (b) The contribution is based upon previous work that, to the best of my
->     knowledge, is covered under an appropriate open source license and I
->     have the right under that license to submit that work with modifications,
->     whether created in whole or in part by me, under the same open source
->     license (unless I am permitted to submit under a different license), as
->     indicated in the file; or
+> knowledge, is covered under an appropriate open source license and I
+> have the right under that license to submit that work with modifications,
+> whether created in whole or in part by me, under the same open source
+> license (unless I am permitted to submit under a different license), as
+> indicated in the file; or
 >
 > (c) The contribution was provided directly to me by some other person who
->     certified (a), (b) or (c) and I have not modified it.
+> certified (a), (b) or (c) and I have not modified it.
 >
 > (d) I understand and agree that this project and the contribution are
->     public and that a record of the contribution (including all personal
->     information I submit with it, including my sign-off) is maintained
->     indefinitely and may be redistributed consistent with this project or
->     the open source license(s) involved.
+> public and that a record of the contribution (including all personal
+> information I submit with it, including my sign-off) is maintained
+> indefinitely and may be redistributed consistent with this project or
+> the open source license(s) involved.
 
 Sign your commits with `git commit -s` (adds `Signed-off-by: Your Name
 <you@example.com>`). If your PR contains commits without a sign-off, we'll
@@ -112,14 +112,14 @@ ask you to add one.
 
 - **Code** — All contributions are accepted under the [MIT License](LICENSE),
   and the project as a whole is MIT-licensed.
-- **Brand** — The **MeshDrop name, logo, and icons are trademarks** and are
+- **Brand** — The **MeshDrop Go name, logo, and icons are trademarks** and are
   governed by the [Trademark Policy](TRADEMARK_POLICY.md). They apply to
-  contributors and users alike; a fork must not use the MeshDrop name or
+  contributors and users alike; a fork must not use the MeshDrop Go name or
   branding.
 
 ## Reporting security issues
 
-MeshDrop is a security- and privacy-focused product, so we treat
+MeshDrop Go is a security- and privacy-focused product, so we treat
 vulnerabilities seriously.
 
 - **Do not open a public issue** for a security vulnerability.

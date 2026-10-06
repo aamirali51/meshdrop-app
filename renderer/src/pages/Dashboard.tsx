@@ -618,7 +618,7 @@ export function Dashboard() {
             </div>
             <p className="text-center font-mono text-sm font-black tracking-widest text-primary">{qrShare.code}</p>
             <p className="text-center text-[11px] text-muted-foreground flex items-center gap-1">
-              <ShieldCheck className="h-3.5 w-3.5 text-[rgb(var(--success))]" /> Scan with MeshDrop Mobile — direct P2P download
+              <ShieldCheck className="h-3.5 w-3.5 text-[rgb(var(--success))]" /> Scan with MeshDrop Go — direct P2P download
             </p>
             <Button
               size="sm"

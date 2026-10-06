@@ -506,7 +506,7 @@ export function PairDeviceModal({ isOpen, onClose, defaultTab = 'myCode' }: Pair
             className='w-full overflow-hidden rounded-2xl border border-border/60 bg-black/40'
           />
           <p className='text-center text-[11px] text-muted-foreground'>
-            Point your camera at a MeshDrop QR Code to pair or claim files automatically.
+            Point your camera at a MeshDrop Go QR Code to pair or claim files automatically.
           </p>
           {renderStatusPanel()}
         </div>

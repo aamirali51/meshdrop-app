@@ -6,11 +6,11 @@
 //
 // The old architecture ran the P2P engine in a separate Bare worker process
 // (PearRuntime + FramedStream pipe) and forwarded its events to the renderer
-// verbatim. The engine now lives in-process (@mesh/core); the renderer's
+// verbatim. The engine now lives in-process (@meshdrop-go/core); the renderer's
 // protocol contract is preserved by re-encoding MeshEngine events as the
 // worker-protocol events the UI already subscribes to.
 
-const { MeshEngine } = require('@mesh/core')
+const { MeshEngine } = require('@meshdrop-go/core')
 const os = require('os')
 const { EVENTS, createEvent } = require('../src/shared/protocol.js')
 const { subscribeEngineEvents } = require('../src/shared/engine-events.js')
@@ -71,7 +71,7 @@ function createEngineBridge({ storageDir, downloadsDir, deviceName, sendToAll, g
     }
   }
 
-  // Map @mesh/core events to the worker-protocol events the renderer consumes.
+  // Map @meshdrop-go/core events to the worker-protocol events the renderer consumes.
   // Site-visit side effects (gateway token rotation, persisted notification)
   // stay Electron-specific and are injected as hooks.
   function wireEvents() {

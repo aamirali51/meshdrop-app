@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link2, Network, Download, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Link2, Network, Download, RefreshCw, ShieldCheck, BookOpen } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { Button } from '@/components/ui/button'
+import { useNavigation } from '@/hooks/useNavigation'
 
 // One-time first-run modal: teaches the core concepts in ~10 seconds.
 // Shows once (flag persisted in localStorage — no account, no server).
@@ -31,7 +32,12 @@ const STEPS = [
 ]
 
 export function WelcomeModal() {
+  const { navigate } = useNavigation()
   const [open, setOpen] = useState(false)
+  const openGuide = () => {
+    dismiss()
+    navigate('/guide')
+  }
 
   useEffect(() => {
     try {
@@ -56,7 +62,7 @@ export function WelcomeModal() {
       onOpenChange={(o) => {
         if (!o) dismiss()
       }}
-      title='Welcome to MeshDrop'
+      title='Welcome to MeshDrop Go'
       description='Peer-to-peer file sharing — no accounts, no cloud.'
     >
       <div className='space-y-4'>
@@ -80,9 +86,14 @@ export function WelcomeModal() {
           End-to-end encrypted and open source (MIT) — your files never touch a server.
         </div>
 
-        <Button onClick={dismiss} className='w-full gap-2 font-bold'>
-          Get Started
-        </Button>
+        <div className='flex flex-col gap-2 sm:flex-row'>
+          <Button onClick={dismiss} className='w-full gap-2 font-bold'>
+            Get Started
+          </Button>
+          <Button onClick={openGuide} variant='outline' className='w-full gap-2 font-bold'>
+            <BookOpen className='h-4 w-4' /> Browse the guide
+          </Button>
+        </div>
       </div>
     </Modal>
   )

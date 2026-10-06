@@ -17,7 +17,7 @@ const path = require('path')
 const fsp = require('fs/promises')
 const { METHODS, EVENTS } = require('../src/shared/protocol.js')
 const { shouldForwardProtocolEvent } = require('../src/shared/engine-events.js')
-const { normalizePairingCode, deriveDeviceId } = require('@mesh/core/crypto.js')
+const { normalizePairingCode, deriveDeviceId } = require('@meshdrop-go/core/crypto.js')
 
 // ─── Pure helpers (ported from workers/helpers.js) ──────────────────────────
 
@@ -359,7 +359,7 @@ function registerEngineHandlers({
   handlers[METHODS.SETTINGS_GET] = async () => {
     const bee = await engine.getBee('settings')
     const entry = await bee.get('settings')
-    // Surface the engine's live flags so the UI toggle reflects actual @mesh/core state.
+    // Surface the engine's live flags so the UI toggle reflects actual @meshdrop-go/core state.
     const live = (await engine.getSettings()) || {}
     return mergeSettings({
       ...(entry?.value || {}),
@@ -421,7 +421,7 @@ function registerEngineHandlers({
   }
 
 // ─── One-time shares (drop codes) ─────────────────────────────────────────
-// All drop lifecycle logic lives in @mesh/core (createDropShare,
+// All drop lifecycle logic lives in @meshdrop-go/core (createDropShare,
 // claimDropCode, listPendingShares, extend/cancel/delete). These handlers are
 // thin RPC shells that surface renderer events for the records they return.
 

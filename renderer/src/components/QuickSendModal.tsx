@@ -103,7 +103,7 @@ export function QuickSendModal() {
         return
       }
 
-      // Root "Send via MeshDrop" -> Open selection modal
+      // Root "Send via MeshDrop Go" -> Open selection modal
       setFiles(payload.files)
       setIsOpen(true)
       setSuccessPeer(null)
@@ -126,7 +126,7 @@ export function QuickSendModal() {
               <Upload className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-foreground">Send via MeshDrop</h3>
+              <h3 className="text-base font-semibold text-foreground">Send via MeshDrop Go</h3>
               <p className="text-xs text-muted-foreground">Select destination device from your mesh</p>
             </div>
           </div>
@@ -176,7 +176,7 @@ export function QuickSendModal() {
               <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
               <p className="text-sm font-medium text-foreground">No Paired Devices Found</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Pair with another device in MeshDrop before sending files.
+                Pair with another device in MeshDrop Go before sending files.
               </p>
             </div>
           ) : (

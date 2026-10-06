@@ -10,6 +10,7 @@ import { Transfers } from '@/pages/Transfers'
 import { Activity } from '@/pages/Activity'
 import { History } from '@/pages/History'
 import { Diagnostics } from '@/pages/Diagnostics'
+import { Guide } from '@/pages/Guide'
 import { Settings } from '@/pages/Settings'
 import { WatchParty } from '@/pages/WatchParty'
 import { SharedFolders } from '@/pages/SharedFolders'
@@ -50,12 +51,13 @@ const pages: Record<string, React.FC> = {
   '/activity': Activity,
   '/history': History,
   '/diagnostics': Diagnostics,
+  '/guide': Guide,
   '/settings': Settings,
   '/about': About,
 }
 
 function PageHeader({ route }: { route: string }) {
-  const title = (PAGE_TITLES as Record<string, string>)[route] || 'MeshDrop'
+  const title = (PAGE_TITLES as Record<string, string>)[route] || 'MeshDrop Go'
   const subtitle = (PAGE_SUBTITLES as Record<string, string>)[route] || ''
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">

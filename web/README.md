@@ -1,4 +1,4 @@
-# MeshDrop web claim page
+# MeshDrop Go web claim page
 
 The static, zero-backend site behind the viral funnel:
 

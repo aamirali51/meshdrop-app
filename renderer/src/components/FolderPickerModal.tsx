@@ -137,7 +137,7 @@ function FolderPickerModal({ onDone }: { onDone: (path: string | null) => void }
         <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>Choose a folder</div>
           <div style={{ fontSize: 12.5, color: '#9aa2b1', marginTop: 3 }}>
-            Pick a folder on this computer — MeshDrop reads it directly from the host
+            Pick a folder on this computer — MeshDrop Go reads it directly from the host
           </div>
         </div>
 

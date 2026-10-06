@@ -2,7 +2,7 @@
 
 // Single source of truth for the MeshDrop IPC protocol.
 // Consumed by: Electron main (electron/main.js), which serves it from the
-// in-process @mesh/core engine, and the renderer (via renderer/src/types/protocol.ts).
+// in-process @meshdrop-go/core engine, and the renderer (via renderer/src/types/protocol.ts).
 
 const PROTOCOL_VERSION = '1.0'
 

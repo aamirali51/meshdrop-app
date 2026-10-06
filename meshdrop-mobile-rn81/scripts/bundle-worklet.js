@@ -1,6 +1,6 @@
 // Regenerates src/worklet.bundle.js from nodejs-assets/nodejs-project using
 // bare-pack (the Holepunch bundler for the Bare runtime). Run this whenever
-// the engine (main.js / @mesh/core) changes, then rebuild the app.
+// the engine (main.js / @meshdrop-go/core) changes, then rebuild the app.
 //
 //   node scripts/bundle-worklet.js
 //

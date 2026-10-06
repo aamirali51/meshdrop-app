@@ -10,10 +10,16 @@ export interface ReleaseNoteItem {
 }
 
 export const LATEST_RELEASE_NOTES: ReleaseNoteItem = {
-  version: '1.0.67',
-  title: "What's New in MeshDrop",
+  version: '1.0.68',
+  title: "What's New in MeshDrop Go",
   date: 'September 2026',
   features: [
+    {
+      icon: 'sparkles',
+      title: 'In-App Guide + mesh CLI',
+      description:
+        'A new Guide in the app walks through every feature step by step, and MeshDrop now ships a headless host and a `mesh` command-line client for servers, NAS boxes and scripts — install it with npm i -g @meshdrop-go/host.'
+    },
     {
       icon: 'zap',
       title: 'Never-Expiring Links Fixed',

@@ -15,6 +15,7 @@ const ROUTE_ORDER: NavRoute[] = [
   '/activity',
   '/tunnels',
   '/diagnostics',
+  '/guide',
   '/settings',
   '/about',
   '/history',
@@ -31,6 +32,7 @@ export const PAGE_TITLES: Record<NavRoute, string> = {
   '/activity': 'Activity',
   '/history': 'History',
   '/diagnostics': 'Diagnostics',
+  '/guide': 'Guide',
   '/settings': 'Settings',
   '/about': 'About',
 }
@@ -46,6 +48,7 @@ export const PAGE_SUBTITLES: Record<NavRoute, string> = {
   '/activity': 'Timeline of transfers and sessions.',
   '/history': 'Searchable record of everything.',
   '/diagnostics': 'Live connection metrics.',
+  '/guide': 'Step-by-step help for every feature.',
   '/settings': 'Preferences and network.',
   '/about': 'Version and links.',
 }
@@ -120,7 +123,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    document.title = currentRoute ? `${PAGE_TITLES[currentRoute]} — MeshDrop` : 'MeshDrop'
+    document.title = currentRoute ? `${PAGE_TITLES[currentRoute]} — MeshDrop Go` : 'MeshDrop Go'
   }, [currentRoute])
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 /**
- * MeshDrop Mobile — Next-Generation P2P File & Folder Sync.
+ * MeshDrop Go Mobile — Next-Generation P2P File & Folder Sync.
  * Pristine Light Design System & Mobile Ergonomics.
  *
  * @format
@@ -390,7 +390,7 @@ function MainApp(): React.JSX.Element {
             </View>
             <View>
               <View style={styles.brandTitleRow}>
-                <Text style={[styles.brand, { color: theme.text }]}>MeshDrop</Text>
+                <Text style={[styles.brand, { color: theme.text }]}>MeshDrop Go</Text>
                 <View style={[styles.versionPill, { backgroundColor: theme.primarySoft }]}>
                   <Text style={[styles.versionText, { color: theme.primary }]}>
                     {appVersion ? `v${appVersion}` : ''}

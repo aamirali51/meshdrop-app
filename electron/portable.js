@@ -209,7 +209,7 @@ async function installToFolder(targetDir, options = {}) {
     const rel = path.relative(stubDir, installDir)
     if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) {
       throw new Error(
-        'MeshDrop is currently running from this folder. Move the portable file ' +
+        'MeshDrop Go is currently running from this folder. Move the portable file ' +
           'to a different location, run it from there, then install to a folder.'
       )
     }
@@ -226,7 +226,7 @@ async function installToFolder(targetDir, options = {}) {
     } catch (err) {
       if (err.code === 'EPERM' || err.code === 'EBUSY' || err.code === 'EACCES') {
         throw new Error(
-          `A MeshDrop instance is running from "${installDir}". Close it (check the ` +
+          `A MeshDrop Go instance is running from "${installDir}". Close it (check the ` +
             'tray icon) and try again, or choose a different folder.'
         )
       }
@@ -236,7 +236,7 @@ async function installToFolder(targetDir, options = {}) {
   if (!safeRm(installDir)) {
     throw new Error(
       `Could not replace "${installDir}" (EPERM) — it is locked by another process or marked ` +
-        'read-only. Close any running MeshDrop instance (check the tray), then try again or ' +
+        'read-only. Close any running MeshDrop Go instance (check the tray), then try again or ' +
         'choose a different folder.'
     )
   }
@@ -335,7 +335,7 @@ async function installToFolder(targetDir, options = {}) {
         shell.writeShortcutLink(desktopPath, 'create', {
           target: destExe,
           cwd: installDir,
-          description: 'MeshDrop — Zero-Cloud P2P File Sharing',
+          description: 'MeshDrop Go — Zero-Cloud P2P File Sharing',
           icon: destExe,
           iconIndex: 0
         })
@@ -353,7 +353,7 @@ async function installToFolder(targetDir, options = {}) {
         shell.writeShortcutLink(startMenuPath, 'create', {
           target: destExe,
           cwd: installDir,
-          description: 'MeshDrop — Zero-Cloud P2P File Sharing',
+          description: 'MeshDrop Go — Zero-Cloud P2P File Sharing',
           icon: destExe,
           iconIndex: 0
         })
@@ -372,7 +372,7 @@ async function installToFolder(targetDir, options = {}) {
           target: destExe,
           cwd: installDir,
           args: options.startMinimized !== false ? '--hidden' : '',
-          description: 'MeshDrop — Zero-Cloud P2P File Sharing',
+          description: 'MeshDrop Go — Zero-Cloud P2P File Sharing',
           icon: destExe,
           iconIndex: 0
         })
@@ -418,7 +418,7 @@ function setupPortableIpc() {
   ipcMain.handle('portable:pickFolder', async () => {
     try {
       const res = await dialog.showOpenDialog({
-        title: 'Select Installation Folder for MeshDrop',
+        title: 'Select Installation Folder for MeshDrop Go',
         buttonLabel: 'Select Folder',
         properties: ['openDirectory', 'createDirectory'],
         defaultPath: path.join(app.getPath('documents'), 'MeshDrop')
@@ -436,7 +436,7 @@ function setupPortableIpc() {
       let targetDir = opts && typeof opts === 'object' ? opts.targetDir : null
       if (!targetDir) {
         const res = await dialog.showOpenDialog({
-          title: 'Install MeshDrop to a folder',
+          title: 'Install MeshDrop Go to a folder',
           buttonLabel: 'Install Here',
           properties: ['openDirectory', 'createDirectory'],
           defaultPath: path.join(app.getPath('documents'), 'MeshDrop')

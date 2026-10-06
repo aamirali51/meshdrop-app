@@ -57,10 +57,10 @@ export function PortableInstallModal({ open, onOpenChange }: PortableInstallModa
           <div className='flex h-7 w-7 items-center justify-center rounded-lg gradient-brand text-white'>
             <FolderDown className='h-4 w-4' />
           </div>
-          <span>Install MeshDrop to a Folder</span>
+          <span>Install MeshDrop Go to a Folder</span>
         </div>
       }
-      description='Copy MeshDrop to a dedicated folder for fast startup, automatic updates, and co-located data storage.'
+      description='Copy MeshDrop Go to a dedicated folder for fast startup, automatic updates, and co-located data storage.'
       blockClose={busy}
     >
       <div className='space-y-4 text-xs'>
@@ -89,7 +89,7 @@ export function PortableInstallModal({ open, onOpenChange }: PortableInstallModa
             </Button>
           </div>
           <p className='text-[11px] text-muted-foreground/80'>
-            If left blank, MeshDrop installs to your Documents directory inside a clean <code>MeshDrop/</code> subfolder.
+            If left blank, MeshDrop Go installs to your Documents directory inside a clean <code>MeshDrop/</code> subfolder.
           </p>
         </div>
 
@@ -161,7 +161,7 @@ export function PortableInstallModal({ open, onOpenChange }: PortableInstallModa
             className='h-9 gap-1.5 rounded-xl gradient-brand px-4 text-xs font-bold text-white shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60'
           >
             {busy ? <Loader2 className='h-3.5 w-3.5 animate-spin' /> : <FolderDown className='h-3.5 w-3.5' />}
-            {busy ? 'Installing MeshDrop…' : 'Install MeshDrop'}
+            {busy ? 'Installing MeshDrop Go…' : 'Install MeshDrop Go'}
           </Button>
         </div>
       </div>

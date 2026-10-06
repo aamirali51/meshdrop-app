@@ -1,4 +1,4 @@
-# MeshDrop Arch Linux (AUR) Package
+# MeshDrop Go Arch Linux (AUR) Package
 
 This directory contains the official **PKGBUILD** recipe for the Arch User Repository (`AUR`) package: **`meshdrop-bin`**.
 
@@ -6,7 +6,7 @@ This directory contains the official **PKGBUILD** recipe for the Arch User Repos
 
 ## 📦 For Arch / Manjaro Users
 
-Users can install MeshDrop with any AUR helper:
+Users can install MeshDrop Go with any AUR helper:
 
 ```bash
 # Using yay

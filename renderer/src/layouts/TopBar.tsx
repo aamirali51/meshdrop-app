@@ -57,7 +57,7 @@ export function TopBar() {
           <Waypoints className="h-4 w-4 text-white" />
         </div>
         <div className="min-w-0 leading-tight">
-          <h1 className="truncate text-sm font-black tracking-tight text-foreground">{PAGE_TITLES[currentRoute] || 'MeshDrop'}</h1>
+          <h1 className="truncate text-sm font-black tracking-tight text-foreground">{PAGE_TITLES[currentRoute] || 'MeshDrop Go'}</h1>
           <p className="hidden md:block font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground/70">P2P file sharing</p>
         </div>
       </div>
@@ -97,10 +97,10 @@ export function TopBar() {
           <button
             onClick={promptInstall}
             className="no-drag hidden sm:inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Install MeshDrop"
+            aria-label="Install MeshDrop Go"
           >
             <Download className="h-4 w-4" />
-            Install MeshDrop
+            Install MeshDrop Go
           </button>
         )}
 
@@ -150,7 +150,7 @@ export function TopBar() {
             { label: 'Show Pairing QR', icon: <QrCode className="h-3.5 w-3.5" />, onClick: toggleQRCodeModal },
             { separator: true } as unknown as { label: string },
             { label: 'Settings', icon: <ShieldCheck className="h-3.5 w-3.5" />, onClick: () => navigate('/settings') },
-            { label: 'About MeshDrop', icon: <Info className="h-3.5 w-3.5" />, onClick: () => navigate('/about') },
+            { label: 'About MeshDrop Go', icon: <Info className="h-3.5 w-3.5" />, onClick: () => navigate('/about') },
           ]}
         />
       )}

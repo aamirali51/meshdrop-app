@@ -219,7 +219,7 @@ async function bridgeCall(method: MethodName, params?: unknown): Promise<unknown
     console.warn(
       `[IPC ${ts}] window.bridge unavailable (non-Electron environment). Method: ${method}`
     )
-    return Promise.reject(new Error('MeshDrop P2P engine is only available in the desktop app'))
+    return Promise.reject(new Error('MeshDrop Go P2P engine is only available in the desktop app'))
   }
 
   // Timeouts account for large file staging and relayed fallback connections:

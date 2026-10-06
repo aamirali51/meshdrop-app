@@ -65,7 +65,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const unsubTray = onTrayHidden(() => {
       toast.info(
-        'MeshDrop is Still Running',
+        'MeshDrop Go is Still Running',
         'The app stays active in the system tray. Click the tray icon to restore it.'
       )
     })

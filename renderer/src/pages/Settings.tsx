@@ -390,9 +390,9 @@ export function Settings() {
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
                           <p className="font-semibold text-foreground">Launch on system startup</p>
-                          <p className="text-[11px] text-muted-foreground">Start MeshDrop when you log in.</p>
+                          <p className="text-[11px] text-muted-foreground">Start MeshDrop Go when you log in.</p>
                         </div>
-                        <Switch checked={settings.launchAtStartup} onCheckedChange={(v) => set('launchAtStartup', v)} aria-label="Launch MeshDrop on system startup" />
+                        <Switch checked={settings.launchAtStartup} onCheckedChange={(v) => set('launchAtStartup', v)} aria-label="Launch MeshDrop Go on system startup" />
                       </div>
                     )}
                     {capabilities.tray && (
@@ -408,7 +408,7 @@ export function Settings() {
                       <div className="flex items-center justify-between gap-4 border-t border-border/40 pt-3">
                         <div className="min-w-0">
                           <p className="font-semibold text-foreground">Explorer context menu</p>
-                          <p className="text-[11px] text-muted-foreground">Add “Send via MeshDrop” to the file manager right-click menu.</p>
+                          <p className="text-[11px] text-muted-foreground">Add “Send via MeshDrop Go” to the file manager right-click menu.</p>
                         </div>
                         <Switch
                           checked={settings.contextMenu !== false}
@@ -434,7 +434,7 @@ export function Settings() {
               <CardContent className="space-y-5 p-5 sm:p-6">
                 <div>
                   <h3 className="text-xs font-bold text-foreground">Network transport</h3>
-                  <p className="text-[11px] text-muted-foreground">How MeshDrop reaches peers and when it relays.</p>
+                  <p className="text-[11px] text-muted-foreground">How MeshDrop Go reaches peers and when it relays.</p>
                 </div>
 
                 <div className="flex items-center justify-between gap-4 border-t border-border/40 pt-4">
@@ -555,7 +555,7 @@ export function Settings() {
                     variant="outline"
                     className="h-9 shrink-0 gap-1.5 text-xs font-bold"
                     onClick={() => {
-                      const payload = { app: 'MeshDrop', deviceId: identity.id, name: identity.name, publicKey: identity.publicKey, pairingCode: identity.pairingCode }
+                      const payload = { app: 'MeshDrop Go', deviceId: identity.id, name: identity.name, publicKey: identity.publicKey, pairingCode: identity.pairingCode }
                       copyWithFeedback(JSON.stringify(payload, null, 2), 'Identity Exported', 'Public identity JSON copied to clipboard.')
                     }}
                   >

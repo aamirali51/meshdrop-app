@@ -1,6 +1,6 @@
 {
   "name": "MeshDropMobile",
-  "version": "1.0.67",
+  "version": "1.0.68",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -16,7 +16,7 @@
     "logs:raw": "adb -s 192.168.1.4:44075 logcat -v threadtime ReactNativeJS:* bare:* *:S"
   },
   "dependencies": {
-    "@mesh/core": "file:../../meshdrop-core",
+    "@meshdrop-go/core": "file:../../meshdrop-core",
     "@react-native/new-app-screen": "0.81.4",
     "b4a": "^1.8.1",
     "bare-bundle": "^1.10.0",

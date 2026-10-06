@@ -107,9 +107,9 @@ function renderLanding(os) {
   }
 
   if (os === 'android') {
-    setText('os-note', 'Android app is in development — check back soon. For now, use MeshDrop on a computer.')
+    setText('os-note', 'Android app is in development — check back soon. For now, use MeshDrop Go on a computer.')
   } else if (os === 'ios') {
-    setText('os-note', 'iOS support is coming soon — for now, use MeshDrop on a computer.')
+    setText('os-note', 'iOS support is coming soon — for now, use MeshDrop Go on a computer.')
   } else {
     setText('os-note', '')
   }
@@ -125,7 +125,7 @@ function renderClaim(code, os) {
   const safe = String(code).toUpperCase()
   setText('claim-code', safe.indexOf('DROP-') === 0 ? safe : 'DROP-' + safe)
   setText('claim-file', fileLine())
-  document.title = "You've received a drop — MeshDrop"
+  document.title = "You've received a drop — MeshDrop Go"
 
   const dl = $('btn-download')
   wireDownload(dl, os)
@@ -152,7 +152,7 @@ function fileLine() {
   if (size) parts.push(size)
   if (parts.length) return parts.join(' · ')
   if (author) return 'A drop from ' + author
-  return 'Open it in MeshDrop to receive the file.'
+  return 'Open it in MeshDrop Go to receive the file.'
 }
 
 /* ─── Deep link ───────────────────────────────────────────────────────── */
@@ -169,7 +169,7 @@ document.addEventListener('visibilitychange', function () {
 function tryOpen(url, noteId) {
   const note = $(noteId)
   appOpened = false
-  if (note) note.textContent = 'Opening MeshDrop…'
+  if (note) note.textContent = 'Opening MeshDrop Go…'
   try {
     window.location.href = url
   } catch (err) {
@@ -182,7 +182,7 @@ function tryOpen(url, noteId) {
   window.setTimeout(function () {
     if (!appOpened && note) {
       note.textContent =
-        "Didn't open? Your browser may be showing an \"Open MeshDrop?\" prompt (click Allow), or the app isn't installed — download it below."
+        "Didn't open? Your browser may be showing an \"Open MeshDrop Go?\" prompt (click Allow), or the app isn't installed — download it below."
     }
   }, DEEP_LINK_FALLBACK_MS)
 }

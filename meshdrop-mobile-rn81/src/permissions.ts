@@ -58,7 +58,7 @@ export async function requestStoragePermission(): Promise<boolean> {
         PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
         {
           title: 'Storage Permission Required',
-          message: 'MeshDrop needs access to storage to transfer and sync files directly between your devices.',
+          message: 'MeshDrop Go needs access to storage to transfer and sync files directly between your devices.',
           buttonPositive: 'Grant Access',
           buttonNegative: 'Cancel',
         }
@@ -101,7 +101,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
       PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
       {
         title: 'Notification Permission Required',
-        message: 'MeshDrop needs notifications to alert you when incoming files arrive or transfers finish.',
+        message: 'MeshDrop Go needs notifications to alert you when incoming files arrive or transfers finish.',
         buttonPositive: 'Allow',
         buttonNegative: 'Deny',
       }
@@ -143,7 +143,7 @@ export async function requestNearbyWifiPermission(): Promise<boolean> {
       PermissionsAndroid.PERMISSIONS.NEARBY_WIFI_DEVICES,
       {
         title: 'Local Device Discovery',
-        message: 'MeshDrop uses local network discovery to find your nearby desktop and mobile devices at high LAN speed.',
+        message: 'MeshDrop Go uses local network discovery to find your nearby desktop and mobile devices at high LAN speed.',
         buttonPositive: 'Allow',
         buttonNegative: 'Deny',
       }
@@ -192,6 +192,6 @@ export async function requestAllPermissions(): Promise<PermissionStatus> {
  */
 export function openAppSettings() {
   Linking.openSettings().catch(() => {
-    Alert.alert('Unable to Open Settings', 'Please open system Settings > Apps > MeshDrop to manage permissions.')
+    Alert.alert('Unable to Open Settings', 'Please open system Settings > Apps > MeshDrop Go to manage permissions.')
   })
 }

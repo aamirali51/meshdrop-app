@@ -27,7 +27,7 @@ export function PortableBanner() {
           <div className='min-w-0 flex-1'>
             <p className='text-xs font-extrabold text-foreground'>Portable Mode</p>
             <p className='mt-0.5 text-[11px] leading-relaxed text-muted-foreground'>
-              Install MeshDrop to a folder for faster startup and automatic file-level updates —
+              Install MeshDrop Go to a folder for faster startup and automatic file-level updates —
               your data stays next to the app.
             </p>
             <div className='mt-2 flex items-center gap-2'>

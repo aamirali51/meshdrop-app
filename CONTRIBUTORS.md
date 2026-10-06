@@ -1,6 +1,6 @@
 # Contributors
 
-MeshDrop is built and maintained by its community. Thank you to everyone who
+MeshDrop Go is built and maintained by its community. Thank you to everyone who
 has contributed code, fixes, and improvements.
 
 ## Maintainer

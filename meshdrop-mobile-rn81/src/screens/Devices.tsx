@@ -351,7 +351,7 @@ export function Devices({ identity }: { identity?: any }) {
       <QRCodeModal
         visible={showQRModal}
         title="Pairing Code"
-        subtitle="Scan this with your other MeshDrop device to pair instantly"
+        subtitle="Scan this with your other MeshDrop Go device to pair instantly"
         value={myCode}
         onClose={() => setShowQRModal(false)}
       />

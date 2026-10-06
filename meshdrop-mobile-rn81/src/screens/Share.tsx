@@ -182,8 +182,8 @@ export function Share() {
   const handleShareNative = async (share: PendingShare) => {
     try {
       await NativeShare.share({
-        message: `MeshDrop Code: ${share.code}\nDownload ${share.filename} (${formatBytes(share.fileSize)}) peer-to-peer on MeshDrop.`,
-        title: 'MeshDrop Share Code',
+        message: `MeshDrop Go Code: ${share.code}\nDownload ${share.filename} (${formatBytes(share.fileSize)}) peer-to-peer on MeshDrop Go.`,
+        title: 'MeshDrop Go Share Code',
       })
     } catch {}
   }

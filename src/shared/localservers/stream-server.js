@@ -20,7 +20,7 @@
 //                                           request (host: its api-token). When unset
 //                                           the server mints its own 24-byte hex token
 //                                           lazily in memory (Electron behavior).
-//     getEngine:   () => engine|null       — the live @mesh/core MeshEngine used to
+//     getEngine:   () => engine|null       — the live @meshdrop-go/core MeshEngine used to
 //                                           resolve /stream/transfer records, coverage
 //                                           gates and playhead steering.
 //     log:         fn                      — console-compatible logger (default console).
@@ -43,7 +43,7 @@ const crypto = require('crypto')
 // P4: container sniffing for the media gateway. The sniff helper lives in the
 // shared core (meshdrop-core) so desktop and mobile agree; here we only read
 // the file head and cache the result per (path, mtime).
-const { sniffContainer } = require('@mesh/core/engine/transfer/integrity.js')
+const { sniffContainer } = require('@meshdrop-go/core/engine/transfer/integrity.js')
 
 const DEFAULT_PORT = 41983
 
@@ -737,7 +737,7 @@ ${responsesXml}
       const headerToken = req.headers['x-meshdrop-token']
       if (!tokenMatches(headerToken, queryToken)) {
         res.writeHead(403, { 'Content-Type': 'text/plain' })
-        res.end('Forbidden — missing or invalid token. Open media through the MeshDrop app.')
+        res.end('Forbidden — missing or invalid token. Open media through the MeshDrop Go app.')
         return
       }
 

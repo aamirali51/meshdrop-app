@@ -1,8 +1,8 @@
-# MeshDrop
+# MeshDrop Go
 
 **Zero-cloud P2P file sharing.** Direct, end-to-end encrypted file transfers between your own devices. No accounts, no cloud, no size limits.
 
-![MeshDrop Interface](images/screenshot.png)
+![MeshDrop Go Interface](images/screenshot.png)
 
 ---
 
@@ -10,11 +10,11 @@
 
 This repository contains the desktop (Electron) and mobile (React Native) clients. The P2P engine lives in a separate public repo so it can be reused independently.
 
-| Repository | Visibility | Contents |
-|------------|-----------|----------|
-| **meshdrop-app** (this repo) | Private | Desktop + mobile clients |
-| [meshdrop-core](https://github.com/aamirali51/meshdrop-core) | Public | P2P engine — `@mesh/core` |
-| [meshdrop-releases](https://github.com/aamirali51/meshdrop-releases) | Public | Release artifacts for the auto-updater |
+| Repository                                                           | Visibility | Contents                               |
+| -------------------------------------------------------------------- | ---------- | -------------------------------------- |
+| **meshdrop-app** (this repo)                                         | Private    | Desktop + mobile clients               |
+| [meshdrop-core](https://github.com/aamirali51/meshdrop-core)         | Public     | P2P engine — `@meshdrop-go/core`              |
+| [meshdrop-releases](https://github.com/aamirali51/meshdrop-releases) | Public     | Release artifacts for the auto-updater |
 
 ---
 
@@ -40,25 +40,25 @@ This repository contains the desktop (Electron) and mobile (React Native) client
 ```mermaid
 graph TD
     R["Renderer - React UI"] <-->|gated IPC| M["Electron Main Process"]
-    M -->|owns MeshEngine in-process| C["@mesh/core"]
+    M -->|owns MeshEngine in-process| C["@meshdrop-go/core"]
     C <-->|hyperswarm| N["DHT / LAN Peers"]
     C <-->|corestore| S[("Hyperbee Storage")]
-    C -.->|same engine| RN["MeshDrop Mobile - Node threads"]
+    C -.->|same engine| RN["MeshDrop Go - Node threads"]
 ```
 
-- **`@mesh/core`** ([meshdrop-core](https://github.com/aamirali51/meshdrop-core)) — The standalone, platform-agnostic P2P networking and transfer engine. Zero Electron or DOM dependencies. Runs in-process on Desktop and via Node threads on mobile.
+- **`@meshdrop-go/core`** ([meshdrop-core](https://github.com/aamirali51/meshdrop-core)) — The standalone, platform-agnostic P2P networking and transfer engine. Zero Electron or DOM dependencies. Runs in-process on Desktop and via Node threads on mobile.
 - **Desktop Application (`electron/`, `renderer/`)** — Glassmorphic React UI built with TypeScript, Vite, and Tailwind CSS, connected to main process IPC bridges (`contextIsolation` enabled).
 
 ---
 
 ## Supported Platforms
 
-| Platform | Distribution Format | Status |
-| :--- | :--- | :--- |
+| Platform    | Distribution Format                                    | Status     |
+| :---------- | :----------------------------------------------------- | :--------- |
 | **Windows** | NSIS Installer (`.exe`), Single-File Portable (`.exe`) | ✅ v1.0.14 |
-| **macOS** | DMG Package (`.dmg`, arm64) | ✅ v1.0.14 |
-| **Linux** | AppImage (`.AppImage`, x86_64) | ✅ v1.0.14 |
-| **Android** | React Native APK (`.apk`) | ✅ v1.0.14 |
+| **macOS**   | DMG Package (`.dmg`, arm64)                            | ✅ v1.0.14 |
+| **Linux**   | AppImage (`.AppImage`, x86_64)                         | ✅ v1.0.14 |
+| **Android** | React Native APK (`.apk`)                              | ✅ v1.0.14 |
 
 Pre-built downloads: [GitHub Releases](https://github.com/aamirali51/meshdrop-releases/releases)
 
@@ -103,6 +103,7 @@ npm run build:release
 ```
 
 Generated build outputs in `dist/`:
+
 - `MeshDrop-Setup-<version>.exe` (Windows — NSIS installer)
 - `MeshDrop-<version>-portable.exe` (Windows — single-file portable)
 - `MeshDrop-<version>-mac-arm64.dmg` (macOS — Apple Silicon)
@@ -123,16 +124,16 @@ The GitHub Actions workflow (`.github/workflows/release.yml`) triggers on `v*` t
 
 Required secrets in this repo:
 
-| Secret | Purpose |
-|--------|---------|
-| `RELEASES_PAT` | Classic PAT with `repo` scope — uploads artifacts to `meshdrop-releases` |
+| Secret                | Purpose                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `RELEASES_PAT`        | Classic PAT with `repo` scope — uploads artifacts to `meshdrop-releases`           |
 | `MESHDROP_UPDATE_KEY` | Ed25519 private key — signs portable APK/exe for integrity verification (optional) |
 
 ---
 
 ## Contributing
 
-MeshDrop is open source — bug reports, documentation, UI polish, and engine
+MeshDrop Go is open source — bug reports, documentation, UI polish, and engine
 improvements are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
 dev setup, contribution workflow, and our DCO sign-off requirement.
 
@@ -140,11 +141,11 @@ dev setup, contribution workflow, and our DCO sign-off requirement.
 
 ## License & Trademark
 
-MeshDrop is **open source** under the **[MIT License](LICENSE)** (SPDX: `MIT`). The entire
-codebase — the `@mesh/core` engine, the desktop application, and packaging code —
+MeshDrop Go is **open source** under the **[MIT License](LICENSE)** (SPDX: `MIT`). The entire
+codebase — the `@meshdrop-go/core` engine, the desktop application, and packaging code —
 is free to use, modify, and distribute, including commercially.
 
-The **"MeshDrop" name, logo, and icons are protected trademarks** of the copyright holder and
+The **"MeshDrop Go" name, logo, and icons are protected trademarks** of the copyright holder and
 are governed by the [Trademark Policy](TRADEMARK_POLICY.md) — a separate document from the MIT
 License. You may fork and reuse all of the code freely, but you may not ship derivative products
-under the MeshDrop name or brand without written permission.
+under the MeshDrop Go name or brand without written permission.

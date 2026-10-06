@@ -33,7 +33,7 @@ function shouldForwardProtocolEvent(event, data) {
 }
 
 // One row per MeshEngine event:
-//   on     — the @mesh/core event name
+//   on     — the @meshdrop-go/core event name
 //   to     — protocol EVENTS forwarded with the engine payload (post-shape)
 //   shape  — optional payload transform (payload, engine) => data
 //   also   — optional extra pushes computed from (payload, engine), e.g. a

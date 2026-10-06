@@ -83,7 +83,7 @@ export function QRScannerModal({
             {
               title: 'Camera Permission Required',
               message:
-                'MeshDrop needs camera access to scan pairing and drop share QR codes.',
+                'MeshDrop Go needs camera access to scan pairing and drop share QR codes.',
               buttonPositive: 'Allow',
               buttonNegative: 'Cancel',
             }

@@ -23,7 +23,7 @@ export function QRCodeModal({ isOpen, onClose }: QRCodeModalProps) {
   const pairingCode = identity.pairingCode || ''
   const publicKey = identity.publicKey || ''
 
-  // Generate QR from the RAW pairing code so any MeshDrop scanner
+  // Generate QR from the RAW pairing code so any MeshDrop Go scanner
   // (desktop or mobile) can decode it — previously the payload was a JSON
   // envelope the scanner did not understand.
   //
@@ -70,7 +70,7 @@ export function QRCodeModal({ isOpen, onClose }: QRCodeModalProps) {
       open={isOpen}
       onOpenChange={(o) => !o && onClose()}
       title='Device Pairing QR Code'
-      description='Scan with another MeshDrop device or share the short code'
+      description='Scan with another MeshDrop Go device or share the short code'
       className='max-w-lg'
     >
       {/* Consistent vertical rhythm between the four logical sections */}

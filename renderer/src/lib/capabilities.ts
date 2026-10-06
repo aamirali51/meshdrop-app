@@ -117,7 +117,7 @@ export interface HostVersionInfo {
 export async function hostVersionInfo(): Promise<HostVersionInfo> {
   const res = await webFetch(`${locationBaseUrl()}/version`)
   if (res.status === 403) throw new Error(SESSION_EXPIRED_MESSAGE)
-  if (!res.ok) throw new Error(`Cannot reach MeshDrop host (HTTP ${res.status})`)
+  if (!res.ok) throw new Error(`Cannot reach MeshDrop Go host (HTTP ${res.status})`)
   const info = (await res.json()) as HostVersionInfo
   return info
 }

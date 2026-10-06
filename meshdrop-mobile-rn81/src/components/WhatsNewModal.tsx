@@ -68,7 +68,7 @@ export function WhatsNewModal() {
   return (
     <SimpleModal
       visible={visible}
-      title="What's New in MeshDrop"
+      title="What's New in MeshDrop Go"
       subtitle={`Version ${CURRENT_VERSION} Update`}
       onClose={handleDismiss}
     >

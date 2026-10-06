@@ -1,6 +1,6 @@
 {
-  "name": "MeshDrop",
-  "short_name": "MeshDrop",
+  "name": "MeshDrop Go",
+  "short_name": "MeshDrop Go",
   "description": "Zero-cloud P2P file sharing — direct, end-to-end encrypted.",
   "display": "standalone",
   "orientation": "any",

@@ -1,6 +1,6 @@
 // MeshDrop mobile engine bridge.
 //
-// Runs @mesh/core (the same P2P engine as the desktop app) inside the embedded
+// Runs @meshdrop-go/core (the same P2P engine as the desktop app) inside the embedded
 // Bare Worklet thread provided by react-native-bare-kit. The React Native UI
 // talks to it over a JSON RPC stream on BareKit.IPC:
 //
@@ -56,7 +56,7 @@ for (const dep of DIAG_DEPS) {
 
 let MeshEngine = null
 try {
-  ;({ MeshEngine } = require('@mesh/core'))
+  ;({ MeshEngine } = require('@meshdrop-go/core'))
 } catch (err) {
   console.error('[MeshDrop] engine load failed:', String((err && err.message) || err))
   send({
